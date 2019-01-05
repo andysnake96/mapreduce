@@ -57,10 +57,12 @@ type token struct {
 //// HASHING KEY FUNCs
 func hashKeyReducerSum(key string, maxIDOut int) int {
 	//simply hash string to int in [0,maxIDOut) by sum chars and %
+	const EXTRASHUFFLE = 96 //extra shuffle in hash func
 	sum := 0
 	for c := range key {
 		sum += c
 	}
+	sum += EXTRASHUFFLE
 	return sum % maxIDOut
 }
 

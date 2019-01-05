@@ -2,71 +2,75 @@ package mapReduce
 
 import (
 	"fmt"
+	"log"
+	"net"
+	"net/rpc"
+	"strconv"
 	"strings"
 )
 
-/*
-core functions for map-reduce works
-map has been implemented in differente way adding method to a _map structure
- */
-type _map struct {
-	rawChunck string
-	output_hshmp map[string]int
-}
-func (m _map) map_string_builtin{
-//map operation for a worker, from assigned chunk string produce tokens key value
-//used string builtin split ... something like 2 chunk all chars read
-	m.output_hshmp = make(map[string]int)
-	//producing token splitting rawChunck by \n and \b
-	lines := strings.Split(m.rawChunck,"\n")
-	const _WRD4LINE = 12
-	words := make([]string,len(lines)*_WRD4LINE)	//preallocate
-	for _,l := range lines {
-		words = append(words,strings.Split(l," ") ...) //TODO SLICES CONCATENATION GO PERFORMACE?
-	}
-	for _,w := range words {
-		m.output_hshmp[w]++							//set token in a dict to simply handle key repetitions
-	}
-	//TODO OUTPUT IN output dict field of _map
-}
-func (m _map) map_raw_parse{
-	//map op for a worker parsing raw chunk in words
-	m.output_hshmp = make(map[string]int)
-	//parser states
-	const STATE_WORD = 0
-	const STATE_NOTWORD = 1
-	state := STATE_WORD
-	var char byte
-	//words low delimiter index in chunk
-	wordDelimLow :=0
-	//set initial state
-	char = m.rawChunck[0]			//get first char
-	if char == '\n' || char== ' ' {
-		state=STATE_NOTWORD
-	}
-	//PRODUCING OUTPUT TOKEN HASHMAP IN ONLY 1! READ OF chunk chars...
-	for i:=0;i<len(m.rawChunck);i++ { //iterate among chunk chars
-		char= m.rawChunck[i]
-		isWordChr := char!= ' ' && char != '\n' //char is part of a word
-		if state==STATE_WORD && !isWordChr { //split condition
-			word:=m.rawChunck[wordDelimLow:i+1]
-			m.output_hshmp[word]++			 //set token key in out hashmap
-		}
-		//TODO ELIF LIKE... ALREADY EXCLUSIVE CONDITIONS
-		if state==STATE_NOTWORD && isWordChr {
-			wordDelimLow=i 					//set new word low index delimiter
-		}
-	}
-	fmt.Println("DEBUG DICTIONARY OF TOKENS-->",m.output_hshmp)
-	//TODO OUTPUT INSIDE STRUCTURE
-}
+const PORTBASE = 1234
 
-func _reduce(middleTokens []token) map[string]int64 {
-//reduce operation for a worker,
-// reduce a token list to a single list of tokens without key repetitions
-	outTokens := make(map[string]int64)
-	for _,tk:=range middleTokens {
-		outTokens[tk.key]++
+const MAP = "MAP"
+const REDUCE = "REDUCE"
+
+func rpcInit(off_port int, kindWork string) {
+	//INIT AN RPC SERVER UNDER PORT BASE + off_port
+	//differentiate rpc server work by kind work string witch has to be MAP Or REDUCE costant
+	//TODO INFERENCE KINDWORK BY WAITGROUP REFERENCE (passed nil on reduce ... =
+	/*
+		 TODO sync after thread==RPC SERVER termination...
+			MAP=>terminate after first request served
+			REDUCE => multi req (by paper requested version :( ) => unknown when to exit by rpc calls
+					=> ?
+
+		 TODO REDUCE SYNC -> in memory
+				-> channel done, barrier. = waitgroup + master multi add per reducer...
+	*/
+
+	//Create an instance of structs which implements map and reduce interfaces
+	map_ := new(_map)
+	reduce_ := new(_reduce)
+
+	//REGISTER MAP AND REDUCE METHODS
+	// Register a new rpc server and the struct we created above.
+	// Only structs which implement Arith interface are allowed to register themselves
+	server := rpc.NewServer()
+
+	err := server.RegisterName("Map", map_)
+	if err != nil {
+		log.Fatal("Format of service Map is not correct: ", err)
 	}
-	return outTokens //TODO RETURN TOKENS DIRECTLY as a list of tuple... ?
+	err = server.RegisterName("Reduce", reduce_)
+	if err != nil {
+		log.Fatal("Format of service Reduce is not correct: ", err)
+	}
+	port := PORTBASE + off_port
+
+	// Listen for incoming tcp packets on port by specified offset of port base.
+	l, e := net.Listen("tcp", ":"+strconv.Itoa(port))
+	if e != nil {
+		log.Fatal("Listen error on port ", port, e)
+	}
+	defer l.Close()
+
+	// Link rpc server to the socket, and allow rpc server to accept
+	// rpc requests coming from that socket.
+
+	//<MAP - REDUCE DIFFERENT LOGIC
+	//reduce case => block until ?? exit
+	if strings.Compare(kindWork, MAP) != 0 {
+		server.Accept(l) //blocked until listener error //TODO EXPAND ACCEPT
+	}
+
+	//map case => block only for first call, then exit
+	conn, err := l.Accept()
+	defer conn.Close()
+	if err != nil {
+		log.Print("rpc.Serve: accept:", err.Error())
+		return
+	}
+	server.ServeConn(conn) //block until connected client hangs up
+	fmt.Println("SERVED RPC REQ")
+
 }
