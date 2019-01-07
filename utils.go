@@ -1,45 +1,43 @@
-package mapReduce
+package main
 
 import (
 	"bufio"
 	"io/ioutil"
+	"math"
 	"os"
 	"strings"
 )
 
-func check(e error) {
-	//check error in one line ...TODO THRHOW EXECEPTION &?
-	if e != nil {
-		panic(e)
-	}
-}
-
 type TEXT_FILE struct {
-	filename string
+	//filename string
 	filesize int64
-	///TODO BETTER ?
 	numblock int
 	blocks   *[]string
 }
 
-func readFile(filename string) TEXT_FILE {
-	f, err := os.Open("/tmp/dat")
-	check(err)
-	defer f.Close()
+func chunksAmmount(f *os.File) int {
 	fileInfo, _ := f.Stat()
 	fileSize := fileInfo.Size()
-	out := TEXT_FILE{filename: filename, filesize: fileSize} //set up return struct
-	reader := bufio.NewReader(f)
-	fileData, err := ioutil.ReadAll(reader) //TODO MORE EFFICIENT READ LOOP !!!!
-
-	//// BLOCKIZE READED DATA
 	div := int(fileSize / blockSize)
 	rem := fileSize % blockSize
 	if rem > 0 {
 		div++
 	}
-	out.numblock = div
-	for x := 0; x < div; x++ {
+	return div
+}
+
+func readFile(f *os.File) TEXT_FILE {
+
+	//INIT TEXT STRUNCT FIELDS
+	fileInfo, _ := f.Stat()
+	fileSize := fileInfo.Size()
+	out := TEXT_FILE{filesize: fileSize, numblock: chunksAmmount(f)} //set up return struct
+	//READ DATA
+	reader := bufio.NewReader(f)
+	fileData, err := ioutil.ReadAll(reader) //TODO confirm readall wrap a good read loop
+	check(err)
+	//CHUNKIZE
+	for x := 0; x < out.numblock; x++ {
 		lowIndx := x * blockSize
 		highIndx := (x + 1) * blockSize
 		block := string(fileData[lowIndx:highIndx])
@@ -48,8 +46,8 @@ func readFile(filename string) TEXT_FILE {
 	return out
 }
 
-type token struct {
-	//rappresent token middle value out from map phase
+type Token struct {
+	//rappresent Token middle value out from map phase
 	key   string
 	value int //key occurence on prj 1
 }
@@ -68,9 +66,9 @@ func hashKeyReducerSum(key string, maxIDOut int) int {
 
 //// SORT SUPPORT FUNCTION FOR TOKEN LIST
 type tokenSorter struct {
-	//rappresent token middle value out from map phase
-	tokens []token
-	//by func(tks1,tks2 token)	//sorting function ... default by key builtin sort func
+	//rappresent Token middle value out from map phase
+	tokens []Token
+	//by func(tks1,tks2 Token)	//sorting function ... default by key builtin sort func
 }
 
 func (t tokenSorter) Len() int {
@@ -81,4 +79,15 @@ func (t tokenSorter) Swap(i, j int) {
 }
 func (t tokenSorter) Less(i, j int) bool {
 	return strings.Compare(t.tokens[i].key, t.tokens[j].key) == -1
+}
+
+/// OTHER
+func check(e error) {
+	//check error in one line ...TODO THRHOW EXECEPTION &?
+	if e != nil {
+		panic(e)
+	}
+}
+func max(a int, b int) int {
+	return int(math.Max(float64(a), float64(b)))
 }

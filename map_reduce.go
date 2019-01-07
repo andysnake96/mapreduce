@@ -1,4 +1,4 @@
-package mapReduce
+package main
 
 //core functions of map reduce,
 //different map and reduce method for map and reduce types
@@ -10,11 +10,11 @@ import (
 // 		MAP		/////////////////////7
 type _map int //type map methods interface
 
-func (m *_map) map_string_builtin(rawChunck string, tokens *map[string]int64) error {
+func (m *_map) Map_string_builtin(rawChunck string, tokens *map[string]int) error {
 	//map operation for a worker, from assigned chunk string produce tokens key value
 	//used string builtin split ... something like 2 chunk all chars read
-	*tokens = make(map[string]int64)
-	//producing token splitting rawChunck by \n and \b
+	*tokens = make(map[string]int)
+	//producing Token splitting rawChunck by \n and \b
 	lines := strings.Split(rawChunck, "\n")
 	const _WRD4LINE = 12
 	words := make([]string, len(lines)*_WRD4LINE) //preallocate
@@ -22,14 +22,14 @@ func (m *_map) map_string_builtin(rawChunck string, tokens *map[string]int64) er
 		words = append(words, strings.Split(l, " ")...) //TODO SLICES CONCATENATION GO PERFORMACE?
 	}
 	for _, w := range words {
-		(*tokens)[w]++ //set token in a dict to simply handle key repetitions
+		(*tokens)[w]++ //set Token in a dict to simply handle key repetitions
 	}
 	return nil
 	//TODO OUTPUT IN output dict field of _map
 }
-func (m *_map) map_raw_parse(rawChunck string, tokens *map[string]int64) error {
+func (m *_map) Map_raw_parse(rawChunck string, tokens *map[string]int) error {
 	//map op for a worker parsing raw chunk in words
-	*tokens = make(map[string]int64)
+	*tokens = make(map[string]int)
 	//parser states
 	const STATE_WORD = 0
 	const STATE_NOTWORD = 1
@@ -48,7 +48,7 @@ func (m *_map) map_raw_parse(rawChunck string, tokens *map[string]int64) error {
 		isWordChr := char != ' ' && char != '\n' //char is part of a word
 		if state == STATE_WORD && !isWordChr {   //split condition
 			word := rawChunck[wordDelimLow : i+1]
-			(*tokens)[word]++ //set token key in out hashmap
+			(*tokens)[word]++ //set Token key in out hashmap
 		}
 		//TODO ELIF LIKE... ALREADY EXCLUSIVE CONDITIONS
 		if state == STATE_NOTWORD && isWordChr {
@@ -67,22 +67,22 @@ type ReduceArg struct {
 	values []int
 }
 
-func (r *_reduce) _reduce_tokens_key(args ReduceArg, outToken *token) error { //version indicated in paper
+func (r *_reduce) Reduce_tokens_key(args ReduceArg, outToken *Token) error { //version indicated in paper
 	//reduce op by values of a single key
-	//return final token with unique key string
+	//return final Token with unique key string
 	count := 0
 	for x := 0; x < len(args.values); x++ {
 		count += args.values[x]
 	}
-	*outToken = token{args.key, count}
+	*outToken = Token{args.key, count}
 	return nil
 }
 
 //TODO EXTRA ... ASK BEFORE IF OK
-func (r *_reduce) _reduce_tokens_all(middleTokens *[]token, tokensMp *map[string]int64) error {
+func (r *_reduce) Reduce_tokens_all(middleTokens *[]Token, tokensMp *map[string]int) error {
 	//reduce operation for a worker,
-	// reduce a tokens list to a single list of tokens without key repetitions...reduce middle token to final tokens
-	*tokensMp = make(map[string]int64)
+	// reduce a tokens list to a single list of tokens without key repetitions...reduce middle Token to final tokens
+	*tokensMp = make(map[string]int)
 	for _, tk := range *middleTokens {
 		(*tokensMp)[tk.key]++
 	}
