@@ -11,15 +11,10 @@ import (
 ///COSTANTS TODO CONFIG_FILE?go config file...
 const (
 	blockSize       = 20480 //byte size for each file block
-	WorkerNumReduce = 6
+	WorkerNumReduce = 11
 )
 
 var WorkerNumMap int //1 mapper per chunk of input
-type worker struct {
-	//struct for worker info
-	busy bool
-	addr string
-}
 
 func init_files_structs(file *os.File, chunksDest *TEXT_FILE, barrier *sync.WaitGroup) {
 	//read filename in a struct TEXT_FILE separating text in chunks by pointer chunksDest
@@ -28,7 +23,6 @@ func init_files_structs(file *os.File, chunksDest *TEXT_FILE, barrier *sync.Wait
 }
 
 type RPCAsyncWrap struct { //wrap 1 rpc calls vars
-	done    chan *rpc.Call
 	divCall *rpc.Call
 	Reply   Token
 } //TODO USE IN MAP ASSIGN TOO LATER TESTS
@@ -58,11 +52,18 @@ func assignWorks_map(files_chunkized []TEXT_FILE) ([]map[string]int, error) {
 			return nil, err //propagate on error
 		}
 		defer clients[x].Close()
+
 	} //all map OPs correctly requested to map servers
 
+	indxRPC := 0
 	/// Asynchronous calls ... RPC REQs
-	for x := 0; x < len(clients); x++ {
-		divCalls[x] = clients[x].Go("Map.map_raw_parse", files_chunkized[x].blocks, &replys[x], nil)
+	for x := 0; x < len(files_chunkized); x++ {
+		for c := 0; c < files_chunkized[x].numblock; c++ {
+			block := &files_chunkized[x].blocks[c]
+			divCalls[indxRPC] = clients[x].Go("Map.Map_raw_parse", block, &replys[indxRPC], nil)
+			indxRPC++
+
+		}
 	}
 	//COLLECT RPC MAP RESULTS... TODO BARRIER OVERNEEDED	////
 	outMapRes := make([]map[string]int, WorkerNumMap)
@@ -80,18 +81,18 @@ func assignWorks_map(files_chunkized []TEXT_FILE) ([]map[string]int, error) {
 
 func assignWorks_Reduce(tokensMap map[string][]int) ([]Token, error) {
 	//assign reduce works to Reduce workers
-	//version with 1 rpc call per unique key
+	//version with 1 rpc call per unique Key
 	//TODO ALTERNATIVE group reduce works by reducer id then send in group....overload
 	clients := make([]*rpc.Client, WorkerNumReduce)
 	workerCallCounters := [WorkerNumReduce]int{} //keep track of reduce call num per reduce worker ..to collect result
 	//replys := make ([][]Token,WorkerNumReduce)
 	//divCalls := make([]*rpc.Call,WorkerNumReduce)
-
+	var totKeys = len(tokensMap)
 	avgCallPerWorkerFair := len(tokensMap) / WorkerNumReduce
 	rpcs_var_wrapped := make([][]RPCAsyncWrap, WorkerNumReduce) //rpc struct to handle all rpc calls
 	var err error
-	//rpc link init
-	for x := 0; x < len(clients); x++ { //DIAL RPC REDUCE SERVERs
+	//////	rpc links init
+	for x := 0; x < WorkerNumReduce; x++ { //DIAL RPC REDUCE SERVERs
 		_worker := Workers[x] //take references for destWorker worker for reduce op
 		clients[x], err = rpc.Dial("tcp", _worker.address)
 		if err != nil {
@@ -101,35 +102,52 @@ func assignWorks_Reduce(tokensMap map[string][]int) ([]Token, error) {
 		rpcs_var_wrapped[x] = make([]RPCAsyncWrap, avgCallPerWorkerFair)
 		workerCallCounters[x] = 0
 	}
-	//INVOKE RPC REDUCE CALLS...1 rpc call per key...
+	////////	INVOKE RPC REDUCE CALLS...
 	for k, v := range tokensMap {
 		destWorker := hashKeyReducerSum(k, WorkerNumReduce)
-		arg := ReduceArg{key: k, values: v}
+		arg := ReduceArg{Key: k, Values: v}
 		//evalutate to extend rpc struct num
-		callsNumOfWorker := workerCallCounters[destWorker] //ammount of rpc call done on destWorker
-		if callsNumOfWorker > avgCallPerWorkerFair {       //EXTEND SPACE OF REPLY MATRIX ON NEED
+		callsNumOfWorker := workerCallCounters[destWorker]         //ammount of rpc call done on destWorker
+		if callsNumOfWorker >= len(rpcs_var_wrapped[destWorker]) { //EXTEND SPACE OF REPLY MATRIX ON NEED
 			rpcs_var_wrapped[destWorker] = append(rpcs_var_wrapped[destWorker], RPCAsyncWrap{})
 		}
-		rpcWrap_k := &rpcs_var_wrapped[destWorker][callsNumOfWorker] //istance of struct for rpc of key k
+		rpcWrap_k := &rpcs_var_wrapped[destWorker][callsNumOfWorker] //istance of struct for rpc of Key k
 		workerCallCounters[destWorker]++
 		//replyRef:=&replys[destWorker][workerCallCounters[destWorker]] //get pntr of reply in replys matrix
-		rpcWrap_k.divCall = clients[destWorker].Go("Reduce._reduce_tokens_key", arg, rpcWrap_k.Reply, nil)
+		//reduceCalls:
+		rpcWrap_k.divCall = clients[destWorker].Go("Reduce.Reduce_tokens_key", arg, &rpcWrap_k.Reply, nil)
+		//	if rpcWrap_k.divCall.Error != nil {
+		//		log.Print(rpcWrap_k.divCall.Error,k)
+		//		clients[destWorker],err = rpc.Dial("tcp",Workers[destWorker].address)
+		//		if err!=nil{
+		//			log.Fatal("REdial")
+		//		}
+		//		goto reduceCalls
+		//}
 	}
 	outTokens := make([]Token, len(tokensMap)) //all result list
 	var tokenCounter int = 0
 	//////			COLLECT REDUCE RESULTs	////
 	//iterate among rpcWrappers structures and append result in final Token list
 	//block for each scheduled rpc , set result on outTokens using a counter
-	for x := 0; x < len(rpcs_var_wrapped); x++ {
-		for y := 0; y < len(rpcs_var_wrapped[x]); y++ {
-			rpcWraped := &rpcs_var_wrapped[x][y]
-			done := <-rpcWraped.done //block until rpc compleated
+	c := 0
+	var percentDone float32 = 0
+	for z := 0; z < len(rpcs_var_wrapped); z++ { //iterate among workers
+		for y := 0; y < workerCallCounters[z]; y++ { //to their effectively calls done (initial allocation is stimed by an fair division)
+			rpcWraped := &rpcs_var_wrapped[z][y]
+			done := <-rpcWraped.divCall.Done //block until rpc compleated
+			c++
+			percentDone = float32(c) / float32(totKeys)
+			if c%100 == 0 {
+				println(percentDone)
+			}
 			if done.Error != nil {
 				log.Println("Error in reduce...: ", done.Error.Error())
 				return nil, done.Error
 			}
 			//append result of this terminated rpc
 			outTokens[tokenCounter] = rpcWraped.Reply
+			tokenCounter++
 		}
 	}
 	return outTokens, nil
@@ -138,12 +156,12 @@ func assignWorks_Reduce(tokensMap map[string][]int) ([]Token, error) {
 //	///SHUFFLE & SORT	/////////
 func mergeToken(tokenList []map[string]int) map[string][]int {
 	//merge map results grouping by keys
-	//return special map (key->values) for reduce works assigns
+	//return special map (Key->Values) for reduce works assigns
 	outTokenGrouped := make(map[string][]int)
 	//merge tokens produced by mappers
 	for x := 0; x < len(tokenList); x++ {
 		for k, v := range tokenList[x] {
-			outTokenGrouped[k] = append(outTokenGrouped[k], v) //append values of dict_x to proper key group
+			outTokenGrouped[k] = append(outTokenGrouped[k], v) //append Values of dict_x to proper Key group
 		}
 	} // out Token now contains all Token obtained from map works
 	//// todo SORTING LIST ???? overneeded
@@ -182,8 +200,13 @@ var Workers []WORKER
 
 func main() { //flexible main by := xD :) :D
 	//TODO FILENAMES FROM os.args  slice..
-	var filenames []string
+	//var filenames []string = os.Args[1:]
+	filenames := []string{"/home/andysnake/Scrivania/books4GoPrj/oscarWilde/dorianGray.txt", "/home/andysnake/Scrivania/books4GoPrj/oscarWilde/soulOfAMen.txt"}
+	if len(filenames) == 0 {
+		fmt.Fprint(os.Stderr, "USAGE plainText1,plainText2,....\n")
+	}
 	filesChunkized := make([]TEXT_FILE, len(filenames))
+	openedFiles := make([]*os.File, len(filenames))
 	////	INIT PHASE	/////
 	//chunkize files
 	barrierRead := new(sync.WaitGroup)
@@ -194,26 +217,31 @@ func main() { //flexible main by := xD :) :D
 		WorkerNumMap += chunksAmmount(f) //set mapper ammount counting all chunks
 		fmt.Println("reading ", filename)
 		go init_files_structs(f, &filesChunkized[i], barrierRead) //read files in chunks by different threads
-		e := f.Close()
-		check(e)
+		openedFiles[i] = f
 	}
 	/*initialize the max num of required workers for map and reduce phases
 	will be initializated the max in worker required in map and reduce phase
 	after map, overneeded workers will be terminated by chan
 	*/
-	Workers = workersInit(max(WorkerNumMap, WorkerNumReduce))
+	_workerNum := max(WorkerNumMap, WorkerNumReduce)
+	Workers = workersInit(_workerNum)
 	barrierRead.Wait() //wait chunkization of files END
-
+	for _, f := range openedFiles {
+		e := f.Close()
+		check(e)
+	}
 	///	MAP PHASE		/////////
 	mapResoults, err := assignWorks_map(filesChunkized) //reqeust and collect MAP ops via rpc
 	if err != nil {
 		fmt.Println("ERROR", err)
 		os.Exit(95)
 	}
-	for x := 0; x < max(0, WorkerNumMap-WorkerNumReduce); x++ { //terminate overneeded worker for reduce phase
-		Workers[x].terminate <- true //terminate worker
+	if WorkerNumMap > WorkerNumReduce {
+		for x := 0; x < max(0, WorkerNumMap-WorkerNumReduce); x++ { //terminate overneeded worker for reduce phase
+			Workers[_workerNum-1-x].terminate <- true //terminate worker
+		}
+		Workers = Workers[:WorkerNumReduce+1]
 	}
-
 	///	SHUFFLE & SORT PHASE 	//////////////////
 	tokenAll := mergeToken(mapResoults)
 
@@ -223,7 +251,31 @@ func main() { //flexible main by := xD :) :D
 		log.Println(err)
 		os.Exit(95)
 	}
-	fmt.Println("FINAL RESULT", defTokens)
+	/////	SERIALIZE RESULT TO FILE
+
+	n := 0
+	lw := 0
+	encodeFile, err := os.Create("finalTokens.txt")
+	for _, tk := range defTokens {
+		line := fmt.Sprint(tk.K, "->", tk.V, "\r\n")
+	write:
+		n, err = encodeFile.WriteString(line[lw:])
+		check(err)
+		if n < len(line) {
+			lw += n
+			goto write
+		}
+		lw = 0
+	}
+	//if err != nil {
+	//	panic(err)
+	//}
+	//e := gob.NewEncoder(encodeFile)
+	//
+	//// Encoding the map
+	//er := e.Encode(defTokens)
+	//check(er)
+	//encodeFile.Close()
 
 	os.Exit(0)
 

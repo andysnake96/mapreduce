@@ -5,7 +5,6 @@ import (
 	"log"
 	"net"
 	"net/rpc"
-	"runtime"
 	"strconv"
 )
 
@@ -68,8 +67,8 @@ func rpcInit(off_port int, done *chan bool) {
 
 	go server.Accept(l) // a new thread is blocked serving rpc requests
 	_ = <-*done         //terminate channel read unblock when master notify worker to end
-	l.Close()           //TODO will unblock rpc requests handler routine
-	runtime.Goexit()    //routine end here
+	//_:=l.Close()           //TODO will unblock rpc requests handler routine
+	//runtime.Goexit()    //routine end here
 }
 
 //old version of init worker differentiating map or reduce, map on barrier
