@@ -2,11 +2,19 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"io/ioutil"
 	"math"
 	"os"
 	"strings"
+	"sync"
 )
+
+type Token struct {
+	//rappresent Token middle V out from map phase
+	K string
+	V int //Key occurence on prj 1
+}
 
 type TEXT_FILE struct {
 	//filename string
@@ -15,7 +23,8 @@ type TEXT_FILE struct {
 	blocks   []string
 }
 
-func chunksAmmount(f *os.File) int {
+func chunksAmmount(f *os.File) (int, int64) {
+	//return ammount of blocks needed for file  f
 	fileInfo, _ := f.Stat()
 	fileSize := fileInfo.Size()
 	div := int(fileSize / blockSize)
@@ -23,7 +32,7 @@ func chunksAmmount(f *os.File) int {
 	if rem > 0 {
 		div++
 	}
-	return div
+	return div, fileSize
 }
 
 func readFile(f *os.File) TEXT_FILE {
@@ -31,8 +40,9 @@ func readFile(f *os.File) TEXT_FILE {
 	//INIT TEXT STRUNCT FIELDS
 	fileInfo, _ := f.Stat()
 	fileSize := fileInfo.Size()
-	out := TEXT_FILE{filesize: fileSize, numblock: chunksAmmount(f)} //set up return struct
-	out.blocks = make([]string, out.numblock)                        //allocate space for blocks
+	numChunk, _ := chunksAmmount(f)
+	out := TEXT_FILE{filesize: fileSize, numblock: numChunk} //set up return struct
+	out.blocks = make([]string, out.numblock)                //allocate space for blocks
 	//READ DATA
 	reader := bufio.NewReader(f)
 	fileData, err := ioutil.ReadAll(reader) //TODO confirm readall wrap a good read loop
@@ -45,12 +55,6 @@ func readFile(f *os.File) TEXT_FILE {
 		out.blocks[x] = block //assign block to out var
 	}
 	return out
-}
-
-type Token struct {
-	//rappresent Token middle V out from map phase
-	K string
-	V int //Key occurence on prj 1
 }
 
 //// HASHING KEY FUNCs
@@ -91,4 +95,37 @@ func check(e error) {
 }
 func max(a int, b int) int {
 	return int(math.Max(float64(a), float64(b)))
+}
+
+func _init_file_structs(file *os.File, chunksDest *TEXT_FILE, barrier *sync.WaitGroup) {
+	//read filename in a struct TEXT_FILE separating text in chunks by pointer chunksDest
+	*chunksDest = readFile(file)
+	barrier.Done()
+}
+func serializeToFile(defTokens []Token, filename string) {
+	/////	SERIALIZE RESULT TO FILE
+	n := 0
+	lw := 0
+	encodeFile, err := os.Create(filename)
+	for _, tk := range defTokens {
+		line := fmt.Sprint(tk.K, "->", tk.V, "\r\n")
+	write:
+		n, err = encodeFile.WriteString(line[lw:])
+		check(err)
+		if n < len(line) {
+			lw += n
+			fmt.Println("write short...")
+			goto write
+		}
+		lw = 0
+	}
+	//if err != nil {
+	//	panic(err)
+	//}
+	//e := gob.NewEncoder(encodeFile)
+	//
+	//// Encoding the map
+	//er := e.Encode(defTokens)
+	//check(er)
+	//encodeFile.Close()
 }

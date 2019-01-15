@@ -8,8 +8,6 @@ import (
 	"strconv"
 )
 
-const PORTBASE = 1234
-
 /*
 WORKER MODULE
 worker will be bounded to different ports by adding a costant to portbase

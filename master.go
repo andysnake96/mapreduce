@@ -11,21 +11,15 @@ import (
 ///COSTANTS TODO CONFIG_FILE?go config file...
 const (
 	blockSize       = 20480 //byte size for each file block
-	WorkerNumReduce = 11
+	WorkerNumReduce = 1
+	OUTFILENAME     = "finalTokens.txt"
+	PORTBASE        = 2019
 )
 
-var WorkerNumMap int //1 mapper per chunk of input
+var WorkerNumMap int //num of mappers... 1 mapper per chunk of input, runtime setted
 
-func init_files_structs(file *os.File, chunksDest *TEXT_FILE, barrier *sync.WaitGroup) {
-	//read filename in a struct TEXT_FILE separating text in chunks by pointer chunksDest
-	*chunksDest = readFile(file)
-	barrier.Done()
-}
-
-type RPCAsyncWrap struct { //wrap 1 rpc calls vars
-	divCall *rpc.Call
-	Reply   Token
-} //TODO USE IN MAP ASSIGN TOO LATER TESTS
+var Workers []WORKER //list of infos set of workers up & running
+var OpenedFiles []*os.File
 
 func assignWorks_map(files_chunkized []TEXT_FILE) ([]map[string]int, error) {
 	/*handle data chunk assignment to map worker
@@ -77,6 +71,11 @@ func assignWorks_map(files_chunkized []TEXT_FILE) ([]map[string]int, error) {
 		outMapRes[z] = replys[z]
 	}
 	return outMapRes, nil
+}
+
+type RPCAsyncWrap struct { //wrap 1 rpc calls variables for reduce phase
+	divCall *rpc.Call
+	Reply   Token
 }
 
 func assignWorks_Reduce(tokensMap map[string][]int) ([]Token, error) {
@@ -169,114 +168,94 @@ func mergeToken(tokenList []map[string]int) map[string][]int {
 	return outTokenGrouped
 }
 
-/*OLD
-func mergeToken(tokenList []map[string]int) []Token {
-	//merge map from map phase result return a list of Token
-	//TODO UNCOMMENT FOR SORTING ...??? cardellini cara mia le slide !=!=!)!)!=!?!
-	var middleListLen int = 0
-	//achive Token list len by maps len...
-	for x := 0; x < len(tokenList); x++ {
-		middleListLen += len(tokenList[x])
-	}
-	outToken := make([]Token, middleListLen) //overstimed list len... TODO TOO MUCH -> MEMORY WASTE  OK ON MEM INTENSIVE APP
-
-	c := 0 //counter to assign map keys to out Token list
-	for x := 0; x < len(tokenList); x++ {
-		//merge tokens produced by mappers
-		for k, v := range tokenList[x] {
-			outToken[c] = Token{k, v}
-			c++
-		}
-	} // out Token now contains all Token obtained from map works
-
-	//// SORTING LIST ..see https://golang.org/pkg/sort/
-	//tks:=tokenSorter{outToken}
-	//sort.Sort(tks)
-	//fmt.Println(&tks.tokens,&outToken,&tks.tokens==&outToken) //TODO SORT IN PLACE...EFFECTED ON ORIGINAL LIST ?
-	return outToken
-}*/
-
-var Workers []WORKER
-
-func main() { //flexible main by := xD :) :D
-	//TODO FILENAMES FROM os.args  slice..
-	//var filenames []string = os.Args[1:]
-	filenames := []string{"/home/andysnake/Scrivania/books4GoPrj/oscarWilde/dorianGray.txt", "/home/andysnake/Scrivania/books4GoPrj/oscarWilde/soulOfAMen.txt"}
-	if len(filenames) == 0 {
-		fmt.Fprint(os.Stderr, "USAGE plainText1,plainText2,....\n")
-	}
-	filesChunkized := make([]TEXT_FILE, len(filenames))
-	openedFiles := make([]*os.File, len(filenames))
+func _init_chunks(filenames []string, barrierRead **sync.WaitGroup) []TEXT_FILE {
 	////	INIT PHASE	/////
+	filesChunkized := make([]TEXT_FILE, len(filenames)) //set of files in chunks
+	var totalWorkSize int64 = 0
+	println("---INIT PHASE---")
 	//chunkize files
-	barrierRead := new(sync.WaitGroup)
-	barrierRead.Add(len(filenames))
+
 	for i, filename := range filenames {
 		f, err := os.Open(filename)
 		check(err)
-		WorkerNumMap += chunksAmmount(f) //set mapper ammount counting all chunks
+		fChunksNum, fSize := chunksAmmount(f) //set mapper ammount counting all chunks
+		totalWorkSize += fSize
+		WorkerNumMap += fChunksNum
 		fmt.Println("reading ", filename)
-		go init_files_structs(f, &filesChunkized[i], barrierRead) //read files in chunks by different threads
-		openedFiles[i] = f
+		go _init_file_structs(f, &filesChunkized[i], *barrierRead) //read files in chunks by different threads
+		OpenedFiles[i] = f
 	}
+	fmt.Println("successfully opened all files with totalsize of: ", totalWorkSize, "bytes...\n"+
+		"using a default chunksize of ", blockSize, "bytes for a total of ", WorkerNumMap, " chunks ammount")
+	fmt.Println("will be rysed the max ammount of worker needed in map and in reduce phase")
+
+	return filesChunkized
+
+}
+
+func main() { // main wrapper, used for test call
+	println("main21")
+	//var filenames []string = os.Args[1:]
+	filenames := []string{"/home/andysnake/Scrivania/books4GoPrj/oscarWilde/dorianGray.txt", "/home/andysnake/Scrivania/books4GoPrj/oscarWilde/soulOfAMen.txt"}
+	defTokens := _main(filenames)
+	serializeToFile(defTokens, OUTFILENAME)
+	os.Exit(0)
+}
+
+func _main(filenames []string) []Token {
+	//main payload , return final processed tokens ready to be serialized
+
+	if len(filenames) == 0 {
+		fmt.Fprint(os.Stderr, "USAGE <plainText1, plainText2, .... >\n")
+	}
+	OpenedFiles = make([]*os.File, len(filenames))
+	barrierRead := new(sync.WaitGroup)
+	barrierRead.Add(len(filenames))
+
+	filesChunkized := _init_chunks(filenames, &barrierRead)
+
 	/*initialize the max num of required workers for map and reduce phases
-	will be initializated the max in worker required in map and reduce phase
-	after map, overneeded workers will be terminated by chan
-	*/
+	will be initializated the max in worker required in map and reduce phase*/
 	_workerNum := max(WorkerNumMap, WorkerNumReduce)
 	Workers = workersInit(_workerNum)
 	barrierRead.Wait() //wait chunkization of files END
-	for _, f := range openedFiles {
+
+	//cleanUp files opened before
+	for _, f := range OpenedFiles {
 		e := f.Close()
 		check(e)
 	}
-	///	MAP PHASE		/////////
+	fmt.Println("SUCCESSFULLY RYSED: ", _workerNum, " workers!")
+
+	///		MAP PHASE		/////////
+	println("---		MAP PHASE		---")
 	mapResoults, err := assignWorks_map(filesChunkized) //reqeust and collect MAP ops via rpc
 	if err != nil {
 		fmt.Println("ERROR", err)
 		os.Exit(95)
 	}
-	if WorkerNumMap > WorkerNumReduce {
-		for x := 0; x < max(0, WorkerNumMap-WorkerNumReduce); x++ { //terminate overneeded worker for reduce phase
-			Workers[_workerNum-1-x].terminate <- true //terminate worker
+	if WorkerNumMap > WorkerNumReduce { //terminate workers thread overneeded after map phase
+		for x := 0; x < max(0, WorkerNumMap-WorkerNumReduce); x++ {
+			Workers[_workerNum-1-x].terminate <- true //terminate worker x using a bool chan
 		}
 		Workers = Workers[:WorkerNumReduce+1]
 	}
+
 	///	SHUFFLE & SORT PHASE 	//////////////////
+	println("---		SHUFFLE & SORT PHASE		---")
 	tokenAll := mergeToken(mapResoults)
 
 	///	REDUCE PHASE	/////////////////////
+	println("---		REDUCE PHASE		---")
 	defTokens, err := assignWorks_Reduce(tokenAll)
 	if err != nil {
 		log.Println(err)
 		os.Exit(95)
 	}
-	/////	SERIALIZE RESULT TO FILE
 
-	n := 0
-	lw := 0
-	encodeFile, err := os.Create("finalTokens.txt")
-	for _, tk := range defTokens {
-		line := fmt.Sprint(tk.K, "->", tk.V, "\r\n")
-	write:
-		n, err = encodeFile.WriteString(line[lw:])
-		check(err)
-		if n < len(line) {
-			lw += n
-			goto write
-		}
-		lw = 0
+	for _, worker := range Workers { //terminate residue worker thread when reduce phases has compleated
+		worker.terminate <- true
 	}
-	//if err != nil {
-	//	panic(err)
-	//}
-	//e := gob.NewEncoder(encodeFile)
-	//
-	//// Encoding the map
-	//er := e.Encode(defTokens)
-	//check(er)
-	//encodeFile.Close()
-
-	os.Exit(0)
+	return defTokens
 
 }

@@ -11,7 +11,7 @@ type _map int //type map methods interface
 
 func (m *_map) Map_string_builtin(rawChunck string, tokens *map[string]int) error {
 	//map operation for a worker, from assigned chunk string produce tokens Key V
-	//used string builtin split ... something like 2 chunk all chars read
+	//used string builtin split ... performance limit... every chunk readed at least 2 times
 	*tokens = make(map[string]int)
 	//producing Token splitting rawChunck by \n and \b
 	lines := strings.Split(rawChunck, "\n")
@@ -24,10 +24,11 @@ func (m *_map) Map_string_builtin(rawChunck string, tokens *map[string]int) erro
 		(*tokens)[w]++ //set Token in a dict to simply handle Key repetitions
 	}
 	return nil
-	//TODO OUTPUT IN output dict field of _map
 }
 func (m *_map) Map_raw_parse(rawChunck string, tokens *map[string]int) error {
-	//map op for a worker parsing raw chunk in words
+	//map op RPC for a worker
+	// parse a chunk in words avoiding to include dotting marks \b,:,?,...
+
 	*tokens = make(map[string]int)
 	//parser states
 	const STATE_WORD = 0
@@ -42,10 +43,12 @@ func (m *_map) Map_raw_parse(rawChunck string, tokens *map[string]int) error {
 		state = STATE_NOTWORD
 	}
 	//PRODUCING OUTPUT TOKEN HASHMAP IN ONLY 1! READ OF chunk chars...
+	var isWordChr bool                    //bool true if actual char is word
 	for i := 0; i < len(rawChunck); i++ { //iterate among chunk chars
 		char = rawChunck[i]
-		isWordChr := char != ' ' && char != '\n' && char != '\r' &&
-			char != ',' && char != '.' && char != '?' && char != '!' && char != ':' && char != ';' && char != '"' //char is part of a word
+		isWordChr = char != ' ' && char != '\n' && char != '\r' &&
+			char != ',' && char != '.' && char != '?' && char != '!' &&
+			char != ':' && char != ';' && char != '"' //char is part of a word
 		if state == STATE_WORD && !isWordChr { //split condition
 			word := rawChunck[wordDelimLow:i]
 			(*tokens)[word]++ //set Token Key in out hashmap
