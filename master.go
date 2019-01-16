@@ -195,8 +195,8 @@ func _init_chunks(filenames []string, barrierRead **sync.WaitGroup) []TEXT_FILE 
 
 func main() { // main wrapper, used for test call
 	println("main21")
-	//var filenames []string = os.Args[1:]
-	filenames := []string{"/home/andysnake/Scrivania/books4GoPrj/oscarWilde/dorianGray.txt", "/home/andysnake/Scrivania/books4GoPrj/oscarWilde/soulOfAMen.txt"}
+	var filenames []string = os.Args[1:]
+	//filenames := []string{"/home/andysnake/Scrivania/books4GoPrj/oscarWilde/dorianGray.txt", "/home/andysnake/Scrivania/books4GoPrj/oscarWilde/soulOfAMen.txt"}
 	defTokens := _main(filenames)
 	serializeToFile(defTokens, OUTFILENAME)
 	os.Exit(0)

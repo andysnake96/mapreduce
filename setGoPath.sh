@@ -1,5 +1,0 @@
-#!/bin/bash
-#ADD TO GO PATH ENV VAR ACTUAL GOPATH OF CALLING THIS SCRIPT
-PATH=$(realpath .)
-export GOPATH=$PATH
-
