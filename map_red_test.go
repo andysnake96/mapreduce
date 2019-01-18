@@ -26,7 +26,7 @@ func _readFilenames(filenames []string) (string, int, error) {
 		if err != nil {
 			return "read err", -1, err //propagate file not founded
 		}
-		numSeparations = WORKERNUMMAP - 1 //ammount of split effectuated during chunkizing in map readuce
+		numSeparations = Configuration.WORKERNUMMAP - 1 //ammount of split effectuated during chunkizing in map readuce
 	}
 	outString := strings.Join(fileStrings, "")
 	return outString, numSeparations, nil
@@ -44,8 +44,9 @@ func TestMapRed(t *testing.T) {
 	*/
 	//TODO CHECK ENV PATH FROM TEST EXEC
 	var filenames []string = []string{"txtSrc/1012-0.txt", "txtSrc/1017-0.txt", "txtSrc/2834-0.txt", "txtSrc/pg17405.txt", "txtSrc/pg174.txt"}
+	ReadConfigFile()
 	////		single thread  version
-	fmt.Printf("SINGLE THREAD EXECUTING")
+	fmt.Println("SINGLE THREAD EXECUTING.....")
 	outSingleThread := make(map[string]int)
 	textRaw, splitAmmount, err := _readFilenames(filenames)
 	if err != nil {
@@ -54,7 +55,7 @@ func TestMapRed(t *testing.T) {
 	// parse & count words in text by same map reduce Map function
 	mp := new(_map)
 	_ = mp.Map_parse_builtin(string(textRaw), &outSingleThread)
-	fmt.Printf("RPC MAP REDUCE MULTI WORKER EXECUTION")
+	fmt.Println("RPC MAP REDUCE MULTI WORKER EXECUTION")
 	////	exec multithread RPC version with map reduce architecture
 	mapReduceFinalTokens := _main(filenames)
 	tollerableMismatches := 3 * splitAmmount

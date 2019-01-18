@@ -10,7 +10,7 @@ import (
 
 /*
 WORKER MODULE
-worker will be bounded to different ports by adding a costant to portbase
+worker will be bounded to different ports by adding a costant to Configuration.PORTBASE
 rpc server initialization is terminate on different go routine
 will be rysed the max from rpc server for map and reduce
 TODO worker rpc server die waiting signal from master on a channel...ask if ok
@@ -30,7 +30,7 @@ func workersInit(n int) []WORKER {
 	for x := 0; x < n; x++ {
 		ch := make(chan bool, 1)
 		workerRefs[x].terminate = ch
-		port := PORTBASE + x
+		port := Configuration.PORTBASE + x
 		workerRefs[x].port = port
 		address := fmt.Sprint("localhost:", port)
 		workerRefs[x].address = address
@@ -63,7 +63,7 @@ func rpcInit(off_port int, done *chan bool) {
 	if err != nil {
 		log.Println("Format of service Reduce is not correct: ", err)
 	}
-	port := PORTBASE + off_port
+	port := Configuration.PORTBASE + off_port
 
 	// Listen for incoming tcp packets on port by specified offset of port base.
 	l, e := net.Listen("tcp", ":"+strconv.Itoa(port))

@@ -95,14 +95,3 @@ func (r *_reduce) Reduce_tokens_key(args ReduceArg, outToken *Token) error { //v
 	*outToken = Token{args.Key, count}
 	return nil
 }
-
-//TODO EXTRA ... ASK BEFORE IF OK
-func (r *_reduce) Reduce_tokens_all(middleTokens *[]Token, tokensMp *map[string]int) error {
-	//reduce operation for a worker,
-	// reduce a tokens list to a single list of tokens without Key repetitions...reduce middle Token to final tokens
-	*tokensMp = make(map[string]int)
-	for _, tk := range *middleTokens {
-		(*tokensMp)[tk.K]++
-	}
-	return nil
-}

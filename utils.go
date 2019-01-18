@@ -1,12 +1,16 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math"
 	"os"
+	"runtime"
 	"strings"
+	"sync"
 )
 
 type Token struct {
@@ -22,6 +26,51 @@ func cleanUpFiles(files []*os.File) {
 		e := f.Close()
 		check(e)
 	}
+}
+
+func _init_chunks(filenames []string) []CHUNK {
+	/*
+		initialize chunk structure ready to be assigned to map workers
+		files will be readed in multiple threads and totalsize will be divided in fair chunks sizes
+		eventually the size of the reminder of division for assignment will be assigned to last chunk
+	*/
+	fmt.Println("---INIT PHASE---")
+	filesChunkized := make([]CHUNK, Configuration.WORKERNUMMAP) //chunkset for assignement
+	filesData := make([]string, len(filenames))
+	barrierRead := new(sync.WaitGroup)
+	barrierRead.Add(len(filenames))
+	var totalWorkSize int64 = 0
+	//////	chunkize files
+	for i, filename := range filenames { //evaluting total work size for fair assignement
+		f, err := os.Open(filename)
+		check(err)
+		OpenedFiles[i] = f
+		go func(barrierRead **sync.WaitGroup, destData *string) { //read all files in separated threads
+			allbytes, err := ioutil.ReadAll(bufio.NewReader(f))
+			check(err)
+			*destData = string(allbytes)
+			(*barrierRead).Done()
+			runtime.Goexit()
+		}(&barrierRead, &filesData[i])
+		fstat, err := f.Stat()
+		check(err)
+		totalWorkSize += fstat.Size()
+	}
+	chunkSize := int64(totalWorkSize / int64(Configuration.WORKERNUMMAP)) //avg like chunk size
+	reminder := int64(totalWorkSize % int64(Configuration.WORKERNUMMAP))  //assigned to first worker
+	barrierRead.Wait()                                                    //wait read data end in all threads
+	allStr := strings.Join(filesData, "")
+
+	var low, high int64
+	for x := 0; x < len(filesChunkized); x++ {
+		low = chunkSize * int64(x)
+		high = chunkSize * int64(x+1)
+		filesChunkized[x] = CHUNK(allStr[low:high])
+	}
+	if reminder > 0 {
+		filesChunkized[len(filesChunkized)-1] = CHUNK(allStr[low : high+reminder]) //last worker get bigger chunk
+	}
+	return filesChunkized
 }
 
 //// HASHING KEY FUNCs
@@ -50,7 +99,7 @@ func (t tokenSorter) Swap(i, j int) {
 	t.tokens[i], t.tokens[j] = t.tokens[j], t.tokens[i]
 }
 func (t tokenSorter) Less(i, j int) bool {
-	return strings.Compare(t.tokens[i].K, t.tokens[j].K) == -1
+	return t.tokens[i].V < t.tokens[j].V
 }
 
 /// OTHER
@@ -69,6 +118,9 @@ func serializeToFile(defTokens []Token, filename string) {
 	n := 0
 	lw := 0
 	encodeFile, err := os.Create(filename)
+	check(err)
+	_, err = encodeFile.Seek(0, 0)
+	check(err)
 	defer encodeFile.Close()
 	for _, tk := range defTokens {
 		line := fmt.Sprint(tk.K, "->", tk.V, "\r\n")
@@ -82,26 +134,17 @@ func serializeToFile(defTokens []Token, filename string) {
 		}
 		lw = 0
 	}
-	//if err != nil {
-	//	panic(err)
-	//}
-	//e := gob.NewEncoder(encodeFile)
-	//
-	//// Encoding the map
-	//er := e.Encode(defTokens)
-	//check(er)
-	//encodeFile.Close()
 }
 
 func ReadConfigFile() {
 	f, err := os.Open(CONFIGFILENAME)
+	//f, err := os.Open("/home/andysnake/Scrivania/uni/magistrale/DS/src/mapReduce/config.json")
 	check(err)
 	defer f.Close()
 	//configRawStr,err:=ioutil.ReadAll(bufio.NewReader(f))
 	//check(err)
 	decoder := json.NewDecoder(f)
-	configuration := Configuration
-	err = decoder.Decode(&configuration)
+	err = decoder.Decode(&Configuration)
 	check(err)
 	//assign global var for readed configuration
 
