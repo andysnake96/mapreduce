@@ -4,6 +4,7 @@ package main
 //different map and reduce method for map and reduce types
 import (
 	"strings"
+	"unicode"
 )
 
 // 		MAP		/////////////////////7
@@ -25,11 +26,25 @@ func (m *_map) Map_string_builtin(rawChunck string, tokens *map[string]int) erro
 	}
 	return nil
 }
+
+func (m *_map) Map_parse_builtin(rawChunck string, tokens *map[string]int) error {
+	*tokens = make(map[string]int)
+	f := func(c rune) bool {
+		return !unicode.IsLetter(c)
+	}
+	words := strings.FieldsFunc(rawChunck, f) //parse Go builtin by spaces
+	//words:= strings.Fields(rawChunck)	//parse Go builtin by spaces
+	for _, word := range words {
+		(*tokens)[word]++
+	}
+	return nil
+}
+
 func (m *_map) Map_raw_parse(rawChunck string, tokens *map[string]int) error {
 	//map op RPC for a worker
 	// parse a chunk in words avoiding to include dotting marks \b,:,?,...
-
 	*tokens = make(map[string]int)
+	dotting := map[byte]bool{'.': true, ',': true, ';': true, '-': true, ':': true, '?': true, '!': true, '\n': true, '\r': true, ' ': true, '"': true}
 	//parser states
 	const STATE_WORD = 0
 	const STATE_NOTWORD = 1
@@ -39,16 +54,14 @@ func (m *_map) Map_raw_parse(rawChunck string, tokens *map[string]int) error {
 	wordDelimLow := 0
 	//set initial state
 	char = rawChunck[0] //get first char
-	if char == '\n' || char == ' ' {
+	if dotting[char] {
 		state = STATE_NOTWORD
 	}
 	//PRODUCING OUTPUT TOKEN HASHMAP IN ONLY 1! READ OF chunk chars...
 	var isWordChr bool                    //bool true if actual char is word
 	for i := 0; i < len(rawChunck); i++ { //iterate among chunk chars
 		char = rawChunck[i]
-		isWordChr = char != ' ' && char != '\n' && char != '\r' &&
-			char != ',' && char != '.' && char != '?' && char != '!' &&
-			char != ':' && char != ';' && char != '"' //char is part of a word
+		isWordChr = !(dotting[char])
 		if state == STATE_WORD && !isWordChr { //split condition
 			word := rawChunck[wordDelimLow:i]
 			(*tokens)[word]++ //set Token Key in out hashmap

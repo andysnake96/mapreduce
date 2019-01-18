@@ -19,19 +19,27 @@ TODO worker rpc server die waiting signal from master on a channel...ask if ok
 type WORKER struct {
 	port      int
 	address   string
+	client    *rpc.Client
 	terminate chan bool
 }
 
 func workersInit(n int) []WORKER {
 	//init n worker and return a WORKER struct for each rysed worker
 	workerRefs := make([]WORKER, n)
+	var err error
 	for x := 0; x < n; x++ {
 		ch := make(chan bool, 1)
 		workerRefs[x].terminate = ch
 		port := PORTBASE + x
 		workerRefs[x].port = port
-		workerRefs[x].address = fmt.Sprint("localhost:", port)
+		address := fmt.Sprint("localhost:", port)
+		workerRefs[x].address = address
 		go rpcInit(x, &ch) //ryse up worker with buffered channel
+		_ = <-ch           //WAIT WORKER THREAD ENDED SETUP CALLS BY CHANNEL NOTIFICATION
+		workerRefs[x].client, err = rpc.Dial("tcp", address)
+		if err != nil {
+			log.Fatal("Error in dialing: ", err)
+		}
 	}
 	return workerRefs
 }
@@ -64,7 +72,9 @@ func rpcInit(off_port int, done *chan bool) {
 	}
 
 	go server.Accept(l) // a new thread is blocked serving rpc requests
-	_ = <-*done         //terminate channel read unblock when master notify worker to end
+
+	*done <- true //signal worker  creator that: rpc service UP&RUNNING
+	_ = <-*done   //terminate channel read unblock when master notify worker to end
 	//_:=l.Close()           //TODO will unblock rpc requests handler routine
 	//runtime.Goexit()    //routine end here
 }

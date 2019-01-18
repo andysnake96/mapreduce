@@ -1,13 +1,12 @@
 package main
 
 import (
-	"bufio"
+	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"log"
 	"math"
 	"os"
 	"strings"
-	"sync"
 )
 
 type Token struct {
@@ -16,45 +15,13 @@ type Token struct {
 	V int //Key occurence on prj 1
 }
 
-type TEXT_FILE struct {
-	//filename string
-	filesize int64
-	numblock int
-	blocks   []string
-}
+type CHUNK string
 
-func chunksAmmount(f *os.File) (int, int64) {
-	//return ammount of blocks needed for file  f
-	fileInfo, _ := f.Stat()
-	fileSize := fileInfo.Size()
-	div := int(fileSize / blockSize)
-	rem := fileSize % blockSize
-	if rem > 0 {
-		div++
+func cleanUpFiles(files []*os.File) {
+	for _, f := range files {
+		e := f.Close()
+		check(e)
 	}
-	return div, fileSize
-}
-
-func readFile(f *os.File) TEXT_FILE {
-
-	//INIT TEXT STRUNCT FIELDS
-	fileInfo, _ := f.Stat()
-	fileSize := fileInfo.Size()
-	numChunk, _ := chunksAmmount(f)
-	out := TEXT_FILE{filesize: fileSize, numblock: numChunk} //set up return struct
-	out.blocks = make([]string, out.numblock)                //allocate space for blocks
-	//READ DATA
-	reader := bufio.NewReader(f)
-	fileData, err := ioutil.ReadAll(reader) //TODO confirm readall wrap a good read loop
-	check(err)
-	//CHUNKIZE
-	for x := 0; x < out.numblock; x++ {
-		lowIndx := x * blockSize
-		highIndx := (x + 1) * blockSize
-		block := string(fileData[lowIndx:highIndx])
-		out.blocks[x] = block //assign block to out var
-	}
-	return out
 }
 
 //// HASHING KEY FUNCs
@@ -90,23 +57,19 @@ func (t tokenSorter) Less(i, j int) bool {
 func check(e error) {
 	//check error in one line ...TODO THRHOW EXECEPTION &?
 	if e != nil {
-		panic(e)
+		log.Fatal(e)
 	}
 }
 func max(a int, b int) int {
 	return int(math.Max(float64(a), float64(b)))
 }
 
-func _init_file_structs(file *os.File, chunksDest *TEXT_FILE, barrier *sync.WaitGroup) {
-	//read filename in a struct TEXT_FILE separating text in chunks by pointer chunksDest
-	*chunksDest = readFile(file)
-	barrier.Done()
-}
 func serializeToFile(defTokens []Token, filename string) {
 	/////	SERIALIZE RESULT TO FILE
 	n := 0
 	lw := 0
 	encodeFile, err := os.Create(filename)
+	defer encodeFile.Close()
 	for _, tk := range defTokens {
 		line := fmt.Sprint(tk.K, "->", tk.V, "\r\n")
 	write:
@@ -128,4 +91,18 @@ func serializeToFile(defTokens []Token, filename string) {
 	//er := e.Encode(defTokens)
 	//check(er)
 	//encodeFile.Close()
+}
+
+func ReadConfigFile() {
+	f, err := os.Open(CONFIGFILENAME)
+	check(err)
+	defer f.Close()
+	//configRawStr,err:=ioutil.ReadAll(bufio.NewReader(f))
+	//check(err)
+	decoder := json.NewDecoder(f)
+	configuration := Configuration
+	err = decoder.Decode(&configuration)
+	check(err)
+	//assign global var for readed configuration
+
 }
