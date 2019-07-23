@@ -1,0 +1,8 @@
+{
+	"WORKERNUMREDUCE" : 2,
+	"WORKERNUMMAP": 300,
+	"_comment": "worker ports assigned by an progressive offset from the  PORTBASE",
+	"PORTBASE":2019,
+	"_comment": "select if SORT the final token list by value",
+	"SORT":true
+}
