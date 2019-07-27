@@ -26,7 +26,7 @@ func _readFilenames(filenames []string) (string, int, error) {
 		if err != nil {
 			return "read err", -1, err //propagate file not founded
 		}
-		numSeparations = Configuration.WORKERNUMMAP - 1 //ammount of split effectuated during chunkizing in map readuce
+		numSeparations = Config.WORKER_NUM_MAP - 1 //ammount of split effectuated during chunkizing in map readuce
 	}
 	outString := strings.Join(fileStrings, "")
 	return outString, numSeparations, nil
@@ -53,7 +53,7 @@ func TestMapRed(t *testing.T) {
 		t.Fatal("ERROR OCCURRED DURING FILE READS", err)
 	}
 	// parse & count words in text by same map reduce Map function
-	mp := new(_map)
+	mp := new(mapper)
 	_ = mp.Map_parse_builtin(string(textRaw), &outSingleThread)
 	fmt.Println("RPC MAP REDUCE MULTI Worker EXECUTION")
 	////	exec multithread RPC version with map reduce architecture

@@ -1,8 +1,15 @@
 {
-	"WORKERNUMREDUCE" : 2,
-	"WORKERNUMMAP": 300,
-	"_comment": "worker ports assigned by an progressive offset from the  PORTBASE",
-	"PORTBASE":2019,
-	"_comment": "select if SORT the final token list by value",
-	"SORT":true
+	"SORT_FINAL": true,
+	"LOCAL_VERSION": true,
+	"WORKER_NUM_MAP": 5,
+	"WORKER_NUM_ONLY_REDUCE": 2,
+	"WORKER_NUM_BACKUP_WORKER": 2,
+	"WORKER_NUM_BACKUP_MASTER": 1,
+
+	"CHUNK_SERVICE_BASE_PORT": 7777,
+	"MAP_SERVICE_BASE_PORT": 8888,
+	"REDUCE_SERVICE_BASE_PORT": 9999,
+
+	"RPC_TYPE":"tcp"
 }
+

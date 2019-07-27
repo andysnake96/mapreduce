@@ -1,7 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="959bba11-67b5-49b9-be5e-31338d05472f" name="Default Changelist" comment="" />
+    <list default="true" id="959bba11-67b5-49b9-be5e-31338d05472f" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/addresses.json" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/masterReducersBindings.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/worker_local_version.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/config.json" beforeDir="false" afterPath="$PROJECT_DIR$/config.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/map_red_test.go" beforeDir="false" afterPath="$PROJECT_DIR$/map_red_test.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/map_reduce.go" beforeDir="false" afterPath="$PROJECT_DIR$/map_reduce.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/master.go" beforeDir="false" afterPath="$PROJECT_DIR$/master.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/utils.go" beforeDir="false" afterPath="$PROJECT_DIR$/utils.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/worker.go" beforeDir="false" afterPath="$PROJECT_DIR$/worker.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/worker_routines.go" beforeDir="false" afterPath="$PROJECT_DIR$/worker_routines.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/worker_tasks.go" beforeDir="false" />
+    </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -9,47 +23,79 @@
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
   <component name="FileEditorManager">
-    <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
+    <leaf>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/config.json">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="190">
+              <caret line="10" column="11" selection-start-line="10" selection-start-column="11" selection-end-line="10" selection-end-column="11" />
+            </state>
+          </provider>
+        </entry>
+      </file>
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/master.go">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="1102">
-              <caret line="175" column="12" selection-start-line="175" selection-start-column="7" selection-end-line="175" selection-end-column="12" />
+            <state relative-caret-position="396">
+              <caret line="103" column="34" lean-forward="true" selection-start-line="103" selection-start-column="34" selection-end-line="103" selection-end-column="34" />
               <folding>
-                <element signature="e#14#63#0" expanded="true" />
+                <element signature="e#66#143#0" />
+                <element signature="e#205#224#0" />
+                <element signature="e#164#440#0" />
+                <element signature="e#770#783#0" />
+                <element signature="n#!!block;n#toString#0" />
+                <element signature="e#650#774#0" />
+                <element signature="n#!!block;n#printFields#1" />
+                <element signature="e#455#864#0" />
+                <element signature="e#1771#1807#0" />
+                <element signature="e#1829#1908#0" />
+                <element signature="e#1948#2174#0" />
+                <element signature="e#2198#2338#0" />
+                <element signature="n#!!block;n#init_local_version#0" />
+                <element signature="e#3638#3655#0" />
+                <element signature="e#3184#3241#0" />
+                <element signature="n#!!block;n#waitJobsEnd#0" />
+                <element signature="e#6036#6132#0" />
+                <element signature="n#!!block;n#cleanUpResidueWorkers#0" />
+                <element signature="e#6251#6360#0" />
+                <element signature="n#!!block;n#assignMapWorks#0" />
+                <element signature="e#3992#4046#0" />
+                <element signature="n#!!block;n#assignChunksIDs#0" />
+                <element signature="e#6706#6836#0" />
+                <element signature="e#4494#5150#0" />
+                <element signature="e#4752#5146#0" />
+                <element signature="e#5252#5857#0" />
+                <element signature="e#8090#8124#0" />
+                <element signature="n#!!block;n#_old_main_wrapper#0" />
+                <element signature="e#6067#6124#0" />
+                <element signature="e#6214#6335#0" />
+                <element signature="n#!!block;n#_main#0" />
+                <element signature="e#9205#9277#0" />
+                <element signature="e#9606#9643#0" />
+                <element signature="e#7725#7762#0" />
+                <element signature="e#10318#10320#0" />
                 <element signature="n#!!block;n#assignWorks_map#0" />
+                <element signature="e#10608#10822#0" />
+                <element signature="e#10825#10846#0" />
+                <element signature="e#8583#8677#0" />
+                <element signature="e#8835#8976#0" />
+                <element signature="n#!!block;n#mergeToken#0" />
+                <element signature="e#11616#11652#0" />
+                <element signature="e#9277#9420#0" />
+                <element signature="e#9312#9417#0" />
+                <element signature="e#9527#9617#0" />
+                <element signature="n#!!block;n#assignWorks_Reduce#0" />
+                <element signature="e#12686#12736#0" />
+                <element signature="e#10254#10353#0" />
+                <element signature="e#10627#11474#0" />
+                <element signature="e#13185#13216#0" />
+                <element signature="e#10827#10846#0" />
+                <element signature="e#11084#11215#0" />
+                <element signature="e#13833#13869#0" />
+                <element signature="e#14156#14232#0" />
+                <element signature="e#11797#12204#0" />
+                <element signature="e#11868#12201#0" />
               </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/worker_routines.go">
-          <provider selected="true" editor-type-id="text-editor">
-            <state>
-              <caret line="1" column="17" selection-start-line="1" selection-start-column="17" selection-end-line="1" selection-end-column="17" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/map_red_test.go">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="114">
-              <caret line="34" column="30" selection-start-line="34" selection-start-column="30" selection-end-line="34" selection-end-column="30" />
-              <folding>
-                <element signature="n#!!block;n#_readFilenames#0" />
-                <element signature="n#!!block;n#TestMapRed#0" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/worker_tasks.go">
-          <provider selected="true" editor-type-id="text-editor">
-            <state>
-              <caret line="25" column="16" selection-start-line="25" selection-start-column="16" selection-end-line="25" selection-end-column="16" />
             </state>
           </provider>
         </entry>
@@ -57,8 +103,49 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/worker.go">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="302">
-              <caret line="37" column="21" selection-start-line="37" selection-start-column="21" selection-end-line="37" selection-end-column="21" />
+            <state relative-caret-position="327">
+              <caret line="149" column="36" selection-start-line="149" selection-start-column="31" selection-end-line="149" selection-end-column="36" />
+              <folding>
+                <element signature="e#78#240#0" />
+                <element signature="n#!!block;n#workerNodeWithMapper#0" />
+                <element signature="n#!!block;n#numHealthyReducerOnWorker#0" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/map_reduce.go">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="76">
+              <caret line="4" column="7" lean-forward="true" selection-start-line="4" selection-start-column="7" selection-end-line="4" selection-end-column="7" />
+              <folding>
+                <element signature="e#105#156#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/worker_local_version.go">
+          <provider selected="true" editor-type-id="text-editor">
+            <state>
+              <caret line="36" column="7" selection-start-line="36" selection-start-column="7" selection-end-line="36" selection-end-column="7" />
+              <folding>
+                <element signature="e#14#42#0" expanded="true" />
+                <element signature="n#!!block;n#initWorkerIstances#0" />
+                <element signature="n#!!block;n#initWorkers_localMock_static#0" />
+                <element signature="e#1646#1861#1" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/addresses.json">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="456">
+              <caret line="24" selection-start-line="24" selection-end-line="24" />
             </state>
           </provider>
         </entry>
@@ -66,15 +153,48 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/utils.go">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="38">
-              <caret line="2" column="7" selection-start-line="2" selection-start-column="7" selection-end-line="2" selection-end-column="7" />
+            <state relative-caret-position="293">
+              <caret line="184" column="50" lean-forward="true" selection-start-line="184" selection-start-column="50" selection-end-line="184" selection-end-column="50" />
               <folding>
-                <element signature="e#14#121#0" expanded="true" />
+                <element signature="e#134#234#0" />
                 <element signature="n#!!block;n#cleanUpFiles#0" />
+                <element signature="e#318#363#0" />
                 <element signature="n#!!block;n#_init_chunks#0" />
+                <element signature="e#1053#1556#0" />
+                <element signature="e#1239#1441#0" />
+                <element signature="e#1943#2054#0" />
+                <element signature="e#2072#2184#0" />
                 <element signature="n#!!block;n#hashKeyReducerSum#0" />
-                <element signature="n#!!block;n#ReadConfigFile#0" />
+                <element signature="e#2500#2515#0" />
+                <element signature="e#2631#2789#0" />
+                <element signature="n#!!block;n#Len#0" />
+                <element signature="n#!!block;n#Swap#0" />
+                <element signature="n#!!block;n#Less#0" />
+                <element signature="e#3073#3117#0" />
+                <element signature="n#!!block;n#Len#1" />
+                <element signature="n#!!block;n#Swap#1" />
+                <element signature="n#!!block;n#Less#1" />
+                <element signature="n#!!block;n#pingHeartBitRcv#0" />
+                <element signature="n#!!block;n#pingHeartBitSnd#0" />
+                <element signature="n#!!block;n#checkErrs#0" />
+                <element signature="e#3682#3720#0" />
+                <element signature="e#3921#3966#0" />
+                <element signature="n#!!block;n#max#0" />
+                <element signature="n#!!block;n#serializeToFile#0" />
+                <element signature="e#4336#4558#0" />
+                <element signature="e#4483#4546#0" />
+                <element signature="n#!!block;n#listOfDictCumulativeSize#0" />
+                <element signature="e#4667#4698#0" />
               </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file:///usr/lib/go-1.11/src/log/log.go">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="283">
+              <caret line="304" column="12" lean-forward="true" selection-start-line="304" selection-start-column="12" selection-end-line="304" selection-end-column="12" />
             </state>
           </provider>
         </entry>
@@ -90,19 +210,17 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>localhost</find>
-      <find>worker</find>
-      <find>Map_parse_builtin</find>
-      <find>else</find>
-      <find>check</find>
-      <find>checkErr</find>
-      <find>Workerstate</find>
-      <find>append</find>
-      <find>token</find>
+      <find>PORT_BASE</find>
+      <find>addresses</find>
+      <find>istance.*</find>
+      <find>Go</find>
+      <find>.Done</find>
+      <find>&lt;*.Done</find>
     </findStrings>
   </component>
   <component name="GOROOT" path="/usr/lib/go-1.11" />
   <component name="Git.Settings">
+    <option name="ROOT_SYNC" value="DONT_SYNC" />
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="GoLibraries">
@@ -115,15 +233,14 @@
   <component name="IdeDocumentHistory">
     <option name="CHANGED_PATHS">
       <list>
-        <option value="$PROJECT_DIR$/src/master.go" />
-        <option value="$PROJECT_DIR$/src/map_reduce.go" />
-        <option value="$PROJECT_DIR$/out/worker.go" />
-        <option value="$PROJECT_DIR$/worker_tasks.go" />
-        <option value="$PROJECT_DIR$/worker_routines.go" />
-        <option value="$PROJECT_DIR$/master.go" />
+        <option value="$PROJECT_DIR$/README.md" />
+        <option value="$PROJECT_DIR$/addresses.json" />
         <option value="$PROJECT_DIR$/utils.go" />
+        <option value="$PROJECT_DIR$/config.json" />
+        <option value="$PROJECT_DIR$/worker_local_version.go" />
         <option value="$PROJECT_DIR$/worker.go" />
         <option value="$PROJECT_DIR$/map_reduce.go" />
+        <option value="$PROJECT_DIR$/master.go" />
       </list>
     </option>
   </component>
@@ -133,7 +250,10 @@
     <option name="width" value="1440" />
     <option name="height" value="750" />
   </component>
-  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
+  <component name="ProjectId" id="1OXQQrTE9NaFRZ2QJlLRNIYQTrH" />
+  <component name="ProjectLevelVcsManager" settingsEditedManually="true">
+    <ConfirmationsSetting value="2" id="Add" />
+  </component>
   <component name="ProjectView">
     <navigator proportions="" version="1">
       <foldersAlwaysOnTop value="true" />
@@ -165,16 +285,16 @@
     <property name="go.sdk.automatically.set" value="true" />
     <property name="last_opened_file_path" value="$PROJECT_DIR$" />
     <property name="nodejs_package_manager_path" value="npm" />
-    <property name="settings.editor.selected.configurable" value="reference.settingsdialog.IDE.editor.colors" />
+    <property name="settings.editor.selected.configurable" value="vcs.Git" />
   </component>
   <component name="RecentsManager">
-    <key name="CopyFile.RECENT_KEYS">
-      <recent name="$PROJECT_DIR$" />
-    </key>
     <key name="MoveFile.RECENT_KEYS">
       <recent name="$PROJECT_DIR$" />
       <recent name="$PROJECT_DIR$/src2" />
       <recent name="$PROJECT_DIR$/src" />
+    </key>
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$" />
     </key>
   </component>
   <component name="RunDashboard">
@@ -225,125 +345,255 @@
     <frame x="-5" y="31" width="1930" height="1005" extended-state="6" />
     <editor active="true" />
     <layout>
-      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.185836" />
+      <window_info id="Favorites" side_tool="true" />
+      <window_info content_ui="combo" id="Project" order="0" weight="0.25" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
-      <window_info id="Favorites" order="2" side_tool="true" />
+      <window_info anchor="bottom" id="Docker" show_stripe_button="false" />
+      <window_info anchor="bottom" id="Database Changes" />
+      <window_info anchor="bottom" id="Version Control" />
+      <window_info anchor="bottom" id="Terminal" />
+      <window_info anchor="bottom" id="Event Log" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="0" />
-      <window_info anchor="bottom" id="Find" order="1" weight="0.32839224" />
-      <window_info anchor="bottom" id="Run" order="2" weight="0.3286638" />
-      <window_info anchor="bottom" id="Debug" order="3" weight="0.39870688" />
+      <window_info anchor="bottom" id="Find" order="1" weight="0.32914287" />
+      <window_info anchor="bottom" id="Run" order="2" />
+      <window_info anchor="bottom" id="Debug" order="3" weight="0.4" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
       <window_info anchor="bottom" id="TODO" order="6" />
-      <window_info anchor="bottom" id="Docker" order="7" show_stripe_button="false" />
-      <window_info anchor="bottom" id="Database Changes" order="8" />
-      <window_info anchor="bottom" id="Version Control" order="9" weight="0.3313679" />
-      <window_info anchor="bottom" id="Terminal" order="10" weight="0.31584948" />
-      <window_info anchor="bottom" id="Event Log" order="11" side_tool="true" />
-      <window_info anchor="bottom" id="Messages" order="12" weight="0.3297414" />
+      <window_info anchor="right" id="Database" />
       <window_info anchor="right" id="Commander" internal_type="SLIDING" order="0" type="SLIDING" weight="0.4" />
       <window_info anchor="right" id="Ant Build" order="1" weight="0.25" />
       <window_info anchor="right" content_ui="combo" id="Hierarchy" order="2" weight="0.25" />
-      <window_info anchor="right" id="Database" order="3" />
     </layout>
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="1" />
   </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State>
+              <option name="RECENTLY_FILTERED_USER_GROUPS">
+                <collection />
+              </option>
+              <option name="RECENTLY_FILTERED_BRANCH_GROUPS">
+                <collection />
+              </option>
+              <option name="COLUMN_ORDER" />
+            </State>
+          </value>
+        </entry>
+      </map>
+    </option>
+    <option name="RECENT_FILTERS">
+      <map>
+        <entry key="Branch">
+          <value>
+            <list />
+          </value>
+        </entry>
+        <entry key="User">
+          <value>
+            <list />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
       <breakpoints>
         <line-breakpoint enabled="true" type="DlvLineBreakpoint">
-          <url>file://$PROJECT_DIR$/map_reduce.go</url>
-          <line>105</line>
+          <url>file://$PROJECT_DIR$/master.go</url>
+          <line>67</line>
           <properties />
-          <option name="timeStamp" value="4" />
+          <option name="timeStamp" value="1" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/config.json">
-      <provider selected="true" editor-type-id="text-editor" />
-    </entry>
-    <entry file="file:///usr/lib/golang/src/log/log.go" />
-    <entry file="file:///usr/lib/golang/src/net/rpc/server.go" />
-    <entry file="file:///usr/lib/golang/src/syscall/exec_unix.go" />
-    <entry file="file:///usr/lib/golang/src/reflect/type.go" />
-    <entry file="file:///usr/lib/golang/src/net/rpc/client.go" />
-    <entry file="file://$USER_HOME$/go/src/golang.org/x/net/html/atom/table.go" />
-    <entry file="file://$PROJECT_DIR$/worker_routines.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state>
-          <caret line="1" column="17" selection-start-line="1" selection-start-column="17" selection-end-line="1" selection-end-column="17" />
+    <entry file="file://$PROJECT_DIR$/README.md">
+      <provider selected="true" editor-type-id="split-provider[text-editor;markdown-preview-editor]">
+        <state split_layout="SPLIT">
+          <first_editor relative-caret-position="19">
+            <caret line="1" selection-start-line="1" selection-end-line="1" />
+          </first_editor>
+          <second_editor />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/worker_tasks.go">
+    <entry file="file:///usr/lib/go-1.11/src/encoding/json/stream.go">
       <provider selected="true" editor-type-id="text-editor">
-        <state>
-          <caret line="25" column="16" selection-start-line="25" selection-start-column="16" selection-end-line="25" selection-end-column="16" />
+        <state relative-caret-position="226">
+          <caret line="48" column="20" selection-start-line="48" selection-start-column="20" selection-end-line="48" selection-end-column="20" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file:///usr/lib/go-1.11/src/log/log.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="283">
+          <caret line="304" column="12" lean-forward="true" selection-start-line="304" selection-start-column="12" selection-end-line="304" selection-end-column="12" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/utils.go">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="38">
-          <caret line="2" column="7" selection-start-line="2" selection-start-column="7" selection-end-line="2" selection-end-column="7" />
+        <state relative-caret-position="293">
+          <caret line="184" column="50" lean-forward="true" selection-start-line="184" selection-start-column="50" selection-end-line="184" selection-end-column="50" />
           <folding>
-            <element signature="e#14#121#0" expanded="true" />
+            <element signature="e#134#234#0" />
             <element signature="n#!!block;n#cleanUpFiles#0" />
+            <element signature="e#318#363#0" />
             <element signature="n#!!block;n#_init_chunks#0" />
+            <element signature="e#1053#1556#0" />
+            <element signature="e#1239#1441#0" />
+            <element signature="e#1943#2054#0" />
+            <element signature="e#2072#2184#0" />
             <element signature="n#!!block;n#hashKeyReducerSum#0" />
-            <element signature="n#!!block;n#ReadConfigFile#0" />
+            <element signature="e#2500#2515#0" />
+            <element signature="e#2631#2789#0" />
+            <element signature="n#!!block;n#Len#0" />
+            <element signature="n#!!block;n#Swap#0" />
+            <element signature="n#!!block;n#Less#0" />
+            <element signature="e#3073#3117#0" />
+            <element signature="n#!!block;n#Len#1" />
+            <element signature="n#!!block;n#Swap#1" />
+            <element signature="n#!!block;n#Less#1" />
+            <element signature="n#!!block;n#pingHeartBitRcv#0" />
+            <element signature="n#!!block;n#pingHeartBitSnd#0" />
+            <element signature="n#!!block;n#checkErrs#0" />
+            <element signature="e#3682#3720#0" />
+            <element signature="e#3921#3966#0" />
+            <element signature="n#!!block;n#max#0" />
+            <element signature="n#!!block;n#serializeToFile#0" />
+            <element signature="e#4336#4558#0" />
+            <element signature="e#4483#4546#0" />
+            <element signature="n#!!block;n#listOfDictCumulativeSize#0" />
+            <element signature="e#4667#4698#0" />
           </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/addresses.json">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="456">
+          <caret line="24" selection-start-line="24" selection-end-line="24" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/worker_local_version.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state>
+          <caret line="36" column="7" selection-start-line="36" selection-start-column="7" selection-end-line="36" selection-end-column="7" />
+          <folding>
+            <element signature="e#14#42#0" expanded="true" />
+            <element signature="n#!!block;n#initWorkerIstances#0" />
+            <element signature="n#!!block;n#initWorkers_localMock_static#0" />
+            <element signature="e#1646#1861#1" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/config.json">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="190">
+          <caret line="10" column="11" selection-start-line="10" selection-start-column="11" selection-end-line="10" selection-end-column="11" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/worker.go">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="302">
-          <caret line="37" column="21" selection-start-line="37" selection-start-column="21" selection-end-line="37" selection-end-column="21" />
+        <state relative-caret-position="327">
+          <caret line="149" column="36" selection-start-line="149" selection-start-column="31" selection-end-line="149" selection-end-column="36" />
+          <folding>
+            <element signature="e#78#240#0" />
+            <element signature="n#!!block;n#workerNodeWithMapper#0" />
+            <element signature="n#!!block;n#numHealthyReducerOnWorker#0" />
+          </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/map_red_test.go">
+    <entry file="file:///usr/lib/go-1.11/src/net/rpc/client.go">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="114">
-          <caret line="34" column="30" selection-start-line="34" selection-start-column="30" selection-end-line="34" selection-end-column="30" />
-          <folding>
-            <element signature="n#!!block;n#_readFilenames#0" />
-            <element signature="n#!!block;n#TestMapRed#0" />
-          </folding>
+        <state relative-caret-position="283">
+          <caret line="298" column="22" selection-start-line="298" selection-start-column="22" selection-end-line="298" selection-end-column="22" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/map_reduce.go">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="336">
-          <caret line="80" column="35" lean-forward="true" selection-start-line="80" selection-start-column="35" selection-end-line="80" selection-end-column="35" />
+        <state relative-caret-position="76">
+          <caret line="4" column="7" lean-forward="true" selection-start-line="4" selection-start-column="7" selection-end-line="4" selection-end-column="7" />
           <folding>
-            <element signature="e#105#137#0" expanded="true" />
-            <element signature="e#3315#3343#0" />
-            <element signature="e#3523#3960#0" />
+            <element signature="e#105#156#0" expanded="true" />
           </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file:///usr/lib/go-1.11/src/builtin/builtin.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="739">
-          <caret line="133" column="5" selection-start-line="133" selection-start-column="5" selection-end-line="133" selection-end-column="5" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/master.go">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1102">
-          <caret line="175" column="12" selection-start-line="175" selection-start-column="7" selection-end-line="175" selection-end-column="12" />
+        <state relative-caret-position="396">
+          <caret line="103" column="34" lean-forward="true" selection-start-line="103" selection-start-column="34" selection-end-line="103" selection-end-column="34" />
           <folding>
-            <element signature="e#14#63#0" expanded="true" />
+            <element signature="e#66#143#0" />
+            <element signature="e#205#224#0" />
+            <element signature="e#164#440#0" />
+            <element signature="e#770#783#0" />
+            <element signature="n#!!block;n#toString#0" />
+            <element signature="e#650#774#0" />
+            <element signature="n#!!block;n#printFields#1" />
+            <element signature="e#455#864#0" />
+            <element signature="e#1771#1807#0" />
+            <element signature="e#1829#1908#0" />
+            <element signature="e#1948#2174#0" />
+            <element signature="e#2198#2338#0" />
+            <element signature="n#!!block;n#init_local_version#0" />
+            <element signature="e#3638#3655#0" />
+            <element signature="e#3184#3241#0" />
+            <element signature="n#!!block;n#waitJobsEnd#0" />
+            <element signature="e#6036#6132#0" />
+            <element signature="n#!!block;n#cleanUpResidueWorkers#0" />
+            <element signature="e#6251#6360#0" />
+            <element signature="n#!!block;n#assignMapWorks#0" />
+            <element signature="e#3992#4046#0" />
+            <element signature="n#!!block;n#assignChunksIDs#0" />
+            <element signature="e#6706#6836#0" />
+            <element signature="e#4494#5150#0" />
+            <element signature="e#4752#5146#0" />
+            <element signature="e#5252#5857#0" />
+            <element signature="e#8090#8124#0" />
+            <element signature="n#!!block;n#_old_main_wrapper#0" />
+            <element signature="e#6067#6124#0" />
+            <element signature="e#6214#6335#0" />
+            <element signature="n#!!block;n#_main#0" />
+            <element signature="e#9205#9277#0" />
+            <element signature="e#9606#9643#0" />
+            <element signature="e#7725#7762#0" />
+            <element signature="e#10318#10320#0" />
             <element signature="n#!!block;n#assignWorks_map#0" />
+            <element signature="e#10608#10822#0" />
+            <element signature="e#10825#10846#0" />
+            <element signature="e#8583#8677#0" />
+            <element signature="e#8835#8976#0" />
+            <element signature="n#!!block;n#mergeToken#0" />
+            <element signature="e#11616#11652#0" />
+            <element signature="e#9277#9420#0" />
+            <element signature="e#9312#9417#0" />
+            <element signature="e#9527#9617#0" />
+            <element signature="n#!!block;n#assignWorks_Reduce#0" />
+            <element signature="e#12686#12736#0" />
+            <element signature="e#10254#10353#0" />
+            <element signature="e#10627#11474#0" />
+            <element signature="e#13185#13216#0" />
+            <element signature="e#10827#10846#0" />
+            <element signature="e#11084#11215#0" />
+            <element signature="e#13833#13869#0" />
+            <element signature="e#14156#14232#0" />
+            <element signature="e#11797#12204#0" />
+            <element signature="e#11868#12201#0" />
           </folding>
         </state>
       </provider>

@@ -10,7 +10,7 @@ import (
 
 /*
 Worker MODULE
-worker will be bounded to different ports by adding a costant to Configuration.PORTBASE
+worker will be bounded to different ports by adding a costant to Config.PORTBASE
 rpc server initialization is terminate on different go routine
 will be rysed the max from rpc server for map and reduce
 TODO worker rpc server die waiting signal from master on a channel...ask if ok

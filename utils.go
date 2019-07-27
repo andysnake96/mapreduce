@@ -8,6 +8,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"reflect"
 	"runtime"
 	"strings"
 	"sync"
@@ -28,14 +29,14 @@ func cleanUpFiles(files []*os.File) {
 	}
 }
 
-func _init_chunks(filenames []string) []CHUNK {	//fast concurrent file read for file generation
+func _init_chunks(filenames []string) []CHUNK {	//fast concurrent file read for chunk generation
 	/*
 		initialize chunk structure ready to be assigned to map workers
 		files will be readed in multiple threads and totalsize will be divided in fair chunks sizes
 		eventually the size of the reminder of division for assignment will be assigned to last chunk
 	*/
-	fmt.Println("---INIT PHASE---")
-	filesChunkized := make([]CHUNK, Configuration.WORKERNUMMAP) //chunkset for assignement
+	fmt.Println("---start chunkization---")
+	filesChunkized := make([]CHUNK, Config.WORKER_NUM_MAP) //chunkset for assignement
 	filesData := make([]string, len(filenames))
 	barrierRead := new(sync.WaitGroup)
 	barrierRead.Add(len(filenames))
@@ -56,9 +57,9 @@ func _init_chunks(filenames []string) []CHUNK {	//fast concurrent file read for 
 		checkErr(err, true, "")
 		totalWorkSize += fstat.Size()
 	}
-	chunkSize := int64(totalWorkSize / int64(Configuration.WORKERNUMMAP)) //avg like chunk size
-	reminder := int64(totalWorkSize % int64(Configuration.WORKERNUMMAP))  //assigned to first Worker
-	barrierRead.Wait()                                                    //wait read data end in all threads
+	chunkSize := int64(totalWorkSize / int64(Config.WORKER_NUM_MAP)) //avg like chunk size
+	reminder := int64(totalWorkSize % int64(Config.WORKER_NUM_MAP))  //assigned to first Worker
+	barrierRead.Wait()                                               //wait read data end in all threads
 	allStr := strings.Join(filesData, "")
 
 	var low, high int64
@@ -86,7 +87,8 @@ func hashKeyReducerSum(key string, maxIDOut int) int {
 	return sum % maxIDOut
 }
 
-//// SORT SUPPORT FUNCTION FOR TOKEN LIST
+//// SORT_FINAL SUPPORT FUNCTION
+// FOR TOKEN LIST
 type tokenSorter struct {
 	//rappresent Token middle V out from map phase
 	tokens []Token
@@ -103,6 +105,21 @@ func (t tokenSorter) Less(i, j int) bool {
 	return t.tokens[i].V < t.tokens[j].V
 }
 
+////  FOR ROUTING COSTS
+type RoutingCostsSorter struct {
+	routingCosts []TrafficCostRecord
+}
+
+func (r RoutingCostsSorter) Len() int {
+	return len(r.routingCosts)
+}
+func (r RoutingCostsSorter) Swap(i, j int) {
+	r.routingCosts[i],r.routingCosts[j] = r.routingCosts[j], r.routingCosts[i]
+}
+func (r RoutingCostsSorter) Less(i, j int) bool {
+	return r.routingCosts[i].routingCost < r.routingCosts[j].routingCost
+}
+
 /////	HEARTBIT FUNCS		/////
 func pingHeartBitRcv(){
 	//TODO PING receve
@@ -113,13 +130,19 @@ func pingHeartBitSnd(){
 }
 
 /// OTHER
-func checkErr(e error, fatal bool, baseMsg string) {
+func checkErrs(errs []error, fatal bool, supplementMsg string) {
+	for _,e:=range errs{
+		checkErr(e,fatal,supplementMsg)
+	}
+}
+func checkErr(e error, fatal bool, supplementMsg string) {
 	//check error, exit if fatal is true
+	baseMsg:=e.Error()
 	if e != nil {
 		if(fatal==true){
-			log.Fatal(baseMsg,e)
+			log.Fatal(baseMsg+supplementMsg,e)
 		} else {
-			log.Println(baseMsg,e)
+			log.Println(baseMsg+supplementMsg,e)
 		}
 	}
 }
@@ -149,16 +172,35 @@ func serializeToFile(defTokens []Token, filename string) {
 		lw = 0
 	}
 }
+func listOfDictCumulativeSize(dictList []map[int]int) int {
+	cumulativeSum:=0
+	for _,dict :=range dictList{
+		cumulativeSum+=len(dict)
+	}
+	return cumulativeSum
+}
 
-func ReadConfigFile() {
-	f, err := os.Open(CONFIGFILENAME)
-	checkErr(err, true, "")
+
+
+func ReadConfigFile(configFileName string,destVar ConfigInterface)  {
+	f, err := os.Open(configFileName)
+	checkErr(err, true, "config file open")
 	defer f.Close()
 	//configRawStr,err:=ioutil.ReadAll(bufio.NewReader(f))
 	decoder := json.NewDecoder(f)
-	err = decoder.Decode(&Configuration)
+	err = decoder.Decode(destVar)
 	checkErr(err, true, "")
-	//assign global var for readed configuration
 
 }
 
+func reflectionFieldsGet(strct interface{})  {
+	val := reflect.ValueOf(strct)
+	values := make(map[string]interface{}, val.NumField())
+	metaTypes := val.Type()
+	for i := 0; i < val.NumField(); i++ {
+		values[metaTypes.Field(i).Name] = val.Field(i).Interface()
+	}
+
+	fmt.Println(values)
+
+}
