@@ -1,0 +1,21 @@
+{
+	"_comment": "explicit addresses for workers related to master",
+	"_comment": "mutable workers",
+	"WorkersMapReduce": [
+		"localhost",
+		"localhost",
+		"localhost",
+		"localhost",
+		"localhost"
+	],
+	"_comment": "workers that execute only reduce",
+	"WorkersOnlyReduce": [
+		"localhost",
+		"localhost"
+	],
+	"WorkerBackup": [
+		"localhost",
+		"localhost"
+	]
+}
+
