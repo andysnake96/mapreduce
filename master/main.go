@@ -2,14 +2,16 @@ package main
 
 import (
 	"../core"
+	"errors"
 	"log"
 	"net/rpc"
+	"strconv"
 )
 
 //// MASTER CONTROL VARS
 var Workers core.WorkersKinds //connected workers
 var ChunkIDS []int
-var AssignedChunkWorkers map[*core.Worker][]int //assigned chunk IDs to a worker
+var AssignedChunkWorkers map[int][]int //workerID->assigned Cunks
 
 func main() {
 	core.Config = new(core.Configuration)
@@ -46,6 +48,7 @@ func main() {
 			(will be assigned a fair share of chunks to each worker + a replication factor of chunks)
 						(chunks replications R.R. of not already assigned chunks)
 	*/
+	AssignedChunkWorkers = make(map[int][]int)
 	assignChunksIDs(&Workers.WorkersMapReduce, &ChunkIDS, core.Config.CHUNKS_REPLICATION_FACTOR, false)
 	assignChunksIDs(&Workers.WorkersBackup, &ChunkIDS, core.Config.CHUNKS_REPLICATION_FACTOR_BACKUP_WORKERS, true) //only replication assignement on backup workers
 	comunicateChunksAssignementToWorkers()                                                                         //RPC 1 IN SEQ DIAGRAM
@@ -64,7 +67,7 @@ func main() {
 }
 func init_local_version() {
 	////// init files
-	var filenames []string = []string{"txtSrc/1012-0.txt"}
+	var filenames []string = core.FILENAMES_LOCL
 	//var filenames []string = os.Args[1:]
 	if len(filenames) == 0 {
 		log.Fatal("USAGE <plainText1, plainText2, .... >")
@@ -97,13 +100,43 @@ func assignMapWorks() core.ReducersTrafficCosts {
 func comunicateChunksAssignementToWorkers() {
 	ends := make([]*rpc.Call, len(AssignedChunkWorkers))
 	i := 0
-	for workerPntr, chunksIds := range AssignedChunkWorkers {
-		ends[i] = (*workerPntr).State.ChunkServIstance.Client.Go("CHUNK.Get_chunk_ids", chunksIds, nil, nil)
-		i++
+	//ii := 0
+	for workerId, chunksIds := range AssignedChunkWorkers {
+		if len(chunksIds) > 0 {
+			workerPntr, err := getWorker(workerId)
+			core.CheckErr(err, true, "chunk assignement comunication")
+			ends[i] = (workerPntr).State.ChunkServIstance.Client.Go("CHUNK.Get_chunk_ids", chunksIds, &i, nil)
+			i++
+			//err = (*workerPntr).State.ChunkServIstance.Client.Call("CHUNK.Get_chunk_ids", chunksIds, &i)
+			//core.CheckErr(err,true,"miseriaccia")
+		}
 	}
 	for _, doneChan := range ends { //wait all assignment compleated
-		<-doneChan.Done
+		if doneChan != nil {
+			divCall := <-doneChan.Done
+			core.CheckErr(divCall.Error, true, "chunkAssign Res")
+		}
 	}
+}
+
+func getWorker(id int) (*core.Worker, error) {
+	//return worker with id, nil if not found
+	for _, worker := range Workers.WorkersMapReduce {
+		if worker.Id == id {
+			return &worker, nil
+		}
+	}
+	for _, worker := range Workers.WorkersOnlyReduce {
+		if worker.Id == id {
+			return &worker, nil
+		}
+	}
+	for _, worker := range Workers.WorkersBackup {
+		if worker.Id == id {
+			return &worker, nil
+		}
+	}
+	return nil, errors.New("NOT FOUNDED WORKER :" + strconv.Itoa(id))
 }
 func assignChunksIDs(workers *[]core.Worker, chunksIds *[]int, replicationFactor int, onlyReplication bool) {
 	/*
@@ -122,8 +155,8 @@ func assignChunksIDs(workers *[]core.Worker, chunksIds *[]int, replicationFactor
 			chunkIDsFairShare := (*chunksIds)[j : j+fairChunkNumShare]
 			worker := (*workers)[workerInAssignementIndex]
 			workerChunks := &(worker.State.ChunksIDs)
-			*workerChunks = append((*workerChunks), chunkIDsFairShare...)                               //TODO CHECK DEBUG
-			AssignedChunkWorkers[&worker] = append(AssignedChunkWorkers[&worker], chunkIDsFairShare...) //quicklink for smart replication
+			*workerChunks = append((*workerChunks), chunkIDsFairShare...)                                   //TODO CHECK DEBUG
+			AssignedChunkWorkers[worker.Id] = append(AssignedChunkWorkers[worker.Id], chunkIDsFairShare...) //quicklink for smart replication
 			workerInAssignementIndex++
 		}
 
@@ -131,13 +164,13 @@ func assignChunksIDs(workers *[]core.Worker, chunksIds *[]int, replicationFactor
 	//CHUNKS REPLICATION and fair share remider assignement to all workers
 	for _, worker := range *workers {
 		//reminder assignment
-		worker.State.ChunksIDs = append(worker.State.ChunksIDs, chunkIDsFairShareReminder...)               // will append an empty list if OnlyReplciation is true//TODO CHECK DEBUG
-		AssignedChunkWorkers[&worker] = append(AssignedChunkWorkers[&worker], chunkIDsFairShareReminder...) //quick link for smart replication
+		worker.State.ChunksIDs = append(worker.State.ChunksIDs, chunkIDsFairShareReminder...)                   // will append an empty list if OnlyReplciation is true//TODO CHECK DEBUG
+		AssignedChunkWorkers[worker.Id] = append(AssignedChunkWorkers[worker.Id], chunkIDsFairShareReminder...) //quick link for smart replication
 		//replication assignment
-		chunksReplicationToAssignID, err := core.GetChunksNotAlreadyAssignedRR(chunksIds, replicationFactor-fairChunkNumRemider, AssignedChunkWorkers[&worker])
-		core.CheckErr(err, false, "")
+		chunksReplicationToAssignID, err := core.GetChunksNotAlreadyAssignedRR(chunksIds, replicationFactor-fairChunkNumRemider, AssignedChunkWorkers[worker.Id])
+		core.CheckErr(err, false, "chunks replication assignment impossibility, chunks saturation on workers")
+		AssignedChunkWorkers[worker.Id] = append(AssignedChunkWorkers[worker.Id], chunksReplicationToAssignID...) //quick link for smart replication
 		worker.State.ChunksIDs = append(worker.State.ChunksIDs, chunksReplicationToAssignID...)
-
 	}
 }
 

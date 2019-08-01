@@ -2,6 +2,7 @@ package core
 
 import (
 	"errors"
+	"net/rpc"
 	"sort"
 )
 
@@ -73,7 +74,12 @@ func InitWorkers_localMock() WorkersKinds {
 		worker = Worker{
 			Address: address,
 			Id:      idWorker,
-			State:   WorkerStateMasterControl{}}
+			State: WorkerStateMasterControl{
+				ChunksIDs:        make([]int, 1),
+				WorkerIstances:   make(map[int]WorkerIstanceControl),
+				ChunkServIstance: WorkerIstanceControl{},
+				WorkerNodeLinks:  &worker,
+			}}
 
 		port = NextUnassignedPort(Config.CHUNK_SERVICE_BASE_PORT, &AssignedPortsAll, true, false)
 		initWorkerInstancesRef(&worker, port, idInstance, CHUNK_ID_INIT)
@@ -90,7 +96,17 @@ func InitWorkers_localMock() WorkersKinds {
 		worker = Worker{
 			Address: address,
 			Id:      idWorker,
-			State:   WorkerStateMasterControl{}}
+			State: WorkerStateMasterControl{
+				ChunksIDs:      make([]int, 1),
+				WorkerIstances: make(map[int]WorkerIstanceControl),
+				ChunkServIstance: WorkerIstanceControl{
+					Port:     0,
+					Kind:     0,
+					IntState: 0,
+					Client:   &rpc.Client{},
+				},
+				WorkerNodeLinks: &worker,
+			}}
 		port = NextUnassignedPort(Config.CHUNK_SERVICE_BASE_PORT, &AssignedPortsAll, true, false)
 		initWorkerInstancesRef(&worker, port, idInstance, CHUNK_ID_INIT)
 		idInstance++
@@ -107,7 +123,17 @@ func InitWorkers_localMock() WorkersKinds {
 		worker = Worker{
 			Address: address,
 			Id:      idWorker,
-			State:   WorkerStateMasterControl{}}
+			State: WorkerStateMasterControl{
+				ChunksIDs:      make([]int, 1),
+				WorkerIstances: make(map[int]WorkerIstanceControl),
+				ChunkServIstance: WorkerIstanceControl{
+					Port:     0,
+					Kind:     0,
+					IntState: 0,
+					Client:   &rpc.Client{},
+				},
+				WorkerNodeLinks: &worker,
+			}}
 		port = NextUnassignedPort(Config.CHUNK_SERVICE_BASE_PORT, &AssignedPortsAll, true, false)
 		initWorkerInstancesRef(&worker, port, idInstance, CHUNK_ID_INIT)
 		idInstance++
@@ -119,9 +145,11 @@ func InitWorkers_localMock() WorkersKinds {
 
 func GetChunksNotAlreadyAssignedRR(chunksIds *[]int, numChunkToFind int, chunksIdsAssignedAlready []int) ([]int, error) {
 	/*
-		find first numChunkToFind not already present in list chunkAssignedAlready (not already assigned to worker
+			find first numChunkToFind not already present in list chunkAssignedAlready (not already assigned to worker
+
+		//TODO SMART REPLICATION->sort global assignement Desc for redundancy num(placed chunk replicas)->select first numChunkToFind low replicated chunks to assign
 	*/
-	chunksToAssign := make([]int, numChunkToFind)
+	chunksToAssign := make([]int, 0)
 	for i := 0; i < len(*chunksIds) && len(chunksToAssign) < numChunkToFind; i++ {
 		chunkId := (*chunksIds)[i]
 		alreadyAssignedChunk := false

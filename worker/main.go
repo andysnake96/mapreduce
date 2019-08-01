@@ -6,6 +6,7 @@ import (
 	"net/rpc"
 	"os"
 	"strconv"
+	"syscall"
 )
 
 /*
@@ -46,6 +47,7 @@ func InitRPCWorkerIstance(istanceId int, port int, kind int, workerNodeInt *core
 		workerIstanceData.IntData.ReduceData = core.ReducerIstanceStateInternal(*reduce_)
 	} else if kind == core.CHUNK_ID_INIT {
 		workersChunks := new(core.WorkerChunks)
+		workersChunks.Chunks = make(map[int]core.CHUNK, WORKER_CHUNKS_INITSIZE_DFLT)
 		workerNodeInt.WorkerChunksStore = core.WorkerChunks(*workersChunks)
 		err = server.RegisterName("CHUNK", workersChunks)
 	} else {
@@ -67,7 +69,6 @@ func InitRPCWorkerIstance(istanceId int, port int, kind int, workerNodeInt *core
 	//_:=l.Close()           	//TODO will unblock rpc requests handler routine
 	//runtime.Goexit()    		//routine end here
 }
-
 func main() {
 	core.Config = new(core.Configuration)
 	core.Addresses = new(core.WorkerAddresses)
@@ -77,7 +78,10 @@ func main() {
 	if core.Config.LOCAL_VERSION {
 		usage := "local version: <>"
 		println(usage)
+		ChunkIDS := core.LoadChunksStorageService_localMock(core.FILENAMES_LOCL)
+		println(ChunkIDS, "<--- chunkIDS ")
 		workersLocalInit(os.Args[1:])
+		syscall.Pause()
 	} else {
 		errs := make([]error, 3)
 		var err error

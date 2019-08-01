@@ -65,6 +65,8 @@ const (
 	OUTFILENAME            = "finalTokens.txt"
 )
 
+var FILENAMES_LOCL = []string{"txtSrc/1012-0.txt"}
+
 type Token struct {
 	//rappresent Token middle V out from map phase
 	K string
@@ -187,10 +189,14 @@ func PingHeartBitSnd() {
 }
 
 /// OTHER
-func CheckErrs(errs []error, fatal bool, supplementMsg string) {
+func CheckErrs(errs []error, fatal bool, supplementMsg string) bool {
+
 	for _, e := range errs {
-		CheckErr(e, fatal, supplementMsg)
+		if CheckErr(e, fatal, supplementMsg) == true {
+			return true
+		}
 	}
+	return false
 }
 func CheckErr(e error, fatal bool, supplementMsg string) bool {
 	//check error, exit if fatal is true
@@ -198,9 +204,9 @@ func CheckErr(e error, fatal bool, supplementMsg string) bool {
 	if e != nil {
 		baseMsg := e.Error()
 		if fatal == true {
-			log.Fatal(baseMsg+supplementMsg, e)
+			log.Fatal("\n\n"+baseMsg+supplementMsg, e)
 		} else {
-			log.Println(baseMsg+supplementMsg, e)
+			log.Println("\n\n"+baseMsg+supplementMsg, e)
 		}
 		return true
 	}
@@ -262,26 +268,28 @@ func ReflectionFieldsGet(strct interface{}) {
 	fmt.Println(values)
 
 }
+func GenericPrint(slice interface{}) bool {
+	sv := reflect.ValueOf(slice)
+
+	for i := 0; i < sv.Len(); i++ {
+		fmt.Printf("%d\t", sv.Index(i).Interface())
+	}
+	fmt.Printf("\n\n")
+	return false
+}
 
 //ports
 func CheckPortAvaibility(port int) (status bool) {
 
 	// Concatenate a colon and the port
 	host := ":" + strconv.Itoa(port)
-
+	errs := make([]error, 2)
 	// Try to create a server with the port
 	server, err := net.Listen("tcp", host)
-
-	// if it fails then the port is likely taken
-	if err != nil {
-		println(err.Error())
-	}
-
+	errs = append(errs, err)
+	err = server.Close()
 	// close the server
-	server.Close()
-
-	// we successfully used and closed the port
-	// so it's now available to be used again
-	return true
+	errs = append(errs, err)
+	return !CheckErrs(errs, true, "checking port avaibility"+strconv.Itoa(port))
 
 }

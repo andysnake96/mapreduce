@@ -11,10 +11,10 @@ func WorkerNodeWithMapper(mapperID int, workers *WorkersKinds) (*Worker, error) 
 	var workerNodeWithMapperIstance *Worker
 	var present bool
 	for _, worker := range workers.WorkersMapReduce { //find worker node
-		workerNodeWithMapperIstance, present = worker.State.WorkerNodeLinks[mapperID]
+		_, present = worker.State.WorkerIstances[mapperID]
 	}
 	for _, worker := range workers.WorkersBackup { //find worker node
-		workerNodeWithMapperIstance, present = worker.State.WorkerNodeLinks[mapperID]
+		_, present = worker.State.WorkerIstances[mapperID]
 	}
 
 	if !present {

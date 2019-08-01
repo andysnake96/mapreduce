@@ -4,6 +4,8 @@ package core
 //different map and reduce method for map and reduce types
 import (
 	"net/rpc"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"unicode"
@@ -14,6 +16,8 @@ type Reducer ReducerIstanceStateInternal
 
 func (c *WorkerChunks) Get_chunk_ids(chunkIDs []int, reply *int) error {
 	//TODO CHECK sync.Map doc for auto handling these issuses
+	sort.Ints(chunkIDs)
+	GenericPrint(chunkIDs)
 	chunksDownloaded := make([]CHUNK, len(chunkIDs))
 	barrierDownload := new(sync.WaitGroup)
 	barrierDownload.Add(len(chunkIDs))
@@ -21,6 +25,7 @@ func (c *WorkerChunks) Get_chunk_ids(chunkIDs []int, reply *int) error {
 		//check if chunk already downloaded
 		if getChunk(chunkId, c) != CHUNK("") {
 			println("already have chunk Id :", chunkId)
+			barrierDownload.Add(-1)
 			continue
 		}
 		go downloadChunk(chunkId, &barrierDownload, &chunksDownloaded[i]) //download chunk from data store and save in isolated position
@@ -41,7 +46,7 @@ func downloadChunk(chunkId int, waitGroup **sync.WaitGroup, chunkLocation *CHUNK
 	if Config.LOCAL_VERSION {
 		chunk, present := ChunksStorageMock[chunkId]
 		if !present {
-			panic("NOT PRESENT CHUNK IN MOCK") //TODO ROBUSTENESS PRE EBUG
+			panic("NOT PRESENT CHUNK IN MOCK\nidchunk: " + strconv.Itoa(chunkId)) //TODO ROBUSTENESS PRE EBUG
 		}
 		*chunkLocation = chunk //write chunk to his isolated position
 	} //else //TODO DOWNLOAD FROM S3, CONFIG FILE AND S3 SDK.... only mem--> S3 rest

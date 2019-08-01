@@ -32,8 +32,8 @@ type WorkerStateMasterControl struct {
 		on reassignement new port will be calculated watching instances max port by kind
 	*/
 	WorkerIstances   map[int]WorkerIstanceControl //for each worker istance ID -> control info (port,state,..)
-	ChunkServIstance WorkerIstanceControl
-	WorkerNodeLinks  map[int]*Worker //link each worker istance ID to worker node that contains it
+	ChunkServIstance WorkerIstanceControl         //specal field for workerNodeLevel chunkService worker instance
+	WorkerNodeLinks  *Worker                      //backward link it
 }
 
 ///WORKER ISTANCE SIDE		routine-task-~-container adaptable
@@ -101,20 +101,27 @@ type WorkerChunks struct { //WORKER NODE LEVEL STRUCT
 }
 
 ////init worker referements master
-
 func initWorkerInstancesRef(worker *Worker, port int, istanceID, istanceType int) {
 	//init a worker istance referement to the master of istanceType  behind a port
 
 	//init chunk service istance for every worker
 	client, err := rpc.Dial(Config.RPC_TYPE, worker.Address+":"+strconv.Itoa(port))
 	CheckErr(err, true, "init worker")
-	worker.State.WorkerIstances[istanceID] = WorkerIstanceControl{
-		Port:     Config.CHUNK_SERVICE_BASE_PORT,
-		Kind:     CHUNK_ID_INIT,
-		IntState: IDLE,
-		Client:   client,
+	if istanceType == CHUNK_ID_INIT {
+		worker.State.ChunkServIstance = WorkerIstanceControl{
+			Port:     port,
+			Kind:     istanceType,
+			IntState: IDLE,
+			Client:   client,
+		}
+	} else {
+		worker.State.WorkerIstances[istanceID] = WorkerIstanceControl{
+			Port:     port,
+			Kind:     istanceType,
+			IntState: IDLE,
+			Client:   client,
+		}
 	}
-	worker.State.WorkerNodeLinks[istanceID] = worker //quick backward link
 
 }
 func InitWorkers() WorkersKinds {
