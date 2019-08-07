@@ -1,10 +1,13 @@
 package core
 
 import (
+	"net"
 	"net/rpc"
 	"strconv"
 	"sync"
 )
+
+const WORKER_CHUNKS_INITSIZE_DFLT = 3
 
 type CHUNK string
 
@@ -23,7 +26,8 @@ type Worker struct { //worker istance master side
 type WorkerStateMasterControl struct {
 	//struct for all data that a worker node may have during computation
 	//because a worker may or may not become both Mapper and Reducer not all these filds will be used
-	ChunksIDs []int //chunks located on Worker
+	ChunksIDs []int //all chunks located on Worker
+	//ChunksIDsFairShare []int //share of chunks located on Worker needed for map
 	/*
 		ids of worker istances --> rpc port
 		for each worker istance running on worker node there is a separated rpc server
@@ -31,30 +35,33 @@ type WorkerStateMasterControl struct {
 		ports will change in different port spaces defined in  config file,
 		on reassignement new port will be calculated watching instances max port by kind
 	*/
-	WorkerIstances   map[int]WorkerIstanceControl //for each worker istance ID -> control info (port,state,..)
-	ChunkServIstance WorkerIstanceControl         //specal field for workerNodeLevel chunkService worker instance
-	WorkerNodeLinks  *Worker                      //backward link it
+	WorkerIstances     map[int]WorkerIstanceControl //for each worker istance ID -> control info (port,state,..)
+	ControlRPCInstance WorkerIstanceControl         //chunkService worker node level instance
+	WorkerNodeLinks    *Worker                      //backward link it
 }
 
 ///WORKER ISTANCE SIDE		routine-task-~-container adaptable
 type MapperIstanceStateInternal struct {
-	//// internal workerstates that are unknown to the master
 	IntermediateTokens map[string]int //produced by map, routed to Reducer
-	workerChunks       *WorkerChunks  //readonly ref to chunks stored in worker that contains this Mapper istance
+	WorkerChunks       *WorkerChunks  //readonly ref to chunks stored in worker that contains this Mapper istance
+	ChunkID            int            //assigned ChunkID unique identifier for a MAPPER work result
 }
+
 type ReducerIstanceStateInternal struct {
 	//// internal workerstate, almost unknown to the master
-	//reduce
-	IntermediateTokenShares      []Token        //mappers intermediate tokens shares received (needed for better fault tollerance
+	IntermediateTokenShares      map[string]int //mappers intermediate tokens shares received (needed for better fault tollerance
 	IntermediateTokensCumulative map[string]int //used by reduce calls to aggregate intermediate tokens from the map executions
-	CumulativeCalls              int            //cumulative number of reduce calls received
-	ExpectedRedCalls             int            //expected num of reduce calls from mappers	(received from the master)
+	CumulativeCalls              map[int]int    //cumulative number of reduce calls received
+	ExpectedRedCalls             map[int]int    //expected num of reduce calls from mappers	(hashed by their assigned chunk)
+	mutex                        sync.Mutex     //because of multiple calls it protect cumulatives fields changes
 }
+
 type GenericInternalState struct {
 	MapData    MapperIstanceStateInternal
 	ReduceData ReducerIstanceStateInternal
 }
 type WorkerIstanceControl struct {
+	Id       int
 	Port     int
 	Kind     int         //RPC ISTANCE TYPE CODE
 	IntState int         //internal state of the istance
@@ -78,20 +85,18 @@ const (
 
 //INIT RPC SERVICE CODES to register different RPC
 const (
-	CHUNK_ID_INIT int = iota //chunk service running on all workers
+	CONTROL int = iota //control services
 	MAP
-	//REDUCER_BINDINGS	//included in map (thread safe because comunicated at the end of all MAP() op
 	REDUCE
-	//PRE_REDUCER_INIT		//included in reduce worker istance
-	BACKUP
-	CONTROL
 	MASTER
 )
 
 ///WORKER SIDE STRUCTS
 type Worker_node_internal struct { //global worker istance worker node side
-	WorkerChunksStore WorkerChunks                   //chunks stored in the worker node
-	Server            map[int]WorkerInstanceInternal //server for each worker istance Id
+	WorkerChunksStore  WorkerChunks                   //chunks stored in the worker node
+	Instances          map[int]WorkerInstanceInternal //server for each worker istance Id
+	ControlRpcInstance WorkerInstanceInternal         //worker node main control instace ->chunks&&respawn
+	ReducersClients    []rpc.Client
 }
 type WorkerChunks struct { //WORKER NODE LEVEL STRUCT
 	//HOLD chunks stored in worker node pretected by a mutex
@@ -101,76 +106,89 @@ type WorkerChunks struct { //WORKER NODE LEVEL STRUCT
 }
 
 ////init worker referements master
-func initWorkerInstancesRef(worker *Worker, port int, istanceID, istanceType int) {
+func InitWorkerInstancesRef(worker *Worker, port int, istanceType int) (WorkerIstanceControl, error) {
 	//init a worker istance referement to the master of istanceType  behind a port
-
-	//init chunk service istance for every worker
+	// return newly created instance ref and eventual error of client estamblishment
+	//find max assigned Id for new instanceId
+	maxId := 0
+	for id, _ := range worker.State.WorkerIstances {
+		if id > maxId {
+			maxId = id
+		}
+	}
+	maxId++ //new worker unique Id for the new instance
+	println("init new instance on worker: ", worker.Id, "with Id: ", maxId)
 	client, err := rpc.Dial(Config.RPC_TYPE, worker.Address+":"+strconv.Itoa(port))
-	CheckErr(err, true, "init worker")
-	if istanceType == CHUNK_ID_INIT {
-		worker.State.ChunkServIstance = WorkerIstanceControl{
+	var newWorkerInstance WorkerIstanceControl
+	if !CheckErr(err, false, "init worker") {
+		newWorkerInstance = WorkerIstanceControl{
 			Port:     port,
 			Kind:     istanceType,
 			IntState: IDLE,
 			Client:   client,
+			Id:       maxId,
 		}
+		if istanceType == CONTROL {
+			worker.State.ControlRPCInstance = newWorkerInstance
+		} else {
+			worker.State.WorkerIstances[maxId] = newWorkerInstance
+		}
+	}
+	return newWorkerInstance, err
+}
+
+func InitRPCWorkerIstance(initData *GenericInternalState, port int, kind int, workerNodeInt *Worker_node_internal) (error, int) {
+	//Create an instance of structs which implements map and reduce interfaces
+	//init code used to discriminate witch rpc to activate (see costants)
+	//initialization data for the new instance can be provided with parameter initData filling the right field
+	//return error or new ID for the created instance
+	var err error
+	maxId := GetMaxIdWorkerInstances(&workerNodeInt.Instances) //find new unique ID
+	newId := maxId + 1
+
+	workerIstanceData := WorkerInstanceInternal{
+		Server: rpc.NewServer(),
+		ControlData: WorkerIstanceControl{
+			Id:       newId,
+			Port:     port,
+			Kind:     kind,
+			IntState: IDLE,
+		}}
+	if kind == MAP {
+		mapper := new(Mapper)
+		if initData != nil {
+			mapper = (*Mapper)(&(initData.MapData))
+		}
+		err = workerIstanceData.Server.RegisterName("MAP", mapper)
+		mapper.WorkerChunks = &workerNodeInt.WorkerChunksStore //link to chunks for mapper
+		workerIstanceData.IntData.MapData = MapperIstanceStateInternal(*mapper)
+	} else if kind == REDUCE {
+		reducer := new(Reducer)
+		if initData != nil {
+			reducer = (*Reducer)(&(initData.ReduceData))
+		}
+		err = workerIstanceData.Server.RegisterName("REDUCE", reducer)
+		workerIstanceData.IntData.ReduceData = ReducerIstanceStateInternal(*reducer)
+	} else if kind == CONTROL { //instances for controlRPCs and ChunksService at workerNodeLevel
+		//chunk service
+		workerNodeInt.WorkerChunksStore.Chunks = make(map[int]CHUNK, WORKER_CHUNKS_INITSIZE_DFLT)
+		err = workerIstanceData.Server.RegisterName("CONTROL", workerNodeInt)
+		workerNodeInt.ControlRpcInstance = workerIstanceData
 	} else {
-		worker.State.WorkerIstances[istanceID] = WorkerIstanceControl{
-			Port:     port,
-			Kind:     istanceType,
-			IntState: IDLE,
-			Client:   client,
-		}
+		panic("unrecognized code" + strconv.Itoa(kind))
+	}
+	if CheckErr(err, false, "Format of service selected  is not correct: ") {
+		return err, -1
 	}
 
-}
-func InitWorkers() WorkersKinds {
-	/*
-		init all kind of workers with addresses and base   Config
-		dinamically from generated addresses file at init phase
-		explicit init of worker by kind for future change
-	*/
-	var worker Worker
-	workersOut := *new(WorkersKinds)
-	idWorker := 0
-	workersOut.WorkersMapReduce = make([]Worker, len(Addresses.WorkersMapReduce))
-	for i, address := range Addresses.WorkersMapReduce {
-		id := 0
-		worker = Worker{
-			Address: address,
-			Id:      idWorker,
-			State:   WorkerStateMasterControl{}}
-		initWorkerInstancesRef(&worker, Config.CHUNK_SERVICE_BASE_PORT, id, CHUNK_ID_INIT)
-		id++
-		initWorkerInstancesRef(&worker, Config.MAP_SERVICE_BASE_PORT, id, MAP)
-		id++
-		workersOut.WorkersMapReduce[i] = worker
-		idWorker++
+	// Listen for incoming tcp packets on port by specified offset of port base.
+	l, e := net.Listen("tcp", ":"+strconv.Itoa(port))
+	if CheckErr(e, false, "listen err on port "+strconv.Itoa(port)) {
+		return e, -1
 	}
-	workersOut.WorkersOnlyReduce = make([]Worker, len(Addresses.WorkersOnlyReduce))
-	for i, address := range Addresses.WorkersOnlyReduce {
-		id := 0
-		worker = Worker{
-			Address: address,
-			Id:      idWorker,
-			State:   WorkerStateMasterControl{}}
-		initWorkerInstancesRef(&worker, Config.CHUNK_SERVICE_BASE_PORT, id, CHUNK_ID_INIT)
-		id++
-		initWorkerInstancesRef(&worker, Config.MAP_SERVICE_BASE_PORT, id, REDUCE)
-		workersOut.WorkersOnlyReduce[i] = worker
-		idWorker++
-	}
-	workersOut.WorkersBackup = make([]Worker, len(Addresses.WorkersBackup))
-	for i, address := range Addresses.WorkersBackup {
-		id := 0
-		worker = Worker{
-			Address: address,
-			Id:      idWorker,
-			State:   WorkerStateMasterControl{}}
-		initWorkerInstancesRef(&worker, Config.CHUNK_SERVICE_BASE_PORT, id, CHUNK_ID_INIT)
-		id++
-		workersOut.WorkersBackup[i] = worker
-		idWorker++
-	}
-	return workersOut
+	//go PingHeartBitRcv()
+	go workerIstanceData.Server.Accept(l) //TODO 4EVER BLOCK-> EXIT CONDITION DEFINE see under
+	//_:=l.Close()           	//TODO will unblock rpc requests handler routine
+	//runtime.Goexit()    		//routine end here
+	return nil, maxId
 }

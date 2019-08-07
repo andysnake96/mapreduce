@@ -75,18 +75,19 @@ func InitWorkers_localMock() WorkersKinds {
 			Address: address,
 			Id:      idWorker,
 			State: WorkerStateMasterControl{
-				ChunksIDs:        make([]int, 1),
-				WorkerIstances:   make(map[int]WorkerIstanceControl),
-				ChunkServIstance: WorkerIstanceControl{},
-				WorkerNodeLinks:  &worker,
+				ChunksIDs:          make([]int, 1),
+				WorkerIstances:     make(map[int]WorkerIstanceControl),
+				ControlRPCInstance: WorkerIstanceControl{},
+				WorkerNodeLinks:    &worker,
 			}}
 
 		port = NextUnassignedPort(Config.CHUNK_SERVICE_BASE_PORT, &AssignedPortsAll, true, false)
-		initWorkerInstancesRef(&worker, port, idInstance, CHUNK_ID_INIT)
+		_, err := InitWorkerInstancesRef(&worker, port, CONTROL)
+		CheckErr(err, true, "init worker client")
 		idInstance++
-		port = NextUnassignedPort(Config.MAP_SERVICE_BASE_PORT, &AssignedPortsAll, true, false)
-		initWorkerInstancesRef(&worker, port, idInstance, MAP)
-		idInstance++
+		//port = NextUnassignedPort(Config.MAP_SERVICE_BASE_PORT, &AssignedPortsAll, true, false)
+		//InitWorkerInstancesRef(&worker, port, idInstance, MAP)
+		//idInstance++
 		workersOut.WorkersMapReduce[i] = worker
 		idWorker++
 	}
@@ -99,7 +100,7 @@ func InitWorkers_localMock() WorkersKinds {
 			State: WorkerStateMasterControl{
 				ChunksIDs:      make([]int, 1),
 				WorkerIstances: make(map[int]WorkerIstanceControl),
-				ChunkServIstance: WorkerIstanceControl{
+				ControlRPCInstance: WorkerIstanceControl{
 					Port:     0,
 					Kind:     0,
 					IntState: 0,
@@ -108,10 +109,8 @@ func InitWorkers_localMock() WorkersKinds {
 				WorkerNodeLinks: &worker,
 			}}
 		port = NextUnassignedPort(Config.CHUNK_SERVICE_BASE_PORT, &AssignedPortsAll, true, false)
-		initWorkerInstancesRef(&worker, port, idInstance, CHUNK_ID_INIT)
-		idInstance++
-		port = NextUnassignedPort(Config.REDUCE_SERVICE_BASE_PORT, &AssignedPortsAll, true, false)
-		initWorkerInstancesRef(&worker, port, idInstance, REDUCE)
+		_, err := InitWorkerInstancesRef(&worker, port, CONTROL)
+		CheckErr(err, true, "init worker client")
 		idInstance++
 		workersOut.WorkersOnlyReduce[i] = worker
 		idWorker++
@@ -126,7 +125,7 @@ func InitWorkers_localMock() WorkersKinds {
 			State: WorkerStateMasterControl{
 				ChunksIDs:      make([]int, 1),
 				WorkerIstances: make(map[int]WorkerIstanceControl),
-				ChunkServIstance: WorkerIstanceControl{
+				ControlRPCInstance: WorkerIstanceControl{
 					Port:     0,
 					Kind:     0,
 					IntState: 0,
@@ -135,7 +134,8 @@ func InitWorkers_localMock() WorkersKinds {
 				WorkerNodeLinks: &worker,
 			}}
 		port = NextUnassignedPort(Config.CHUNK_SERVICE_BASE_PORT, &AssignedPortsAll, true, false)
-		initWorkerInstancesRef(&worker, port, idInstance, CHUNK_ID_INIT)
+		_, err := InitWorkerInstancesRef(&worker, port, CONTROL)
+		CheckErr(err, true, "init worker client")
 		idInstance++
 		workersOut.WorkersBackup[i] = worker
 		idWorker++
@@ -175,9 +175,9 @@ var ChunksStorageMock map[int]CHUNK
 func LoadChunksStorageService_localMock(filenames []string) []int {
 	/*
 		simulate chunk distribuited storage service in a local
-		chunks will be generated and a map of chunkID->chunk_data will be created
+		chunks will be generated and a map of ChunkID->chunk_data will be created
 	*/
-	chunks := Init_chunks(filenames)
+	chunks := InitChunks(filenames)
 	chunkIDS := make([]int, len(ChunksStorageMock))
 	ChunksStorageMock = make(map[int]CHUNK)
 	for i, chunk := range chunks {

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
-	"math"
 	"net"
 	"os"
 	"reflect"
@@ -33,11 +32,14 @@ type Configuration struct {
 	CHUNK_SERVICE_BASE_PORT  int
 	MAP_SERVICE_BASE_PORT    int
 	REDUCE_SERVICE_BASE_PORT int
+	MASTER_BASE_PORT         int
+
 	// main loadBalacing vars
 	MAX_REDUCERS_PER_WORKER int
 	// main replication vars
 	CHUNKS_REPLICATION_FACTOR                int
 	CHUNKS_REPLICATION_FACTOR_BACKUP_WORKERS int
+	CHUNK_SIZE                               int64
 }
 
 func (config *Configuration) printFields() {
@@ -80,7 +82,7 @@ func CleanUpFiles(files []*os.File) {
 	}
 }
 
-func Init_chunks(filenames []string) []CHUNK { //fast concurrent file read for chunk generation
+func InitChunks(filenames []string) []CHUNK { //fast concurrent file read for chunk generation
 	/*
 		initialize chunk structure ready to be assigned to map workers
 		files will be readed in multiple threads and totalsize will be divided in fair chunks sizes
@@ -88,7 +90,6 @@ func Init_chunks(filenames []string) []CHUNK { //fast concurrent file read for c
 	*/
 	openedFiles := make([]*os.File, len(filenames))
 	fmt.Println("---start chunkization---")
-	filesChunkized := make([]CHUNK, Config.WORKER_NUM_MAP) //chunkset for assignement
 	filesData := make([]string, len(filenames))
 	barrierRead := new(sync.WaitGroup)
 	barrierRead.Add(len(filenames))
@@ -109,23 +110,41 @@ func Init_chunks(filenames []string) []CHUNK { //fast concurrent file read for c
 		CheckErr(err, true, "")
 		totalWorkSize += fstat.Size()
 	}
-	chunkSize := int64(totalWorkSize / int64(Config.WORKER_NUM_MAP)) //avg like chunk size
-	reminder := int64(totalWorkSize % int64(Config.WORKER_NUM_MAP))  //assigned to first Worker
-	barrierRead.Wait()                                               //wait read data end in all threads
+	barrierRead.Wait() //wait read data end in all threads
 	defer closeFileLists(openedFiles)
+
+	var chunkSize int64
+	var reminder int64
+	var numChunk int
+	fixedChunkSize := Config.CHUNK_SIZE > 0
+	// chunk num and size based on configuration
+	if fixedChunkSize { //fixed chunk size
+		chunkSize = Config.CHUNK_SIZE
+		numChunk = int(totalWorkSize / chunkSize)
+		reminder = totalWorkSize % chunkSize
+		if reminder > 0 {
+			numChunk++
+		}
+	} else { //fixed chunk num
+		numChunk = Config.WORKER_NUM_MAP
+		chunkSize = int64(totalWorkSize / int64(numChunk)) //avg like chunk size
+		reminder = int64(totalWorkSize % int64(numChunk))  //assigned to first Worker
+	}
+	filesChunkized := make([]CHUNK, numChunk)
 	allStr := strings.Join(filesData, "")
 
 	var low, high int64
 	for x := 0; x < len(filesChunkized); x++ {
 		low = chunkSize * int64(x)
-		high = chunkSize * int64(x+1)
+		high = Min(chunkSize*int64(x+1), int64(len(allStr))) //fixed chunk size and positive reminder => last extra chunk smaller
 		filesChunkized[x] = CHUNK(allStr[low:high])
 	}
-	if reminder > 0 {
+	if !fixedChunkSize && reminder > 0 {
 		filesChunkized[len(filesChunkized)-1] = CHUNK(allStr[low : high+reminder]) //last Worker get bigger chunk
 	}
 	return filesChunkized
 }
+
 func closeFileLists(files []*os.File) {
 	for _, file := range files {
 		err := file.Close()
@@ -164,7 +183,7 @@ func (t TokenSorter) Less(i, j int) bool {
 	return t.tokens[i].V < t.tokens[j].V
 }
 
-////  FOR ROUTING COSTS
+////  ROUTING COSTS
 type RoutingCostsSorter struct {
 	routingCosts []TrafficCostRecord
 }
@@ -186,6 +205,17 @@ func PingHeartBitRcv() {
 func PingHeartBitSnd() {
 	//TODO PING send
 	//TODO CHEAP TRIGGER ON NO ANSW
+}
+
+////	INSTANCES FUNCs
+func GetMaxIdWorkerInstances(workerInstances *map[int]WorkerInstanceInternal) int {
+	maxId := 0
+	for id, _ := range *workerInstances {
+		if id > maxId {
+			maxId = id //updateMaxId
+		}
+	}
+	return maxId
 }
 
 /// OTHER
@@ -212,8 +242,19 @@ func CheckErr(e error, fatal bool, supplementMsg string) bool {
 	}
 	return false
 }
-func Max(a int, b int) int {
-	return int(math.Max(float64(a), float64(b)))
+func Max(a int64, b int64) int64 {
+	if a > b {
+		return a
+	} else {
+		return b
+	}
+}
+func Min(a int64, b int64) int64 {
+	if a < b {
+		return a
+	} else {
+		return b
+	}
 }
 
 func SerializeToFile(defTokens []Token, filename string) {
@@ -241,6 +282,13 @@ func SerializeToFile(defTokens []Token, filename string) {
 func ListOfDictCumulativeSize(dictList []map[int]int) int {
 	cumulativeSum := 0
 	for _, dict := range dictList {
+		cumulativeSum += len(dict)
+	}
+	return cumulativeSum
+}
+func DictsNestedCumulativeSize(dictsNestes map[int]map[int]int) int {
+	cumulativeSum := 0
+	for _, dict := range dictsNestes {
 		cumulativeSum += len(dict)
 	}
 	return cumulativeSum

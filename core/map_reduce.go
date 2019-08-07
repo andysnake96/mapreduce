@@ -11,32 +11,8 @@ import (
 	"unicode"
 )
 
-type Mapper MapperIstanceStateInternal
-type Reducer ReducerIstanceStateInternal
-
-func (c *WorkerChunks) Get_chunk_ids(chunkIDs []int, reply *int) error {
-	//TODO CHECK sync.Map doc for auto handling these issuses
-	sort.Ints(chunkIDs)
-	GenericPrint(chunkIDs)
-	chunksDownloaded := make([]CHUNK, len(chunkIDs))
-	barrierDownload := new(sync.WaitGroup)
-	barrierDownload.Add(len(chunkIDs))
-	for i, chunkId := range chunkIDs {
-		//check if chunk already downloaded
-		if getChunk(chunkId, c) != CHUNK("") {
-			println("already have chunk Id :", chunkId)
-			barrierDownload.Add(-1)
-			continue
-		}
-		go downloadChunk(chunkId, &barrierDownload, &chunksDownloaded[i]) //download chunk from data store and save in isolated position
-	}
-	barrierDownload.Wait() //wait end of concurrent downloads
-	//settings downloaded chunksDownloaded in datastore
-	for i, chunkId := range chunkIDs { //chunkIDS and chunksDownloaded has same indexing semanting
-		c.Chunks[chunkId] = chunksDownloaded[i]
-	}
-	return nil
-}
+type Mapper MapperIstanceStateInternal   //map
+type Reducer ReducerIstanceStateInternal //reduce
 
 func downloadChunk(chunkId int, waitGroup **sync.WaitGroup, chunkLocation *CHUNK) {
 	/*
@@ -53,9 +29,60 @@ func downloadChunk(chunkId int, waitGroup **sync.WaitGroup, chunkLocation *CHUNK
 	(*waitGroup).Done() //notify other chunk download compleated
 }
 
-///// 		MAP		/////////////////
+/////	CONTROL-RPC	/////////////////
+func (workerNode *Worker_node_internal) Get_chunk_ids(chunkIDs []int, reply *int) error {
+	sort.Ints(chunkIDs)
+	GenericPrint(chunkIDs)
+	chunksDownloaded := make([]CHUNK, len(chunkIDs))
+	barrierDownload := new(sync.WaitGroup)
+	barrierDownload.Add(len(chunkIDs))
+	for i, chunkId := range chunkIDs {
+		//check if chunk already downloaded
+		if getChunk(chunkId, &(workerNode.WorkerChunksStore)) != CHUNK("") {
+			println("already have chunk Id :", chunkId)
+			barrierDownload.Add(-1)
+			continue
+		}
+		go downloadChunk(chunkId, &barrierDownload, &chunksDownloaded[i]) //download chunk from data store and save in isolated position
+	}
+	barrierDownload.Wait() //wait end of concurrent downloads
+	//settings downloaded chunksDownloaded in datastore
+	for i, chunkId := range chunkIDs { //chunkIDS and chunksDownloaded has same indexing semanting
+		workerNode.WorkerChunksStore.Chunks[chunkId] = chunksDownloaded[i]
+	}
+	return nil
+}
+func (workerNode *Worker_node_internal) RemoteControl_NewInstance(instanceKind int, chosenPort *int) error {
+	//create a new worker instance on top of workerNode, returning the chosen port for the new instance
+	var dfltPort int
+	if instanceKind == CONTROL {
+		dfltPort = Config.CHUNK_SERVICE_BASE_PORT
+	} else if instanceKind == MAP {
+		dfltPort = Config.MAP_SERVICE_BASE_PORT
+	} else if instanceKind == REDUCE {
+		dfltPort = Config.REDUCE_SERVICE_BASE_PORT
+	}
+	*chosenPort = NextUnassignedPort(dfltPort, &AssignedPortsAll, true, true)
+	//if Config.LOCAL_VERSION {
+	//} //else { worker node level assigned ports
+	err, _ := InitRPCWorkerIstance(nil, *chosenPort, instanceKind, workerNode) //init instance propagating errors
+	return err
+}
+func (workerNode *Worker_node_internal) ActivateNewReducer(expectedNumCallsFromMappers map[int]int, chosenPort *int) error {
+	//create a new worker instance on top of workerNode, returning the chosen port for the new instance
+	*chosenPort = NextUnassignedPort(Config.REDUCE_SERVICE_BASE_PORT, &AssignedPortsAll, true, true)
+	redInitData := GenericInternalState{ReduceData: ReducerIstanceStateInternal{ExpectedRedCalls: expectedNumCallsFromMappers}}
+	err, _ := InitRPCWorkerIstance(&redInitData, *chosenPort, REDUCE, workerNode)
+	return err
+}
 
-func (m *Mapper) Map_parse_builtin_quick_route(rawChunkId int, destinationsCosts *map[int]int) error {
+type Map2ReduceRouteCost struct {
+	RouteCosts map[int]int //for each reducerID (logic) --> cumulative data routing cost
+	RouteNum   map[int]int //for each reducerID (logic) --> expected num calls reduce()
+}
+
+///// 		MAP		/////////////////
+func (m *Mapper) Map_parse_builtin_quick_route(rawChunkId int, destinationsCosts *Map2ReduceRouteCost) error {
 	/*
 
 		map operation over rawChunck resolved from his Id
@@ -64,9 +91,13 @@ func (m *Mapper) Map_parse_builtin_quick_route(rawChunkId int, destinationsCosts
 		( will be selected Reducers positioning considering data locality, also minimizing net Overhead )
 
 	*/
-	rawChunk := getChunk(rawChunkId, m.workerChunks) //TODO
+	m.ChunkID = rawChunkId
+	rawChunk := getChunk(rawChunkId, m.WorkerChunks)
 	m.IntermediateTokens = make(map[string]int)
-	*destinationsCosts = make(map[int]int) //cost of routing to Reducers for intermediate tokens
+	*destinationsCosts = Map2ReduceRouteCost{
+		RouteCosts: make(map[int]int, Config.ISTANCES_NUM_REDUCE),
+		RouteNum:   make(map[int]int, Config.ISTANCES_NUM_REDUCE),
+	}
 	///		parse words
 	f := func(c rune) bool {
 		return !unicode.IsLetter(c)
@@ -76,31 +107,20 @@ func (m *Mapper) Map_parse_builtin_quick_route(rawChunkId int, destinationsCosts
 	for _, word := range words {
 		m.IntermediateTokens[word]++
 	}
-
 	//building reverse map for smart activations of ReducerNodes
 	var destReducerNodeId int
 	for k, v := range m.IntermediateTokens {
 		destReducerNodeId = HashKeyReducerSum(k, Config.ISTANCES_NUM_REDUCE)
-		(*destinationsCosts)[destReducerNodeId] += estimateTokenSize(Token{k, v})
+		(*destinationsCosts).RouteCosts[destReducerNodeId] += estimateTokenSize(Token{k, v})
+		(*destinationsCosts).RouteNum[destReducerNodeId]++
 	}
 	return nil
 }
-func InitRpcClients(addresses map[int]string) (map[int]*rpc.Client, error) {
-	clients := make(map[int]*rpc.Client, len(addresses))
-	var err error
-	for k, v := range addresses {
-		clients[k], err = rpc.Dial(Config.RPC_TYPE, v)
-		if CheckErr(err, false, "dialing") {
-			return nil, err
-		}
-	}
-	return clients, nil
-}
-func (m *Mapper) Map_quick_route_reducers(reducersAddresses map[int]string) error {
+func (m *Mapper) Map_quick_route_reducers(reducersAddresses map[int]string, voidReply *int) error {
 	/*
-		master will comunicate how to route intermediate tokens to reducers by this RPC
+		master will communicate how to route intermediate tokens to reducers by this RPC
 		reducersAddresses binds reducers ID to their actual Address
-		selected by the master minimizing the network overhead exploiting the data locallity on Mapper nodes
+		selected by the master minimizing the network overhead exploiting the data locality on Mapper nodes
 	*/
 	var destReducerNodeId int
 	//TODO MUTED
@@ -133,6 +153,17 @@ func (m *Mapper) Map_quick_route_reducers(reducersAddresses map[int]string) erro
 	//}
 	return nil
 }
+func InitRpcClients(addresses map[int]string) (map[int]*rpc.Client, error) {
+	clients := make(map[int]*rpc.Client, len(addresses))
+	var err error
+	for k, v := range addresses {
+		clients[k], err = rpc.Dial(Config.RPC_TYPE, v)
+		if CheckErr(err, false, "dialing") {
+			return nil, err
+		}
+	}
+	return clients, nil
+}
 
 func estimateTokenSize(token Token) int {
 	//return unsafe.Sizeof(token.V)+unsafe.Sizeof(token.K[0])*len(token.K)	//TODO CAST ERR
@@ -160,28 +191,36 @@ type ReduceArg struct {
 }
 
 func (r *Reducer) Reduce_IntermediateTokens(intermediateTokens []Token, mapperIDTODO *int) error {
-	r.CumulativeCalls++ //update cummulative calls
-	println(*mapperIDTODO, "TODO DEBUG")
-	for _, token := range intermediateTokens {
-		//cumulate intermediate token values in a cumulative dictionary
-		r.IntermediateTokensCumulative[token.K] += token.V
-	}
-	if r.CumulativeCalls == r.ExpectedRedCalls {
-		//go TODO RPC TO returnReduce(r.intermediateTokensCumulative)
-
-	}
+	return nil
+}
+func (r *Reducer) Reduce_(intermediateTokens []Token, mapperIDTODO *int) error {
+	//r.CumulativeCalls++ //update cummulative calls
+	//println(*mapperIDTODO, "TODO DEBUG")
+	//for _, token := range intermediateTokens {
+	//	//cumulate intermediate token values in a cumulative dictionary
+	//	r.IntermediateTokensCumulative[token.K] += token.V
+	//}
+	//if r.CumulativeCalls == r.ExpectedRedCalls {
+	//	//go TODO RPC TO returnReduce(r.intermediateTokensCumulative)
+	//
+	//}
 	return nil
 }
 
 ////////		MASTER		///////////////////////////////
-type _master int
+type Master struct {
+	FinalTokens     []Token
+	mutex           sync.Mutex
+	ReturnedReducer chan bool
+}
 
-var FinalTokens []Token //TODO LINK FROM GLOBAL ONE, TODO SMART PREALLOCATION
-
-func (master *_master) returnReduce(finalTokensPartial map[string]int) error {
+func (master *Master) ReturnReduce(finalTokensPartial map[string]int, voidReply *int) error {
+	master.mutex.Lock()
 	for k, v := range finalTokensPartial {
-		FinalTokens = append(FinalTokens, Token{k, v})
+		master.FinalTokens = append(master.FinalTokens, Token{k, v})
 	}
+	master.mutex.Unlock()
+	master.ReturnedReducer <- true //notify returned reducer
 	return nil
 }
 

@@ -32,3 +32,23 @@ func NumHealthyReducerOnWorker(workerNode *Worker) int {
 	}
 	return numHealthyReducers
 }
+
+func GetWorker(id int, workers *WorkersKinds) (Worker, error) {
+	//return worker with id, nil if not found
+	for _, worker := range (*workers).WorkersMapReduce {
+		if worker.Id == id {
+			return worker, nil
+		}
+	}
+	for _, worker := range (*workers).WorkersOnlyReduce {
+		if worker.Id == id {
+			return worker, nil
+		}
+	}
+	for _, worker := range (*workers).WorkersBackup {
+		if worker.Id == id {
+			return worker, nil
+		}
+	}
+	return Worker{}, errors.New("NOT FOUNDED WORKER :" + strconv.Itoa(id))
+}
