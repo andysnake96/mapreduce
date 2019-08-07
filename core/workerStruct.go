@@ -69,8 +69,8 @@ type WorkerIstanceControl struct {
 
 }
 type WorkerInstanceInternal struct {
-	Server      *rpc.Server
 	ControlData WorkerIstanceControl
+	Server      *rpc.Server
 	IntData     GenericInternalState //generic data carried by istance discriminated by kind //TODO REDUNDANT OTHER THAN intState=?
 }
 
@@ -96,7 +96,7 @@ type Worker_node_internal struct { //global worker istance worker node side
 	WorkerChunksStore  WorkerChunks                   //chunks stored in the worker node
 	Instances          map[int]WorkerInstanceInternal //server for each worker istance Id
 	ControlRpcInstance WorkerInstanceInternal         //worker node main control instace ->chunks&&respawn
-	ReducersClients    []rpc.Client
+	ReducersClients    []rpc.Client                   //connection to reducers (post activated and comunicated by master)
 }
 type WorkerChunks struct { //WORKER NODE LEVEL STRUCT
 	//HOLD chunks stored in worker node pretected by a mutex
