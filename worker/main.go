@@ -3,8 +3,7 @@ package main
 import (
 	"../core"
 	"os"
-	"strconv"
-	"syscall"
+	"reflect"
 )
 
 /*
@@ -20,10 +19,7 @@ instances running on a worker will have an progressive ID starting to first inst
 	workers num decided by addresses.json fields
 */
 
-/// worker internal state
-//TODO LOCAL  VERSION
-var workersNodeInternal_localVersion []core.Worker_node_internal //for each local simulated worker indexed by his own id -> intenal state
-var workerNodeInternal core.Worker_node_internal                 //worker internal state
+var WorkersNodeInternal_localVersion []core.Worker_node_internal //for each local simulated worker indexed by his own id -> intenal state
 
 func main() {
 	core.Config = new(core.Configuration)
@@ -36,65 +32,40 @@ func main() {
 		println(usage)
 		ChunkIDS := core.LoadChunksStorageService_localMock(core.FILENAMES_LOCL)
 		println(ChunkIDS, "<--- chunkIDS ")
-		workersLocalInit(os.Args[1:])
-		syscall.Pause()
+		core.InitWorkers_LocalMock_WorkerSide(&WorkersNodeInternal_localVersion)
+		waitWorkersEnd()
+		os.Exit(0)
 	} else {
-		errs := make([]error, 3)
-		var err error
-		port, err := strconv.Atoi(os.Args[1])
-		errs = append(errs, err)
-		rpcCODE, err := strconv.Atoi(os.Args[2])
-		errs = append(errs, err)
-		usage := "<distribuited PORT,WORKER INSTANCE KIND>"
-		core.CheckErrs(errs, true, usage)
-		//init node structs...
-		workerNodeInternal.Instances = make(map[int]core.WorkerInstanceInternal)
-		workerNodeInternal.WorkerChunksStore.Chunks = make(map[int]core.CHUNK, core.WORKER_CHUNKS_INITSIZE_DFLT)
-		e1, _ := core.InitRPCWorkerIstance(nil, core.Config.CHUNK_SERVICE_BASE_PORT, core.CONTROL, &workerNodeInternal)
-		e2, _ := core.InitRPCWorkerIstance(nil, port, rpcCODE, &workerNodeInternal)
-		core.CheckErrs([]error{e1, e2}, true, "instantiating base instances...")
+		//errs := make([]error, 3)
+		//var err error
+		//port, err := strconv.Atoi(os.Args[1])
+		//errs = append(errs, err)
+		//rpcCODE, err := strconv.Atoi(os.Args[2])
+		//errs = append(errs, err)
+		//usage := "<distribuited PORT,WORKER INSTANCE KIND>"
+		//core.CheckErrs(errs, true, usage)
+		////init node structs...
+		//workerNodeInternal.Instances = make(map[int]core.WorkerInstanceInternal)
+		//workerNodeInternal.WorkerChunksStore.Chunks = make(map[int]core.CHUNK, core.WORKER_CHUNKS_INITSIZE_DFLT)
+		//e1, _ := core.InitRPCWorkerIstance(nil, core.Config.CHUNK_SERVICE_BASE_PORT, core.CONTROL, &workerNodeInternal)
+		//e2, _ := core.InitRPCWorkerIstance(nil, port, rpcCODE, &workerNodeInternal)
+		//core.CheckErrs([]error{e1, e2}, true, "instantiating base instances...")
 	}
 }
 
-func workersLocalInit(args []string) {
-	//local worker init version
-	//worker initialized on localhost as routine with instances running on them (logically as other routine) with unique assigned ports
-	var avaiblePort int
-	var workerInternalNode *core.Worker_node_internal
-	totalWorkerNum := core.Config.WORKER_NUM_MAP + core.Config.WORKER_NUM_BACKUP_WORKER + core.Config.WORKER_NUM_ONLY_REDUCE
-	workersNodeInternal_localVersion = make([]core.Worker_node_internal, totalWorkerNum)
-	workerId := 0
-	core.AssignedPortsAll = make([]int, 0, totalWorkerNum)
-	//initalize workers by kinds specified in configuration file starting with the chunk service instance
-	for i := 0; i < core.Config.WORKER_NUM_MAP; i++ {
-		workerInternalNode = &workersNodeInternal_localVersion[workerId]
-		workerInternalNode.Instances = make(map[int]core.WorkerInstanceInternal)
-		workerInternalNode.WorkerChunksStore.Chunks = make(map[int]core.CHUNK, core.WORKER_CHUNKS_INITSIZE_DFLT)
-		avaiblePort = core.NextUnassignedPort(core.Config.CHUNK_SERVICE_BASE_PORT, &core.AssignedPortsAll, true, true) //TODO HP AVAIBILITY FOR BASE PORT ASSIGNMENTS
-		e, _ := core.InitRPCWorkerIstance(nil, avaiblePort, core.CONTROL, workerInternalNode)
-		core.CheckErr(e, true, "instantiating base instances...")
-		//TODO heartbit monitoring service for each worker
-		workerId++
+func waitWorkersEnd() {
+	chanSet := []reflect.SelectCase{}
+	for _, worker := range WorkersNodeInternal_localVersion {
+		chanSet = append(chanSet, reflect.SelectCase{
+			Dir:  reflect.SelectRecv,
+			Chan: reflect.ValueOf(worker.ExitChan),
+		})
 	}
-	for i := 0; i < core.Config.WORKER_NUM_ONLY_REDUCE; i++ {
-		workerInternalNode := &workersNodeInternal_localVersion[workerId]
-		workerInternalNode.Instances = make(map[int]core.WorkerInstanceInternal)
-		workerInternalNode.WorkerChunksStore.Chunks = make(map[int]core.CHUNK, core.WORKER_CHUNKS_INITSIZE_DFLT)
-		avaiblePort = core.NextUnassignedPort(core.Config.CHUNK_SERVICE_BASE_PORT, &core.AssignedPortsAll, true, true) //TODO HP AVAIBILITY FOR BASE PORT ASSIGNMENTS
-		e, _ := core.InitRPCWorkerIstance(nil, avaiblePort, core.CONTROL, workerInternalNode)
-		core.CheckErrs([]error{e}, true, "instantiating base instances...")
-		workerId++
+	for i := 0; i < len(WorkersNodeInternal_localVersion); i++ {
+		//<-worker.ExitChan
+		from, chanOut, _ := reflect.Select(chanSet)
+		//chanOut := valValue.Interface().(int)
+		println("ended worker: ", from, reflect.ValueOf(chanOut).Interface())
 	}
-	for i := 0; i < core.Config.WORKER_NUM_BACKUP_WORKER; i++ {
-		workerInternalNode := &workersNodeInternal_localVersion[workerId]
-		workerInternalNode.Instances = make(map[int]core.WorkerInstanceInternal)
-		workerInternalNode.WorkerChunksStore.Chunks = make(map[int]core.CHUNK, core.WORKER_CHUNKS_INITSIZE_DFLT)
-		avaiblePort = core.NextUnassignedPort(core.Config.CHUNK_SERVICE_BASE_PORT, &core.AssignedPortsAll, true, true) //TODO HP AVAIBILITY FOR BASE PORT ASSIGNMENTS
-		e, _ := core.InitRPCWorkerIstance(nil, avaiblePort, core.CONTROL, workerInternalNode)
-		core.CheckErr(e, true, "init backup instancez")
-		workerId++
-
-	}
-	println(core.AssignedPortsAll)
 
 }

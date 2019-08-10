@@ -16,6 +16,7 @@
 	"WorkersBackup": [
 		"localhost",
 		"localhost"
-	]
+	],
+	"Master": "localhost"
 }
 

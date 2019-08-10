@@ -47,10 +47,12 @@ func (config *Configuration) printFields() {
 }
 
 //support variable for dinamic generated addresses read
-type WorkerAddresses struct { //refs to up&running workers
+type WorkerAddresses struct {
+	//refs to up&running workers
 	WorkersMapReduce  []string
 	WorkersOnlyReduce []string
 	WorkersBackup     []string
+	Master            string
 }
 
 func (addrs *WorkerAddresses) printFields() {
@@ -68,6 +70,16 @@ const (
 )
 
 var FILENAMES_LOCL = []string{"txtSrc/1012-0.txt"}
+
+//errors constant for fault revery
+const ( //errors kinds
+	REDUCER_ACTIVATE           = "REDUCER_ACTIVATE"           //reducer activation error -->id reducer (logic)
+	REDUCERS_ADDR_COMUNICATION = "REDUCERS_ADDR_COMUNICATION" //reducer collocation comunication to worker --> id of worker with mappers
+	REDUCE_CONNECTION          = "REDUCE_CONNECTION"          //worker connection reducer error	--> reduce id logic
+	REDUCE_CALL                = "REDUCE_CALL"                //reduce() error					--> reduce id logic
+	ERROR_SEPARATOR            = " "                          //errors sub field separator
+
+)
 
 type Token struct {
 	//rappresent Token middle V out from map phase
@@ -215,6 +227,22 @@ func GetMaxIdWorkerInstances(workerInstances *map[int]WorkerInstanceInternal) in
 			maxId = id //updateMaxId
 		}
 	}
+	return maxId
+}
+func GetMaxIdWorkerInstancesGenericDict(workerInstancesMap interface{}) int {
+	v := reflect.ValueOf(workerInstancesMap)
+	if v.Kind() != reflect.Map {
+		panic("TRYING TO GET KEYS FROM A NON MAP but have" + v.Kind().String())
+	}
+	ids := v.MapKeys()
+	maxId := 0
+	for _, id := range ids {
+		if int(id.Int()) > maxId {
+			maxId = int(id.Int()) //updateMaxId
+		}
+	}
+	//GenericPrint(ids)
+	//println(maxId)
 	return maxId
 }
 

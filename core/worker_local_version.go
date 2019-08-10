@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/rpc"
 	"sort"
+	"sync"
 )
 
 var AssignedPortsAll []int //list of assigned ports (globally) for local version
@@ -52,95 +53,123 @@ func NextUnassignedPort(basePort int, assignedPorts *[]int, assignNewPort bool, 
 		}
 	}
 foundedPort:
-	println("founded avaible port ", port)
+	//println("founded avaible port ", port)
 	if assignNewPort { //evalue to append port to appended port list
 		*assignedPorts = append(*assignedPorts, port)
 	}
 	return port
 }
 
-func InitWorkers_localMock() WorkersKinds {
-	/*
-		init all kind of workers on localhost under a progressive assigned ports using MaxPortAssigned var
-		explicit assignement of istances for workers by their kind for future change on deflt assignements
-	*/
+func InitWorkers_LocalMock_WorkerSide(workers *[]Worker_node_internal) {
+	//local worker init version
+	//workerSide version
+	//worker initialized on localhost as routine with instances running on them (logically as other routine) with unique assigned ports for each rpc instance
+
+	var avaiblePort int
+	totalWorkerNum := Config.WORKER_NUM_MAP + Config.WORKER_NUM_BACKUP_WORKER + Config.WORKER_NUM_ONLY_REDUCE
+	*workers = make([]Worker_node_internal, totalWorkerNum)
+	workersKindsNums := map[string]int{
+		WORKERS_MAP_REDUCE: Config.WORKER_NUM_MAP, WORKERS_ONLY_REDUCE: Config.WORKER_NUM_ONLY_REDUCE, WORKERS_BACKUP_W: Config.WORKER_NUM_BACKUP_WORKER,
+	}
+
+	workerId := 0
+	AssignedPortsAll = make([]int, 0, totalWorkerNum)
+	//initalize workers by kinds specified in configuration file starting with the chunk service instance
+	for workerKind, numToInit := range workersKindsNums {
+		println("initiating workers of type: ", workerKind)
+		for i := 0; i < numToInit; i++ {
+			workerInternalNode := &((*workers)[workerId])
+			*workerInternalNode = Worker_node_internal{
+				WorkerChunksStore: WorkerChunks{
+					Mutex:  sync.Mutex{},
+					Chunks: make(map[int]CHUNK, WORKER_CHUNKS_INITSIZE_DFLT),
+				},
+				Instances:       make(map[int]WorkerInstanceInternal),
+				ReducersClients: make(map[int]*rpc.Client),
+				Id:              workerId,
+				ExitChan:        make(chan bool),
+			}
+			//starting worker control rpc instance
+			avaiblePort = NextUnassignedPort(Config.CHUNK_SERVICE_BASE_PORT, &AssignedPortsAll, true, true) //TODO HP AVAIBILITY FOR BASE PORT ASSIGNMENTS
+			e, _ := InitRPCWorkerIstance(nil, avaiblePort, CONTROL, workerInternalNode)
+			CheckErr(e, true, "instantiating base instances...")
+
+			//TODO heartbit monitoring service for each worker
+
+			// evaluating special fields basing on worker type
+			if workerKind == WORKERS_MAP_REDUCE {
+				workerInternalNode.IntermediateDataAggregated = AggregatedIntermediateTokens{
+					ChunksSouces:                 make([]int, 0),
+					PerReducerIntermediateTokens: make([]map[string]int, Config.ISTANCES_NUM_REDUCE),
+				}
+				workerInternalNode.ReducersClients = make(map[int]*rpc.Client, Config.WORKER_NUM_ONLY_REDUCE)
+			} //else if .....
+			println("started worker: ", workerId)
+
+			workerId++
+		}
+	}
+	println(AssignedPortsAll)
+
+}
+
+func InitWorkers_LocalMock_MasterSide() (WorkersKinds, []*Worker) {
+	//init all kind of workers local version
+	//master side version
+
 	var worker Worker
 	var port int
-	workersOut := *new(WorkersKinds)
-	idWorker := 0
+	totalWorkersNum := Config.WORKER_NUM_MAP + Config.WORKER_NUM_ONLY_REDUCE + Config.WORKER_NUM_BACKUP_WORKER
+	workersKindsNums := map[string]int{
+		WORKERS_MAP_REDUCE: Config.WORKER_NUM_MAP, WORKERS_ONLY_REDUCE: Config.WORKER_NUM_ONLY_REDUCE, WORKERS_BACKUP_W: Config.WORKER_NUM_BACKUP_WORKER,
+	}
+	//generic destination variable for init
+	var addressesWorkers []string
+	var destWorkersContainer *[]Worker //dest variable for workers to init
+	//init out variables
+	workersAllsRef := make([]*Worker, 0, totalWorkersNum) //refs to all created workers (for deallocation master side)
+	workersOut := *new(WorkersKinds)                      //actual workers to return
 	workersOut.WorkersMapReduce = make([]Worker, len(Addresses.WorkersMapReduce))
-	for i, address := range Addresses.WorkersMapReduce {
-		idInstance := 0
-		worker = Worker{
-			Address: address,
-			Id:      idWorker,
-			State: WorkerStateMasterControl{
-				ChunksIDs:          make([]int, 1),
-				WorkerIstances:     make(map[int]WorkerIstanceControl),
-				ControlRPCInstance: WorkerIstanceControl{},
-				WorkerNodeLinks:    &worker,
-			}}
-
-		port = NextUnassignedPort(Config.CHUNK_SERVICE_BASE_PORT, &AssignedPortsAll, true, false)
-		_, err := InitWorkerInstancesRef(&worker, port, CONTROL)
-		CheckErr(err, true, "init worker client")
-		idInstance++
-		//port = NextUnassignedPort(Config.MAP_SERVICE_BASE_PORT, &AssignedPortsAll, true, false)
-		//InitWorkerInstancesRef(&worker, port, idInstance, MAP)
-		//idInstance++
-		workersOut.WorkersMapReduce[i] = worker
-		idWorker++
-	}
 	workersOut.WorkersOnlyReduce = make([]Worker, len(Addresses.WorkersOnlyReduce))
-	for i, address := range Addresses.WorkersOnlyReduce {
-		idInstance := 0
-		worker = Worker{
-			Address: address,
-			Id:      idWorker,
-			State: WorkerStateMasterControl{
-				ChunksIDs:      make([]int, 1),
-				WorkerIstances: make(map[int]WorkerIstanceControl),
-				ControlRPCInstance: WorkerIstanceControl{
-					Port:     0,
-					Kind:     0,
-					IntState: 0,
-					Client:   &rpc.Client{},
-				},
-				WorkerNodeLinks: &worker,
-			}}
-		port = NextUnassignedPort(Config.CHUNK_SERVICE_BASE_PORT, &AssignedPortsAll, true, false)
-		_, err := InitWorkerInstancesRef(&worker, port, CONTROL)
-		CheckErr(err, true, "init worker client")
-		idInstance++
-		workersOut.WorkersOnlyReduce[i] = worker
-		idWorker++
-
-	}
 	workersOut.WorkersBackup = make([]Worker, len(Addresses.WorkersBackup))
-	for i, address := range Addresses.WorkersBackup {
-		idInstance := 0
-		worker = Worker{
-			Address: address,
-			Id:      idWorker,
-			State: WorkerStateMasterControl{
-				ChunksIDs:      make([]int, 1),
-				WorkerIstances: make(map[int]WorkerIstanceControl),
-				ControlRPCInstance: WorkerIstanceControl{
-					Port:     0,
-					Kind:     0,
-					IntState: 0,
-					Client:   &rpc.Client{},
-				},
-				WorkerNodeLinks: &worker,
-			}}
-		port = NextUnassignedPort(Config.CHUNK_SERVICE_BASE_PORT, &AssignedPortsAll, true, false)
-		_, err := InitWorkerInstancesRef(&worker, port, CONTROL)
-		CheckErr(err, true, "init worker client")
-		idInstance++
-		workersOut.WorkersBackup[i] = worker
-		idWorker++
+	idWorker := 0
+	for workerKind, numToInit := range workersKindsNums {
+		println("initiating: ", numToInit, "of workers kind: ", workerKind)
+		//taking worker kind addresses list
+		if workerKind == WORKERS_MAP_REDUCE {
+			addressesWorkers = Addresses.WorkersMapReduce
+			destWorkersContainer = &workersOut.WorkersMapReduce
+		} else if workerKind == WORKERS_ONLY_REDUCE {
+			addressesWorkers = Addresses.WorkersOnlyReduce
+			destWorkersContainer = &workersOut.WorkersOnlyReduce
+		} else if workerKind == WORKERS_BACKUP_W {
+			addressesWorkers = Addresses.WorkersBackup
+			destWorkersContainer = &workersOut.WorkersOnlyReduce
+		}
+		for i, address := range addressesWorkers {
+			worker = Worker{
+				Address: address,
+				Id:      idWorker,
+				State: WorkerStateMasterControl{
+					ChunksIDs:       make([]int, 0),
+					WorkerIstances:  make(map[int]WorkerIstanceControl),
+					WorkerNodeLinks: &worker,
+				}}
+			//init control rpc instance
+			port = NextUnassignedPort(Config.CHUNK_SERVICE_BASE_PORT, &AssignedPortsAll, true, false)
+			_, err := InitWorkerInstancesRef(&worker, port, CONTROL)
+			CheckErr(err, true, "init worker client")
+
+			//setting refs
+			//noinspection ALL ... workers holders initiated before for
+			(*destWorkersContainer)[i] = worker
+			workersAllsRef = append(workersAllsRef, &((*destWorkersContainer)[i]))
+			idWorker++
+			println("initiated worker: ", worker.Id)
+		}
 	}
-	return workersOut
+
+	return workersOut, workersAllsRef
 }
 
 func GetChunksNotAlreadyAssignedRR(chunksIds *[]int, numChunkToFind int, chunksIdsAssignedAlready []int) ([]int, error) {
@@ -178,11 +207,11 @@ func LoadChunksStorageService_localMock(filenames []string) []int {
 		chunks will be generated and a map of ChunkID->chunk_data will be created
 	*/
 	chunks := InitChunks(filenames)
-	chunkIDS := make([]int, len(ChunksStorageMock))
-	ChunksStorageMock = make(map[int]CHUNK)
+	chunkIDS := make([]int, len(chunks))
+	ChunksStorageMock = make(map[int]CHUNK, len(chunks))
 	for i, chunk := range chunks {
+		chunkIDS[i] = i
 		ChunksStorageMock[i] = chunk
-		chunkIDS = append(chunkIDS, i)
 	}
 	return chunkIDS
 
