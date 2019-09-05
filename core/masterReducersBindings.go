@@ -30,7 +30,7 @@ type ReducersRouteInfos struct {
 
 func ReducersBindingsLocallityAwareEuristic(reducersIdsTrafficIN ReducersDataRouteCosts, workers *WorkersKinds) map[int]int {
 	/*
-		Quick Euristic to select placement of Reducers Workers Istances exploiting intermediate tokens data locality
+		Quick Euristic to select placement of Reducers Workers Istances exploiting intermediate Tokens data locality
 		minimizing traffic cost of routing data  to reducers will be produced the bindings of reducersID->Address (worker node placement)
 		Basic Algo: extract a list of costs for each hash binding to a reducerID
 					sort decreasingly by costs

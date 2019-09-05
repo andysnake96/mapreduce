@@ -1,15 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="959bba11-67b5-49b9-be5e-31338d05472f" name="Default Changelist" comment="ended mapReduce logic mapper version without faultTollerantLogic....&#10;-added map op as instances with same intermediate data stored as before for fault recovery as routine inside worker ( logic instances)&#10; reducers placed as worker rpc instances considering data locality minimizing routing costs as &#10; -Reduce calls invocated from mapResults aggregatated at worker level ( explicit reduce calls from mappers would strongly increase client num ( connection replication))&#10; -So all maps result is aggregated at worker level before REDUCE()&#10; reducers work until all itermediate chunk data is received from aggregated mappers ( witch interm. data is identified uniquely from chunkIDs that have produce it) &#10; Worker termination started from last reduce retunerd to master&#10; -internal Termination handled with channel at worker level and master level">
+    <list default="true" id="959bba11-67b5-49b9-be5e-31338d05472f" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/master/recovery.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/configurations/addresses.json" beforeDir="false" afterPath="$PROJECT_DIR$/configurations/addresses.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/configurations/config.json" beforeDir="false" afterPath="$PROJECT_DIR$/configurations/config.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/core/map_reduce.go" beforeDir="false" afterPath="$PROJECT_DIR$/core/map_reduce.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/masterReducersBindings.go" beforeDir="false" afterPath="$PROJECT_DIR$/core/masterReducersBindings.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/core/utils.go" beforeDir="false" afterPath="$PROJECT_DIR$/core/utils.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/core/workerStruct.go" beforeDir="false" afterPath="$PROJECT_DIR$/core/workerStruct.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/core/worker_local_version.go" beforeDir="false" afterPath="$PROJECT_DIR$/core/worker_local_version.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/core/workersUtils.go" beforeDir="false" afterPath="$PROJECT_DIR$/core/workersUtils.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/master/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/master/main.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/test/map_red_test.go" beforeDir="false" afterPath="$PROJECT_DIR$/test/map_red_test.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/worker/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/worker/main.go" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -18,96 +21,6 @@
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
-  <component name="FileEditorManager">
-    <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/master/main.go">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="6536">
-              <caret line="353" column="48" selection-start-line="353" selection-start-column="48" selection-end-line="353" selection-end-column="48" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/configurations/config.json">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="152">
-              <caret line="8" column="21" selection-start-line="8" selection-start-column="21" selection-end-line="8" selection-end-column="21" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/core/map_reduce.go">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="703">
-              <caret line="83" column="40" selection-start-line="83" selection-start-column="40" selection-end-line="83" selection-end-column="40" />
-              <folding>
-                <element signature="n#!!block;n#RemoteControl_NewInstance#0" />
-                <element signature="n#!!block;n#ActivateNewReducer#0" />
-                <element signature="n#!!block;n#Map_quick_route_reducers#0" />
-                <element signature="n#!!block;n#Map_parse_builtin#0" />
-                <element signature="n#!!block;n#Map_string_builtin#0" />
-                <element signature="n#!!block;n#Map_raw_parse#0" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/core/utils.go">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="5871">
-              <caret line="349" column="5" selection-start-line="349" selection-start-column="5" selection-end-line="349" selection-end-column="5" />
-              <folding>
-                <element signature="e#197#225#0" />
-                <element signature="e#245#1225#0" />
-                <element signature="e#1270#1302#0" />
-                <element signature="e#1577#1608#0" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="true">
-        <entry file="file://$PROJECT_DIR$/core/worker_local_version.go">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="34">
-              <caret line="149" column="14" selection-start-line="149" selection-start-column="14" selection-end-line="149" selection-end-column="14" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file:///usr/lib/go-1.11/src/reflect/value.go">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="38380">
-              <caret line="2024" column="5" selection-start-line="2024" selection-start-column="5" selection-end-line="2024" selection-end-column="5" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/core/workerStruct.go">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="1900">
-              <caret line="105" column="8" selection-start-line="105" selection-start-column="8" selection-end-line="105" selection-end-column="8" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/worker/main.go">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="1197">
-              <caret line="67" column="74" selection-start-line="67" selection-start-column="74" selection-end-line="67" selection-end-column="74" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-    </leaf>
-  </component>
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
       <list>
@@ -115,47 +28,7 @@
       </list>
     </option>
   </component>
-  <component name="FindInProjectRecents">
-    <findStrings>
-      <find>InitRpcClients</find>
-      <find>make([]</find>
-      <find>map</find>
-      <find>getW</find>
-      <find>present</find>
-      <find>Map_parse_builtin</find>
-      <find>&quot;CONTROL.</find>
-      <find>mapPort</find>
-      <find>CONTROL.Re</find>
-      <find>map[int]map[int]int</find>
-      <find>AssignedChunkWorkers</find>
-      <find>SIZE</find>
-      <find>Error</find>
-      <find>Mapper</find>
-      <find>map[int]string</find>
-      <find>activated new reducer</find>
-      <find>master return failed</find>
-      <find>ReturnReduce</find>
-      <find>MasterClient</find>
-      <find>Reduce</find>
-      <find>chan</find>
-      <find>founded avaible port</find>
-      <find>init new instance on worker</find>
-      <find>chunk fair share remainder</find>
-      <find>ActivateNewReducer</find>
-      <find>error on bindings comunication</find>
-      <find>reduce failed</find>
-      <find>core.</find>
-      <find>allRef</find>
-      <find>ended worker</find>
-    </findStrings>
-    <replaceStrings>
-      <replace>core.</replace>
-      <replace />
-      <replace>idInstance</replace>
-      <replace>MapperIstanceStateInternal</replace>
-    </replaceStrings>
-  </component>
-  <component name="GOROOT" path="/usr/lib/go-1.11" />
+  <component name="GOROOT" path="C:/Program Files/GO" />
   <component name="Git.Settings">
     <option name="ROOT_SYNC" value="DONT_SYNC" />
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
@@ -173,74 +46,12 @@
     </option>
     <option name="useGoPathFromSystemEnvironment" value="false" />
   </component>
-  <component name="IdeDocumentHistory">
-    <option name="CHANGED_PATHS">
-      <list>
-        <option value="$PROJECT_DIR$/utils/utils.go" />
-        <option value="$PROJECT_DIR$/worker/worker_routines.go" />
-        <option value="$PROJECT_DIR$/core/masterReducersBindings.go" />
-        <option value="$PROJECT_DIR$/configurations/config.json" />
-        <option value="$PROJECT_DIR$/configurations/addresses.json" />
-        <option value="$PROJECT_DIR$/core/workersUtils.go" />
-        <option value="$PROJECT_DIR$/core/utils.go" />
-        <option value="$PROJECT_DIR$/core/workerStruct.go" />
-        <option value="$PROJECT_DIR$/core/map_reduce.go" />
-        <option value="$PROJECT_DIR$/master/main.go" />
-        <option value="$PROJECT_DIR$/worker/main.go" />
-        <option value="$PROJECT_DIR$/core/worker_local_version.go" />
-      </list>
-    </option>
-  </component>
-  <component name="ProjectFrameBounds" extendedState="6">
-    <option name="x" value="274" />
-    <option name="y" value="294" />
-    <option name="width" value="1440" />
-    <option name="height" value="750" />
-  </component>
   <component name="ProjectId" id="1OXQQrTE9NaFRZ2QJlLRNIYQTrH" />
   <component name="ProjectLevelVcsManager" settingsEditedManually="true">
     <ConfirmationsSetting value="2" id="Add" />
   </component>
-  <component name="ProjectView">
-    <navigator proportions="" version="1">
-      <foldersAlwaysOnTop value="true" />
-    </navigator>
-    <panes>
-      <pane id="ProjectPane">
-        <subPane>
-          <expand>
-            <path>
-              <item name="mapreduceextended" type="b2602c69:ProjectViewProjectNode" />
-              <item name="mapreduceextended" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="mapreduceextended" type="b2602c69:ProjectViewProjectNode" />
-              <item name="mapreduceextended" type="462c0819:PsiDirectoryNode" />
-              <item name="configurations" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="mapreduceextended" type="b2602c69:ProjectViewProjectNode" />
-              <item name="mapreduceextended" type="462c0819:PsiDirectoryNode" />
-              <item name="core" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="mapreduceextended" type="b2602c69:ProjectViewProjectNode" />
-              <item name="mapreduceextended" type="462c0819:PsiDirectoryNode" />
-              <item name="master" type="462c0819:PsiDirectoryNode" />
-            </path>
-            <path>
-              <item name="mapreduceextended" type="b2602c69:ProjectViewProjectNode" />
-              <item name="mapreduceextended" type="462c0819:PsiDirectoryNode" />
-              <item name="worker" type="462c0819:PsiDirectoryNode" />
-            </path>
-          </expand>
-          <select />
-        </subPane>
-      </pane>
-      <pane id="Scope" />
-    </panes>
-  </component>
   <component name="PropertiesComponent">
+    <property name="ASKED_ADD_EXTERNAL_FILES" value="true" />
     <property name="DefaultGoTemplateProperty" value="Go File" />
     <property name="GO_FMT" value="true" />
     <property name="SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
@@ -361,36 +172,18 @@
   <component name="TimeTrackingManager">
     <option name="totallyTimeSpent" value="33000" />
   </component>
-  <component name="ToolWindowManager">
-    <frame x="-4" y="0" width="1928" height="1048" extended-state="6" />
-    <editor active="true" />
-    <layout>
-      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.19548872" />
-      <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
-      <window_info id="Favorites" order="2" side_tool="true" />
-      <window_info anchor="bottom" id="Message" order="0" />
-      <window_info anchor="bottom" id="Find" order="1" weight="0.32822758" />
-      <window_info anchor="bottom" id="Debug" order="2" weight="0.4775281" />
-      <window_info anchor="bottom" id="Cvs" order="3" weight="0.25" />
-      <window_info anchor="bottom" id="Inspection" order="4" weight="0.4" />
-      <window_info anchor="bottom" id="TODO" order="5" />
-      <window_info anchor="bottom" id="Docker" order="6" show_stripe_button="false" />
-      <window_info anchor="bottom" id="Database Changes" order="7" />
-      <window_info anchor="bottom" id="Version Control" order="8" weight="0.3280899" />
-      <window_info anchor="bottom" id="Terminal" order="9" weight="0.3280899" />
-      <window_info anchor="bottom" id="Event Log" order="10" side_tool="true" weight="0.32960895" />
-      <window_info anchor="bottom" id="Python Console" order="11" />
-      <window_info anchor="bottom" id="Inspection Results" order="12" weight="0.32900944" />
-      <window_info anchor="bottom" id="Run" order="13" weight="0.3" />
-      <window_info anchor="right" id="Commander" internal_type="SLIDING" order="0" type="SLIDING" weight="0.4" />
-      <window_info anchor="right" id="Ant Build" order="1" weight="0.25" />
-      <window_info anchor="right" content_ui="combo" id="Hierarchy" order="2" weight="0.25" />
-      <window_info anchor="right" id="Database" order="3" />
-      <window_info anchor="right" id="SciView" order="4" />
-    </layout>
-  </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="1" />
+  </component>
+  <component name="Vcs.Log.History.Properties">
+    <option name="COLUMN_ORDER">
+      <list>
+        <option value="0" />
+        <option value="2" />
+        <option value="3" />
+        <option value="1" />
+      </list>
+    </option>
   </component>
   <component name="Vcs.Log.Tabs.Properties">
     <option name="TAB_STATES">
@@ -398,20 +191,7 @@
         <entry key="MAIN">
           <value>
             <State>
-              <option name="RECENTLY_FILTERED_USER_GROUPS">
-                <collection />
-              </option>
-              <option name="RECENTLY_FILTERED_BRANCH_GROUPS">
-                <collection />
-              </option>
-              <option name="COLUMN_ORDER">
-                <list>
-                  <option value="0" />
-                  <option value="1" />
-                  <option value="2" />
-                  <option value="3" />
-                </list>
-              </option>
+              <option name="COLUMN_ORDER" />
             </State>
           </value>
         </entry>
@@ -436,50 +216,72 @@
     <MESSAGE value="ADDED &#10;locality aware reuduce position full euristic and support structs&#10;map/reduce/chunkInit rpc logic &#10;assignment full rpc&#10;worker full struct def&#10;worker rpc/node initialization&#10;full worker Init LocalMock&#10;config read interface &#10;NEXT TEST&#10;....cps danger :( ...." />
     <MESSAGE value="ADDED &#10;smartPortAssignment offset based from BASEPORTs&#10;worker init (distribuited skeleton, good local) functions&#10;packaging UP-&gt; build success&#10;&#10;....cps ultra danger :( ...." />
     <MESSAGE value="chunks assignement RPC ok!!" />
-    <option name="LAST_COMMIT_MESSAGE" value="chunks assignement RPC ok!!" />
+    <MESSAGE value="ended mapReduce logic mapper version without whole faultTollerantLogic....&#10;-added map op as logic instances with same intermediate data stored as before for fault recovery but now are routine inside worker ( logic instances)&#10; -reducers placed as worker rpc instances considering data locality minimizing routing costs as before (removed BUG)&#10; -Reduce calls triggered from mapResults are now aggregated at worker level ( explicit reduce calls from mappers would strongly increase client num ( connection replication)) but this choice complicate slightly mappers fault tolerant logic in reducers&#10; -Reducers work until all itermediate chunk data is received from aggregated mappers ( witch interm. data is identified uniquely from chunkIDs that have produce it) &#10;     so new exit condition for reducer is have received all CHUNKS's derived intermediate data (NB even if a chunk doesn't produce any tokens for a reducer, it will send an empty int.data to reducer)&#10;     and aggregated mapper have to identify their produced data with sources CHUNK's IDs&#10; -Worker termination started from last reduce retunerd to master&#10; -internal Termination handled with channel at worker level and master level" />
+    <option name="LAST_COMMIT_MESSAGE" value="ended mapReduce logic mapper version without whole faultTollerantLogic....&#10;-added map op as logic instances with same intermediate data stored as before for fault recovery but now are routine inside worker ( logic instances)&#10; -reducers placed as worker rpc instances considering data locality minimizing routing costs as before (removed BUG)&#10; -Reduce calls triggered from mapResults are now aggregated at worker level ( explicit reduce calls from mappers would strongly increase client num ( connection replication)) but this choice complicate slightly mappers fault tolerant logic in reducers&#10; -Reducers work until all itermediate chunk data is received from aggregated mappers ( witch interm. data is identified uniquely from chunkIDs that have produce it) &#10;     so new exit condition for reducer is have received all CHUNKS's derived intermediate data (NB even if a chunk doesn't produce any tokens for a reducer, it will send an empty int.data to reducer)&#10;     and aggregated mapper have to identify their produced data with sources CHUNK's IDs&#10; -Worker termination started from last reduce retunerd to master&#10; -internal Termination handled with channel at worker level and master level" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
       <breakpoints>
         <line-breakpoint enabled="true" type="DlvLineBreakpoint">
-          <url>file://$PROJECT_DIR$/master/main.go</url>
-          <line>82</line>
-          <option name="timeStamp" value="59" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="DlvLineBreakpoint">
           <url>file://$PROJECT_DIR$/core/map_reduce.go</url>
-          <line>296</line>
+          <line>308</line>
           <option name="timeStamp" value="67" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="DlvLineBreakpoint">
-          <url>file://$PROJECT_DIR$/core/map_reduce.go</url>
-          <line>317</line>
-          <option name="timeStamp" value="70" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="DlvLineBreakpoint">
           <url>file://$PROJECT_DIR$/core/worker_local_version.go</url>
-          <line>165</line>
-          <option name="timeStamp" value="72" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="DlvLineBreakpoint">
-          <url>file://$PROJECT_DIR$/core/worker_local_version.go</url>
-          <line>172</line>
+          <line>180</line>
           <option name="timeStamp" value="73" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="DlvLineBreakpoint">
+          <url>file://$PROJECT_DIR$/core/utils.go</url>
+          <line>294</line>
+          <option name="timeStamp" value="75" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="DlvLineBreakpoint">
+          <url>file://$PROJECT_DIR$/master/main.go</url>
+          <line>156</line>
+          <option name="timeStamp" value="83" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="DlvLineBreakpoint">
+          <url>file://$PROJECT_DIR$/master/main.go</url>
+          <line>173</line>
+          <option name="timeStamp" value="96" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="DlvLineBreakpoint">
+          <url>file://$PROJECT_DIR$/worker/main.go</url>
+          <line>90</line>
+          <option name="timeStamp" value="98" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="DlvLineBreakpoint">
+          <url>file://$PROJECT_DIR$/master/main.go</url>
+          <line>78</line>
+          <option name="timeStamp" value="101" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="DlvLineBreakpoint">
+          <url>file://$PROJECT_DIR$/core/utils.go</url>
+          <line>344</line>
+          <option name="timeStamp" value="103" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="DlvLineBreakpoint">
+          <url>file://$PROJECT_DIR$/core/map_reduce.go</url>
+          <line>20</line>
+          <option name="timeStamp" value="110" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="DlvLineBreakpoint">
+          <url>file://$PROJECT_DIR$/core/masterReducersBindings.go</url>
+          <line>61</line>
+          <option name="timeStamp" value="115" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="DlvLineBreakpoint">
+          <url>file://$PROJECT_DIR$/master/main.go</url>
+          <line>307</line>
+          <option name="timeStamp" value="116" />
         </line-breakpoint>
       </breakpoints>
       <default-breakpoints>
-        <breakpoint enabled="true" type="javascript-exception">
-          <properties />
-        </breakpoint>
+        <breakpoint enabled="true" type="javascript-exception" />
       </default-breakpoints>
     </breakpoint-manager>
-    <watches-manager>
-      <configuration name="GoApplicationRunConfiguration">
-        <watch expression="AssignedChunkWorkers" language="go" />
-        <watch expression="ChunkIDS" language="go" />
-        <watch expression="Workers" language="go" />
-      </configuration>
-    </watches-manager>
   </component>
   <component name="debuggerHistoryManager">
     <expressions id="watch">
@@ -588,198 +390,5 @@
         <evaluation-mode>EXPRESSION</evaluation-mode>
       </expression>
     </expressions>
-  </component>
-  <component name="editorHistoryManager">
-    <entry file="file:///usr/lib/go-1.11/src/net/rpc/server.go" />
-    <entry file="file:///usr/lib/go-1.11/src/sort/sort.go" />
-    <entry file="file:///usr/lib/go-1.11/src/syscall/exec_unix.go" />
-    <entry file="file://$PROJECT_DIR$/worker/worker_routines.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state>
-          <caret column="12" selection-start-column="12" selection-end-column="12" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/.idea/workspace.xml">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-1653" />
-      </provider>
-    </entry>
-    <entry file="file:///usr/lib/golang/src/net/rpc/jsonrpc/client.go" />
-    <entry file="file:///usr/lib/golang/src/runtime/signal_unix.go" />
-    <entry file="file:///usr/lib/golang/src/sync/waitgroup.go" />
-    <entry file="file:///usr/lib/golang/src/syscall/asm_linux_amd64.s" />
-    <entry file="file:///usr/lib/golang/src/runtime/proc.go" />
-    <entry file="file:///usr/lib/golang/src/runtime/asm_amd64.s" />
-    <entry file="file:///usr/lib/golang/src/sync/map.go" />
-    <entry file="file:///usr/lib/golang/src/builtin/builtin.go" />
-    <entry file="file:///usr/lib/golang/src/net/rpc/client.go" />
-    <entry file="file:///usr/lib/golang/src/syscall/zsyscall_linux_amd64.go" />
-    <entry file="file:///usr/lib/golang/src/runtime/panic.go" />
-    <entry file="file:///usr/lib/golang/src/net/rpc/server.go" />
-    <entry file="file:///usr/lib/go-1.11/src/testing/quick/quick.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="409">
-          <caret line="231" column="21" selection-start-line="231" selection-start-column="21" selection-end-line="231" selection-end-column="21" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file:///usr/lib/go-1.11/src/strings/strings.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="200">
-          <caret line="372" column="44" selection-start-line="372" selection-start-column="44" selection-end-line="372" selection-end-column="44" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file:///usr/lib/go-1.11/src/net/dial.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="295">
-          <caret line="297" column="7" selection-start-line="297" selection-start-column="7" selection-end-line="297" selection-end-column="7" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/configurations/addresses.json">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="361">
-          <caret line="19" column="9" selection-start-line="19" selection-start-column="9" selection-end-line="19" selection-end-column="9" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file:///usr/lib/go-1.11/src/cmd/compile/internal/ssa/debug.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="418">
-          <caret line="1068" column="8" selection-start-line="1068" selection-start-column="8" selection-end-line="1068" selection-end-column="8" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file:///usr/lib/go-1.11/src/net/rpc/client.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="3724">
-          <caret line="205" selection-start-line="205" selection-end-line="205" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file:///usr/lib/go-1.11/src/runtime/proc.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="434">
-          <caret line="264" column="5" selection-start-line="264" selection-start-column="5" selection-end-line="264" selection-end-column="5" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file:///usr/lib/go-1.11/src/runtime/panic.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="157">
-          <caret line="680" selection-start-line="680" selection-end-line="680" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file:///usr/lib/go-1.11/src/builtin/builtin.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="338">
-          <caret line="148" column="39" lean-forward="true" selection-start-line="148" selection-start-column="39" selection-end-line="148" selection-end-column="39" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file:///usr/lib/go-1.11/src/runtime/asm_amd64.s">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="351">
-          <caret line="522" selection-start-line="522" selection-end-line="522" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/core/masterReducersBindings.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="179">
-          <caret line="61" column="47" selection-start-line="61" selection-start-column="47" selection-end-line="61" selection-end-column="47" />
-          <folding>
-            <element signature="e#14#32#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/core/workersUtils.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="456">
-          <caret line="71" column="15" selection-start-line="71" selection-start-column="15" selection-end-line="71" selection-end-column="15" />
-          <folding>
-            <element signature="n#!!block;n#WorkerNodeWithMapper#0" />
-            <element signature="n#!!block;n#NumHealthyReducerOnWorker#0" />
-            <element signature="n#!!block;n#GetWorker#0" />
-            <element signature="n#!!block;n#estimateTokenSize#0" />
-            <element signature="n#!!block;n#getChunk#0" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/master/main.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="6536">
-          <caret line="353" column="48" selection-start-line="353" selection-start-column="48" selection-end-line="353" selection-end-column="48" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/configurations/config.json">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="152">
-          <caret line="8" column="21" selection-start-line="8" selection-start-column="21" selection-end-line="8" selection-end-column="21" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/core/map_reduce.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="703">
-          <caret line="83" column="40" selection-start-line="83" selection-start-column="40" selection-end-line="83" selection-end-column="40" />
-          <folding>
-            <element signature="n#!!block;n#RemoteControl_NewInstance#0" />
-            <element signature="n#!!block;n#ActivateNewReducer#0" />
-            <element signature="n#!!block;n#Map_quick_route_reducers#0" />
-            <element signature="n#!!block;n#Map_parse_builtin#0" />
-            <element signature="n#!!block;n#Map_string_builtin#0" />
-            <element signature="n#!!block;n#Map_raw_parse#0" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/core/utils.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="5871">
-          <caret line="349" column="5" selection-start-line="349" selection-start-column="5" selection-end-line="349" selection-end-column="5" />
-          <folding>
-            <element signature="e#197#225#0" />
-            <element signature="e#245#1225#0" />
-            <element signature="e#1270#1302#0" />
-            <element signature="e#1577#1608#0" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file:///usr/lib/go-1.11/src/reflect/value.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="38380">
-          <caret line="2024" column="5" selection-start-line="2024" selection-start-column="5" selection-end-line="2024" selection-end-column="5" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/core/workerStruct.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1900">
-          <caret line="105" column="8" selection-start-line="105" selection-start-column="8" selection-end-line="105" selection-end-column="8" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/worker/main.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1197">
-          <caret line="67" column="74" selection-start-line="67" selection-start-column="74" selection-end-line="67" selection-end-column="74" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/core/worker_local_version.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="34">
-          <caret line="149" column="14" selection-start-line="149" selection-start-column="14" selection-end-line="149" selection-end-column="14" />
-        </state>
-      </provider>
-    </entry>
   </component>
 </project>

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/rpc"
 	"sort"
+	"strconv"
 	"sync"
 )
 
@@ -11,9 +12,8 @@ var AssignedPortsAll []int //list of assigned ports (globally) for local version
 
 func NextUnassignedPort(basePort int, assignedPorts *[]int, assignNewPort bool, checkExternalPortBindings bool) int {
 	//find next avaible port among the assignedPorts starting search from basePort,
-	// will be returned the closest next assignable port
+	//will be returned the closest next assignable port
 	//the new port will be assigned if true assignNewFoundedPort
-
 	sort.Ints(*assignedPorts)
 	conflict := false
 	var nextPortUnassigned int
@@ -60,7 +60,7 @@ foundedPort:
 	return port
 }
 
-func InitWorkers_LocalMock_WorkerSide(workers *[]Worker_node_internal) {
+func InitWorkers_LocalMock_WorkerSide(workers *[]Worker_node_internal,stopPingChan chan bool) {
 	//local worker init version
 	//workerSide version
 	//worker initialized on localhost as routine with instances running on them (logically as other routine) with unique assigned ports for each rpc instance
@@ -78,8 +78,7 @@ func InitWorkers_LocalMock_WorkerSide(workers *[]Worker_node_internal) {
 	for workerKind, numToInit := range workersKindsNums {
 		println("initiating workers of type: ", workerKind)
 		for i := 0; i < numToInit; i++ {
-			workerInternalNode := &((*workers)[workerId])
-			*workerInternalNode = Worker_node_internal{
+			workerNode := Worker_node_internal{
 				WorkerChunksStore: WorkerChunks{
 					Mutex:  sync.Mutex{},
 					Chunks: make(map[int]CHUNK, WORKER_CHUNKS_INITSIZE_DFLT),
@@ -88,24 +87,28 @@ func InitWorkers_LocalMock_WorkerSide(workers *[]Worker_node_internal) {
 				ReducersClients: make(map[int]*rpc.Client),
 				Id:              workerId,
 				ExitChan:        make(chan bool),
+				StartChan:       make(chan bool,1),
 			}
 			//starting worker control rpc instance
 			avaiblePort = NextUnassignedPort(Config.CHUNK_SERVICE_BASE_PORT, &AssignedPortsAll, true, true) //TODO HP AVAIBILITY FOR BASE PORT ASSIGNMENTS
-			e, _ := InitRPCWorkerIstance(nil, avaiblePort, CONTROL, workerInternalNode)
-			CheckErr(e, true, "instantiating base instances...")
-
-			//TODO heartbit monitoring service for each worker
+			e, _ := InitRPCWorkerIstance(nil, avaiblePort, CONTROL, &workerNode)
+			CheckErr(e, true, "instantiating base instanc error...")
+			/////////// ping service start
+			avaiblePort = NextUnassignedPort(Config.PING_SERVICE_BASE_PORT, &AssignedPortsAll, true, true) //TODO HP AVAIBILITY FOR BASE PORT ASSIGNMENTS
+			conn,err:=PingHeartBitRcv(avaiblePort,stopPingChan)
+			CheckErr(err,true,"heart bit init error")
+			workerNode.PingConnection =conn
 
 			// evaluating special fields basing on worker type
 			if workerKind == WORKERS_MAP_REDUCE {
-				workerInternalNode.IntermediateDataAggregated = AggregatedIntermediateTokens{
+				workerNode.IntermediateDataAggregated = AggregatedIntermediateTokens{
 					ChunksSouces:                 make([]int, 0),
 					PerReducerIntermediateTokens: make([]map[string]int, Config.ISTANCES_NUM_REDUCE),
 				}
-				workerInternalNode.ReducersClients = make(map[int]*rpc.Client, Config.WORKER_NUM_ONLY_REDUCE)
+				workerNode.ReducersClients = make(map[int]*rpc.Client, Config.WORKER_NUM_ONLY_REDUCE)
 			} //else if .....
 			println("started worker: ", workerId)
-
+			(*workers)[workerId]=workerNode
 			workerId++
 		}
 	}
@@ -113,7 +116,7 @@ func InitWorkers_LocalMock_WorkerSide(workers *[]Worker_node_internal) {
 
 }
 
-func InitWorkers_LocalMock_MasterSide() (WorkersKinds, []*Worker) {
+func InitWorkers_LocalMock_MasterSide() (WorkersKinds, []Worker) {
 	//init all kind of workers local version
 	//master side version
 
@@ -127,7 +130,7 @@ func InitWorkers_LocalMock_MasterSide() (WorkersKinds, []*Worker) {
 	var addressesWorkers []string
 	var destWorkersContainer *[]Worker //dest variable for workers to init
 	//init out variables
-	workersAllsRef := make([]*Worker, 0, totalWorkersNum) //refs to all created workers (for deallocation master side)
+	workersAllsRef := make([]Worker, 0, totalWorkersNum) //refs to all created workers (for deallocation master side)
 	workersOut := *new(WorkersKinds)                      //actual workers to return
 	workersOut.WorkersMapReduce = make([]Worker, len(Addresses.WorkersMapReduce))
 	workersOut.WorkersOnlyReduce = make([]Worker, len(Addresses.WorkersOnlyReduce))
@@ -144,31 +147,36 @@ func InitWorkers_LocalMock_MasterSide() (WorkersKinds, []*Worker) {
 			destWorkersContainer = &workersOut.WorkersOnlyReduce
 		} else if workerKind == WORKERS_BACKUP_W {
 			addressesWorkers = Addresses.WorkersBackup
-			destWorkersContainer = &workersOut.WorkersOnlyReduce
+			destWorkersContainer = &workersOut.WorkersBackup
 		}
 		for i, address := range addressesWorkers {
+			port = NextUnassignedPort(Config.CHUNK_SERVICE_BASE_PORT, &AssignedPortsAll, true, false)
+			pingPort:=NextUnassignedPort(Config.PING_SERVICE_BASE_PORT,&AssignedPortsAll,true,false)
+			client, err := rpc.Dial(Config.RPC_TYPE, worker.Address+":"+strconv.Itoa(port))
+			CheckErr(err, true, "init worker client")
+			//init control rpc instance
 			worker = Worker{
-				Address: address,
-				Id:      idWorker,
+				Address:         address,
+				PingServicePort: pingPort,
+				Id:              idWorker,
 				State: WorkerStateMasterControl{
 					ChunksIDs:       make([]int, 0),
-					WorkerIstances:  make(map[int]WorkerIstanceControl),
 					WorkerNodeLinks: &worker,
-				}}
-			//init control rpc instance
-			port = NextUnassignedPort(Config.CHUNK_SERVICE_BASE_PORT, &AssignedPortsAll, true, false)
-			_, err := InitWorkerInstancesRef(&worker, port, CONTROL)
-			CheckErr(err, true, "init worker client")
+					ControlRPCInstance:WorkerIstanceControl{
+						Port:     port,
+						Kind:     CONTROL,
+						Client:   client,
+					}}}
 
 			//setting refs
 			//noinspection ALL ... workers holders initiated before for
 			(*destWorkersContainer)[i] = worker
-			workersAllsRef = append(workersAllsRef, &((*destWorkersContainer)[i]))
 			idWorker++
 			println("initiated worker: ", worker.Id)
 		}
 	}
-
+	workersAllsRef=append(workersOut.WorkersBackup,workersOut.WorkersMapReduce ...)
+	workersAllsRef=append(workersAllsRef,workersOut.WorkersOnlyReduce...)
 	return workersOut, workersAllsRef
 }
 
@@ -212,6 +220,26 @@ func LoadChunksStorageService_localMock(filenames []string) []int {
 	for i, chunk := range chunks {
 		chunkIDS[i] = i
 		ChunksStorageMock[i] = chunk
+	}
+	return chunkIDS
+
+}
+func LoadChunks_multipleTimes_debug(filenames []string,replicationFactor int) []int {
+	/*
+		simulate chunk distribuited storage service in a local
+		chunks will be generated and a map of ChunkID->chunk_data will be created
+		each chunk will be replicated replciaitonFactor number of times for debugging check
+	*/
+	chunks := InitChunks(filenames)
+	chunkIDS := make([]int, len(chunks)*replicationFactor)
+	ChunksStorageMock = make(map[int]CHUNK, len(chunks)*replicationFactor)
+	chunkReplicatedIndex:=0
+	for _, chunk := range chunks {
+		for j := 0; j < replicationFactor; j++ {
+			chunkIDS[chunkReplicatedIndex] = chunkReplicatedIndex
+			ChunksStorageMock[chunkReplicatedIndex] = chunk
+			chunkReplicatedIndex++
+		}
 	}
 	return chunkIDS
 

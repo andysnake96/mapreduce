@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 //////////// FLEX CONFIGURATION
@@ -22,6 +23,7 @@ type ConfigInterface interface {
 type Configuration struct {
 	SORT_FINAL               bool   //sort final file (extra computation)
 	LOCAL_VERSION            bool   //use function for local deply
+	SIMULATE_WORKERS_CRUSH	 bool
 	ISTANCES_NUM_REDUCE      int    //number of reducer to istantiate
 	WORKER_NUM_ONLY_REDUCE   int    //num of worker node that will exec only 1 reduce istance
 	WORKER_NUM_MAP           int    //num of mapper to istantiate
@@ -33,7 +35,7 @@ type Configuration struct {
 	MAP_SERVICE_BASE_PORT    int
 	REDUCE_SERVICE_BASE_PORT int
 	MASTER_BASE_PORT         int
-
+	PING_SERVICE_BASE_PORT	 int
 	// main loadBalacing vars
 	MAX_REDUCERS_PER_WORKER int
 	// main replication vars
@@ -78,9 +80,29 @@ const ( //errors kinds
 	REDUCE_CONNECTION          = "REDUCE_CONNECTION"          //worker connection reducer error	--> reduce id logic
 	REDUCE_CALL                = "REDUCE_CALL"                //reduce() error					--> reduce id logic
 	ERROR_SEPARATOR            = " "                          //errors sub field separator
+	TIMEOUT           		   = "TIMEOUT"                    // rpc timeout
 
 )
+func ParseReduceErrString(reduceRpcErrs []error,reducerCollocation map[int]int,workers *WorkersKinds) (map[int][]int, map[int][]int) {
+	//parse reduce rpc error string, find failed worker setting map/reduce JOB to reset
+	var workerFailed Worker
+	mapsToRedo:=make(map[int][]int)
+	reduceToRedo:=make(map[int][]int)
 
+	for _, err := range reduceRpcErrs {
+		tmpErrString:=strings.Split(err.Error(),ERROR_SEPARATOR)	//key value in 2 string FAIL_TYPE-->ID OF FAILED
+		failedId, _ :=strconv.Atoi(tmpErrString[1])
+		if tmpErrString[0]==REDUCERS_ADDR_COMUNICATION{				//worker fail during bindings comunication
+			workerFailed,_=GetWorker(failedId,workers)
+		} else {
+			workerFailed,_=GetWorker(reducerCollocation[failedId],workers)	//get worker hosting reducer logic
+		}
+		workerFailed.State.Failed=true
+		mapsToRedo[workerFailed.Id]=workerFailed.State.MapIntermediateTokenIDs
+		reduceToRedo[workerFailed.Id]=workerFailed.State.ReducersHostedIDs
+	}
+	return mapsToRedo,reduceToRedo
+}
 type Token struct {
 	//rappresent Token middle V out from map phase
 	K string
@@ -181,18 +203,18 @@ func HashKeyReducerSum(key string, maxIDOut int) int {
 // FOR TOKEN LIST
 type TokenSorter struct {
 	//rappresent Token middle V out from map phase
-	tokens []Token
+	Tokens []Token
 	//by func(tks1,tks2 Token)	//sorting function ... default by Key builtin sort func
 }
 
 func (t TokenSorter) Len() int {
-	return len(t.tokens)
+	return len(t.Tokens)
 }
 func (t TokenSorter) Swap(i, j int) {
-	t.tokens[i], t.tokens[j] = t.tokens[j], t.tokens[i]
+	t.Tokens[i], t.Tokens[j] = t.Tokens[j], t.Tokens[i]
 }
 func (t TokenSorter) Less(i, j int) bool {
-	return t.tokens[i].V < t.tokens[j].V
+	return t.Tokens[i].V < t.Tokens[j].V
 }
 
 ////  ROUTING COSTS
@@ -210,15 +232,117 @@ func (r RoutingCostsSorter) Less(i, j int) bool {
 	return r.routingCosts[i].RoutingCost < r.routingCosts[j].RoutingCost
 }
 
-/////	HEARTBIT FUNCS		/////
-func PingHeartBitRcv() {
-	//TODO PING receve
-}
-func PingHeartBitSnd() {
-	//TODO PING send
-	//TODO CHEAP TRIGGER ON NO ANSW
+
+
+
+
+/////	HEARTBIT 	/////
+const PING_LEN = 1;
+const PONG = 1;
+const PING = 0;
+const PING_TRY_NUM = 5;
+var PING_TIMEOUT time.Duration=time.Millisecond*960;
+
+func PingHeartBitRcv(port int,stopPing chan bool) (net.Conn,error) {
+	//ping receve and reply service under port implemented with ping/pong of 1 byte readed/written by a routine
+	//stopPing has to be a initiated and 1 buffered channel for non blocking read
+	//return the listen udp connection to caller or error
+
+	conn, err := net.ListenUDP("udp", &net.UDPAddr{
+		Port: port,
+		IP:   net.ParseIP("0.0.0.0"),
+	})
+	if CheckErr(err,false,"ping rcv error"){
+		return conn,err;
+	}
+	/// go ping reaceiver rountine
+	go func () {
+		message := make([]byte,PING_LEN )
+		pong:=make([]byte,PING_LEN)
+		pong[0]=PONG;
+		for ;len(stopPing)<1;{
+			//ping read&reply loop until stop has been set on bufferd channel in stopPing
+			//TODO STOP SERVICE DURING READ BLOCK => ERROR PRINT
+			//error check fatal setted to false on stop service propagated to ping routie
+			receivedLen, remoteAddr, err := conn.ReadFromUDP(message)						//PING
+			if CheckErr(err,false,"udp read err"){
+				break
+			}
+			_,err=conn.WriteToUDP(pong,remoteAddr);											//PONG
+			if CheckErr(err,false,"udp write err"){
+				break
+			}
+			data := strings.TrimSpace(string(message[:receivedLen]))
+			fmt.Printf("received: %s from %s\n", data, remoteAddr)
+		}
+		_ = conn.Close()
+	}()
+	return conn,nil;
 }
 
+func PingHeartBitSnd(addr string) (error) {
+	//ping host at addr with 1byte ping msg waiting for a pong or a timeout expire
+	//fixed num of trys performed
+
+	/// setup destination
+ 	udpAddr,err:=net.ResolveUDPAddr("udp",addr);
+ 	CheckErr(err,true,"udp Addr resolve connection error");
+ 	udpConn,err:=net.DialUDP("udp",nil,udpAddr);	//nil laddr will set a euphimeral port on sender
+ 	defer udpConn.Close();
+ 	CheckErr(err,true,"udp dial error");
+
+ 	///// set up ephemeral source socket
+ 	//euphimeralAddr:=udpConn.LocalAddr().String();
+	//myIp:=strings.Split(euphimeralAddr,":")[0];
+	//ephemeralPortStr :=strings.Split(euphimeralAddr,":")[1];
+	//ephemeralPort,err:=strconv.Atoi(ephemeralPortStr);
+	//CheckErr(err,true,"ephemeral port extracting error");
+	//ephemeralConn, err := net.ListenUDP("udp", &net.UDPAddr{
+	//	 Port: ephemeralPort,
+	//	 IP:   net.ParseIP(myIp),
+	// })
+	//CheckErr(err,true,"ephemeral conn listen error");
+	//defer ephemeralConn.Close();
+
+	pong := make([]byte,PING_LEN);
+	ping:=make([]byte,PING_LEN)
+	ping[0]=PING;
+	socketFail :=true;
+	err=udpConn.SetReadDeadline(time.Now().Add(PING_TIMEOUT));
+	CheckErr(err,true,"set deadline to ping socket error");
+	/// fixed num of ping try
+	for i:=0;i<PING_TRY_NUM && socketFail ;i++  {
+		 //// write ping
+		 _,err=udpConn.Write(ping);								//PING
+		 CheckErr(err,true,"udp write 1 byte ping error");
+		 //// read pong
+		 _,err:=udpConn.Read(pong)								//PONG rcv
+		 if CheckErr(err,false,"pong read error"){
+			 socketFail =true; //no error exit ping try loop
+		 }else {
+		 	socketFail=false
+		 }
+	}
+	if socketFail {
+		return err;
+	}
+	return nil;
+}
+
+func PingProbeAlivenessFilter(workers *[]Worker) {
+	//probe each worker for aliveness, filter away dead workers
+	for indx, worker := range *workers {
+		err:=PingHeartBitSnd(worker.Address+":"+strconv.Itoa(worker.PingServicePort))
+		if err!=nil{	//dead worker, delete from list in place
+			worker.State.Failed=true
+			if indx<len(*workers) {
+				*workers= append((*workers)[:indx], (*workers)[indx+1:]...)
+			} else {
+				*workers=(*workers)[:indx]
+			}
+		}
+	}
+}
 ////	INSTANCES FUNCs
 func GetMaxIdWorkerInstances(workerInstances *map[int]WorkerInstanceInternal) int {
 	maxId := 0
@@ -321,7 +445,14 @@ func DictsNestedCumulativeSize(dictsNestes map[int]map[int]int) int {
 	}
 	return cumulativeSum
 }
-
+func CheckAllTrueInBoolDict(boolDict map[int]bool) bool{
+	for _, value := range boolDict {
+		if value==false {
+			return false
+		}
+	}
+	return true
+}
 func ReadConfigFile(configFilePath string, destVar ConfigInterface) {
 	f, err := os.Open(configFilePath)
 	CheckErr(err, true, "config file open")
