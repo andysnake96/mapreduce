@@ -1,0 +1,3 @@
+./src/github.com/aws/aws-sdk-go/.git
+./src/golang.org/x/net/.git
+./src/golang.org/x/text/.git

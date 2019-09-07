@@ -51,7 +51,7 @@ func (workerNode *Worker_node_internal) RemoteControl_NewInstance(instanceKind i
 	} else if instanceKind == REDUCE {
 		dfltPort = Config.REDUCE_SERVICE_BASE_PORT
 	}
-	*chosenPort = NextUnassignedPort(dfltPort, &AssignedPortsAll, true, true)
+	*chosenPort = NextUnassignedPort(dfltPort, &AssignedPortsAll, true, true, "tcp")
 	//if Config.LOCAL_VERSION {
 	//} //else { worker node level assigned ports
 	err, _ := InitRPCWorkerIstance(nil, *chosenPort, instanceKind, workerNode) //init instance propagating errors
@@ -65,7 +65,7 @@ type ReducerActivateArgs struct {
 
 func (workerNode *Worker_node_internal) ActivateNewReducer(redArg ReducerActivateArgs, chosenPort *int) error {
 	//create a new reducer actual instance on top of workerNode, returning the chosen port for the new instance
-	*chosenPort = NextUnassignedPort(Config.REDUCE_SERVICE_BASE_PORT, &AssignedPortsAll, true, true)
+	*chosenPort = NextUnassignedPort(Config.REDUCE_SERVICE_BASE_PORT, &AssignedPortsAll, true, true, "tcp")
 	masterClient, err := rpc.Dial(Config.RPC_TYPE, redArg.MasterAddress) //init master client for future final return
 	if CheckErr(err, false, "reducer activation master link fail") {
 		return err

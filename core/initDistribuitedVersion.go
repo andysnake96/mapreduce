@@ -63,10 +63,10 @@ func loadChunksToChunkStorage(filenames []string, waitGroup **sync.WaitGroup, co
 	errsMutex := sync.Mutex{}
 	println("concurrent S3 UPLOAD OF ", len(chunks), " CHUNKS start")
 	startTime := time.Now()
-	for i, chunk := range chunks {
+	for i, _ := range chunks {
 		keyChunk := strconv.Itoa(i)
-		go func(barrier **sync.WaitGroup) {
-			err := aws_SDK_wrap.UploadDATA(uploader, string(chunk), keyChunk, bucket)
+		go func(barrier **sync.WaitGroup, i int) {
+			err := aws_SDK_wrap.UploadDATA(uploader, string(chunks[i]), keyChunk, bucket)
 			if err != nil {
 				_, _ = fmt.Fprint(os.Stderr, "upload err", err)
 				errsMutex.Lock()
@@ -75,7 +75,7 @@ func loadChunksToChunkStorage(filenames []string, waitGroup **sync.WaitGroup, co
 			}
 			print(".")
 			(*barrier).Done()
-		}(&uploadAllBarrier)
+		}(&uploadAllBarrier, i)
 		chunkIDS[i] = i
 	}
 	uploadAllBarrier.Wait()
@@ -90,7 +90,7 @@ func waitWorkersRegister(waitGroup **sync.WaitGroup, control *MASTER_CONTROL, as
 	//publish this address to workers
 	//wait workers to registry to master
 
-	port := NextUnassignedPort(Config.WORKER_REGISTER_SERVICE_BASE_PORT, assignedPorts, true, true)
+	port := NextUnassignedPort(Config.WORKER_REGISTER_SERVICE_BASE_PORT, assignedPorts, true, true, "tcp")
 	conn, err := net.ListenTCP("tcp", &net.TCPAddr{
 		Port: port,
 		IP:   net.ParseIP("0.0.0.0"),
@@ -147,8 +147,8 @@ func InitWorker(worker *Worker_node_internal, stopPingChan chan bool) ([]int, er
 	////// start ping service and initialize worker
 	assignedPorts := make([]int, 0, 5)
 	/// init worker struct
-	pingPort := NextUnassignedPort(Config.PING_SERVICE_BASE_PORT, &assignedPorts, true, true)       //TODO HP AVAIBILITY FOR BASE PORT ASSIGNMENTS
-	controlRpcPort := NextUnassignedPort(Config.PING_SERVICE_BASE_PORT, &assignedPorts, true, true) //TODO HP AVAIBILITY FOR BASE PORT ASSIGNMENTS
+	pingPort := NextUnassignedPort(Config.PING_SERVICE_BASE_PORT, &assignedPorts, true, true, "udp")        //TODO HP AVAIBILITY FOR BASE PORT ASSIGNMENTS
+	controlRpcPort := NextUnassignedPort(Config.CHUNK_SERVICE_BASE_PORT, &assignedPorts, true, true, "tcp") //TODO HP AVAIBILITY FOR BASE PORT ASSIGNMENTS
 
 	pingConn, err := PingHeartBitRcv(pingPort, stopPingChan)
 	if CheckErr(err, false, "worker init distribuited version") {

@@ -9,7 +9,7 @@ import (
 )
 
 var AssignedPortsAll []int //list of assigned ports (globally) for local version
-func NextUnassignedPort(basePort int, assignedPorts *[]int, assignNewPort bool, checkExternalPortBindings bool) int {
+func NextUnassignedPort(basePort int, assignedPorts *[]int, assignNewPort bool, checkExternalPortBindings bool, networkToCheck string) int {
 	//find next avaible port among the assignedPorts starting search from basePort,
 	//will be returned the closest next assignable port
 	//the new port will be assigned if true assignNewFoundedPort
@@ -17,7 +17,7 @@ func NextUnassignedPort(basePort int, assignedPorts *[]int, assignNewPort bool, 
 	conflict := false
 	var nextPortAssigned int
 	port := basePort
-	var portIndex int
+	portIndex := 0
 	//check if base port is assigned
 	for portIndex, nextPortAssigned = range *assignedPorts {
 		if nextPortAssigned == port {
@@ -26,35 +26,45 @@ func NextUnassignedPort(basePort int, assignedPorts *[]int, assignNewPort bool, 
 			break
 		}
 	}
-	if conflict && portIndex+1 < len(*assignedPorts) { //on port assignement conflict=>find next avaible port starting from that location
-		//also skip port collision sub resolve if nextPortAssigned is already the last one
-		portIndex++ //start search next port checking next assigned port
-		for lastAssignedPort := (*assignedPorts)[len(*assignedPorts)-1]; nextPortAssigned < lastAssignedPort; portIndex++ {
-			nextPortAssigned = (*assignedPorts)[portIndex]
-			if nextPortAssigned != port { //find port avaibility near to the baseport
-				if !checkExternalPortBindings {
-					goto foundedPort
+	if checkExternalPortBindings && !CheckPortAvaibility(port, networkToCheck) {
+		conflict = true
+	}
+	if conflict {
+		if portIndex+1 < len(*assignedPorts) { //on port assignement conflict=>find next avaible port starting from that location
+			//also skip port collision sub resolve if nextPortAssigned is already the last one
+			portIndex++ //start search next port checking next assigned port
+			for lastAssignedPort := (*assignedPorts)[len(*assignedPorts)-1]; nextPortAssigned < lastAssignedPort; portIndex++ {
+				nextPortAssigned = (*assignedPorts)[portIndex]
+				if nextPortAssigned != port { //find port avaibility near to the baseport
+					if !checkExternalPortBindings {
+						goto foundedPort
+					}
+					for ; port < nextPortAssigned && !CheckPortAvaibility(port, networkToCheck); port++ { //check port binding to other app
+						println("already bounded port:", port)
+						*assignedPorts = append(*assignedPorts, port) //append not assignable port
+					}
+					if CheckPortAvaibility(port, networkToCheck) {
+						goto foundedPort
+					} else {
+						*assignedPorts = append(*assignedPorts, port) //append not assignable port
+						continue                                      //exceeded port during search, skip increment because already done in check port bounded by other apps
+					}
 				}
-				for ; port < nextPortAssigned && !CheckPortAvaibility(port); port++ { //check port binding to other app
-					println("check if already bounded port:", port)
-				}
-				if CheckPortAvaibility(port) {
-					goto foundedPort
-				} else {
-					continue //exceeded port during search, skip increment because already done in check port bounded by other apps
-				}
+				port++
 			}
-			port++
-		}
-		if !conflict {
-			port++ //ended assigned port vector checks without find an avaible port==> just take the next
+
+		} else {
+			for ; checkExternalPortBindings && !CheckPortAvaibility(port, networkToCheck); port++ {
+				*assignedPorts = append(*assignedPorts, port)
+			}
 		}
 	}
 foundedPort:
-	println("founded avaible port ", port, "\t", checkExternalPortBindings)
 	if assignNewPort { //evalue to append port to appended port list
 		*assignedPorts = append(*assignedPorts, port)
 	}
+	println("founded avaible port ", port, "\t", checkExternalPortBindings, "\n assigned ports:")
+	GenericPrint(*assignedPorts)
 	return port
 }
 
@@ -87,11 +97,11 @@ func InitWorkers_LocalMock_WorkerSide(workers *[]Worker_node_internal, stopPingC
 				Id:              workerId,
 			}
 			//starting worker control rpc instance
-			avaiblePort = NextUnassignedPort(Config.CHUNK_SERVICE_BASE_PORT, &AssignedPortsAll, true, true) //TODO HP AVAIBILITY FOR BASE PORT ASSIGNMENTS
+			avaiblePort = NextUnassignedPort(Config.CHUNK_SERVICE_BASE_PORT, &AssignedPortsAll, true, true, "tcp") //TODO HP AVAIBILITY FOR BASE PORT ASSIGNMENTS
 			e, _ := InitRPCWorkerIstance(nil, avaiblePort, CONTROL, &workerNode)
 			CheckErr(e, true, "instantiating base instanc error...")
 			/////////// ping service start
-			avaiblePort = NextUnassignedPort(Config.PING_SERVICE_BASE_PORT, &AssignedPortsAll, true, true) //TODO HP AVAIBILITY FOR BASE PORT ASSIGNMENTS
+			avaiblePort = NextUnassignedPort(Config.PING_SERVICE_BASE_PORT, &AssignedPortsAll, true, true, "tcp") //TODO HP AVAIBILITY FOR BASE PORT ASSIGNMENTS
 			conn, err := PingHeartBitRcv(avaiblePort, stopPingChan)
 			CheckErr(err, true, "heart bit init error")
 			workerNode.PingConnection = conn
@@ -147,8 +157,8 @@ func InitWorkers_LocalMock_MasterSide() (WorkersKinds, []Worker) {
 			destWorkersContainer = &workersOut.WorkersBackup
 		}
 		for i, address := range addressesWorkers {
-			port = NextUnassignedPort(Config.CHUNK_SERVICE_BASE_PORT, &AssignedPortsAll, true, false)
-			pingPort := NextUnassignedPort(Config.PING_SERVICE_BASE_PORT, &AssignedPortsAll, true, false)
+			port = NextUnassignedPort(Config.CHUNK_SERVICE_BASE_PORT, &AssignedPortsAll, true, false, "tcp")
+			pingPort := NextUnassignedPort(Config.PING_SERVICE_BASE_PORT, &AssignedPortsAll, true, false, "tcp")
 			client, err := rpc.Dial(Config.RPC_TYPE, worker.Address+":"+strconv.Itoa(port))
 			CheckErr(err, true, "init worker client")
 			//init control rpc instance

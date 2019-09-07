@@ -490,17 +490,31 @@ func GenericPrint(slice interface{}) bool {
 }
 
 //ports
-func CheckPortAvaibility(port int) (status bool) {
+func CheckPortAvaibility(port int, network string) (status bool) {
 
 	// Concatenate a colon and the port
-	host := ":" + strconv.Itoa(port)
 	errs := make([]error, 2)
 	// Try to create a server with the port
-	server, err := net.Listen("tcp", host)
-	errs = append(errs, err)
-	err = server.Close()
-	// close the server
-	errs = append(errs, err)
-	return !CheckErrs(errs, true, "checking port avaibility"+strconv.Itoa(port))
+	if network == "tcp" {
+		server, err := net.Listen(network, ":"+strconv.Itoa(port))
+		errs = append(errs, err)
+		if err == nil {
+			err = server.Close()
+		}
+		errs = append(errs, err)
+
+	} else {
+		conn, err := net.ListenUDP("udp", &net.UDPAddr{
+			Port: port,
+			IP:   net.ParseIP("0.0.0.0"),
+		})
+		errs = append(errs, err)
+		if err == nil {
+			err = conn.Close()
+		}
+		errs = append(errs, err)
+	}
+
+	return !CheckErrs(errs, false, "checking port avaibility"+strconv.Itoa(port))
 
 }

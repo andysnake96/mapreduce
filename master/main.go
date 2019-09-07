@@ -53,15 +53,21 @@ func main() {
 		init_local_version(&MasterControl)
 	} else {
 		println("usage: publicIP master, upload to S3, source file1,...source fileN")
-		filenames := core.FILENAMES_LOCL //TODO SWITCH TO ARGV
-		//filenames:=os.Args[3:]
+		filenames := core.FILENAMES_LOCL
+		if len(os.Args) >= 3 { //TODO SWTICH TO ARGV TEMPLATE
+			filenames = os.Args[3:]
+		}
 
-		//masterAddress=os.Args[1]
 		masterAddress = "37.116.178.139" //dig +short myip.opendns.com @resolver1.opendns.com
+		if len(os.Args) >= 3 {           //TODO SWTICH TO ARGV TEMPLATE
+			masterAddress = os.Args[1]
+		}
 
 		loadChunksToS3 := false
-		loadChunksToS3Str := "true"
-		//loadChunksToS3Str:=os.Args[2]
+		loadChunksToS3Str := "false"
+		if len(os.Args) >= 3 { //TODO SWTICH TO ARGV TEMPLATE
+			loadChunksToS3Str = os.Args[2]
+		}
 		if strings.Contains(strings.ToUpper(loadChunksToS3Str), "TRUE") {
 			loadChunksToS3 = true
 		}
