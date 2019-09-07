@@ -16,9 +16,9 @@ import (
 
 /////	CONTROL-RPC	/////////////////
 func (workerNode *Worker_node_internal) Get_chunk_ids(chunkIDs []int, voidReply *int) error {
-	workerNode.StartChan<-true					//todo trigger start for local version
+
 	sort.Ints(chunkIDs)
-	println("GETTING CHUNKS AT ",workerNode.Id)
+	println("GETTING CHUNKS AT ", workerNode.Id)
 	GenericPrint(chunkIDs)
 	chunksDownloaded := make([]CHUNK, len(chunkIDs))
 	barrierDownload := new(sync.WaitGroup)
@@ -58,16 +58,21 @@ func (workerNode *Worker_node_internal) RemoteControl_NewInstance(instanceKind i
 	return err
 } //TODO OTHER BRANCH
 
-func (workerNode *Worker_node_internal) ActivateNewReducer(numChunks int, chosenPort *int) error {
+type ReducerActivateArgs struct {
+	NumChunks     int
+	MasterAddress string
+}
+
+func (workerNode *Worker_node_internal) ActivateNewReducer(redArg ReducerActivateArgs, chosenPort *int) error {
 	//create a new reducer actual instance on top of workerNode, returning the chosen port for the new instance
 	*chosenPort = NextUnassignedPort(Config.REDUCE_SERVICE_BASE_PORT, &AssignedPortsAll, true, true)
-	masterClient, err := rpc.Dial(Config.RPC_TYPE, Addresses.Master+":"+strconv.Itoa(Config.MASTER_BASE_PORT)) //init master client for future final return
+	masterClient, err := rpc.Dial(Config.RPC_TYPE, redArg.MasterAddress) //init master client for future final return
 	if CheckErr(err, false, "reducer activation master link fail") {
 		return err
 	}
 	//init expected intermdiate data shares for the new reducer
 	cumulativesCalls := make(map[int]bool)
-	for i := 0; i < numChunks; i++ {
+	for i := 0; i < redArg.NumChunks; i++ {
 		cumulativesCalls[i] = false
 	}
 	redInitData := GenericInternalState{ReduceData: ReducerIstanceStateInternal{
@@ -104,9 +109,9 @@ func (workerNode *Worker_node_internal) DoMAPs(MapChunkIds []int, DestinationsCo
 	var newInstance *WorkerInstanceInternal
 	//concurrent do map on go rountines
 	for i, chunkId := range MapChunkIds {
-		newInstanceId:=chunkId
+		newInstanceId := chunkId
 		newInstance = workerNode.initLogicWorkerIstance(nil, MAP, &newInstanceId) //init new mapper logic instance with chunkID as instance id
-		workerNode.Instances[newInstanceId]=*newInstance								  //set the newly created instance
+		workerNode.Instances[newInstanceId] = *newInstance                        //set the newly created instance
 		destCostOut[i] = make(chan Map2ReduceRouteCost)
 		go newInstance.IntData.MapData.Map_parse_builtin_quick_route(chunkId, &(destCostOut[i])) //concurrent map computations
 	}
@@ -168,9 +173,9 @@ func (workerNode *Worker_node_internal) ReducersCollocations(ReducersAddresses m
 	ends := make([]*rpc.Call, len(ReducersAddresses))
 	sourcesChunks := workerNode.IntermediateDataAggregated.ChunksSouces
 	for reducerLogicId, intermediateTokens := range workerNode.IntermediateDataAggregated.PerReducerIntermediateTokens {
-		_,isNewlySpawnedReducer:=ReducersAddresses[reducerLogicId]
+		_, isNewlySpawnedReducer := ReducersAddresses[reducerLogicId]
 		if !isNewlySpawnedReducer {
-			continue								//skip not spawned reducers
+			continue //skip not spawned reducers
 		}
 		ends[reducerLogicId] = workerNode.ReducersClients[reducerLogicId].Go("REDUCE.Reduce", ReduceArgs{intermediateTokens, sourcesChunks}, nil, nil)
 	}

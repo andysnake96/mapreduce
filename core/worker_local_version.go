@@ -9,34 +9,33 @@ import (
 )
 
 var AssignedPortsAll []int //list of assigned ports (globally) for local version
-
 func NextUnassignedPort(basePort int, assignedPorts *[]int, assignNewPort bool, checkExternalPortBindings bool) int {
 	//find next avaible port among the assignedPorts starting search from basePort,
 	//will be returned the closest next assignable port
 	//the new port will be assigned if true assignNewFoundedPort
 	sort.Ints(*assignedPorts)
 	conflict := false
-	var nextPortUnassigned int
+	var nextPortAssigned int
 	port := basePort
 	var portIndex int
 	//check if base port is assigned
-	for portIndex, nextPortUnassigned = range *assignedPorts {
-		if nextPortUnassigned == port {
+	for portIndex, nextPortAssigned = range *assignedPorts {
+		if nextPortAssigned == port {
 			port++ //first try to avoid port collision
 			conflict = true
 			break
 		}
 	}
 	if conflict && portIndex+1 < len(*assignedPorts) { //on port assignement conflict=>find next avaible port starting from that location
-		//also skip port collision sub resolve if nextPortUnassigned is already the last one
+		//also skip port collision sub resolve if nextPortAssigned is already the last one
 		portIndex++ //start search next port checking next assigned port
-		for lastAssignedPort := (*assignedPorts)[len(*assignedPorts)-1]; nextPortUnassigned < lastAssignedPort; portIndex++ {
-			nextPortUnassigned = (*assignedPorts)[portIndex]
-			if nextPortUnassigned != port { //find port avaibility near to the baseport
+		for lastAssignedPort := (*assignedPorts)[len(*assignedPorts)-1]; nextPortAssigned < lastAssignedPort; portIndex++ {
+			nextPortAssigned = (*assignedPorts)[portIndex]
+			if nextPortAssigned != port { //find port avaibility near to the baseport
 				if !checkExternalPortBindings {
 					goto foundedPort
 				}
-				for ; port < nextPortUnassigned && !CheckPortAvaibility(port); port++ { //check port binding to other app
+				for ; port < nextPortAssigned && !CheckPortAvaibility(port); port++ { //check port binding to other app
 					println("check if already bounded port:", port)
 				}
 				if CheckPortAvaibility(port) {
@@ -47,20 +46,19 @@ func NextUnassignedPort(basePort int, assignedPorts *[]int, assignNewPort bool, 
 			}
 			port++
 		}
-
 		if !conflict {
 			port++ //ended assigned port vector checks without find an avaible port==> just take the next
 		}
 	}
 foundedPort:
-	//println("founded avaible port ", port)
+	println("founded avaible port ", port, "\t", checkExternalPortBindings)
 	if assignNewPort { //evalue to append port to appended port list
 		*assignedPorts = append(*assignedPorts, port)
 	}
 	return port
 }
 
-func InitWorkers_LocalMock_WorkerSide(workers *[]Worker_node_internal,stopPingChan chan bool) {
+func InitWorkers_LocalMock_WorkerSide(workers *[]Worker_node_internal, stopPingChan chan bool) {
 	//local worker init version
 	//workerSide version
 	//worker initialized on localhost as routine with instances running on them (logically as other routine) with unique assigned ports for each rpc instance
@@ -85,9 +83,8 @@ func InitWorkers_LocalMock_WorkerSide(workers *[]Worker_node_internal,stopPingCh
 				},
 				Instances:       make(map[int]WorkerInstanceInternal),
 				ReducersClients: make(map[int]*rpc.Client),
-				Id:              workerId,
 				ExitChan:        make(chan bool),
-				StartChan:       make(chan bool,1),
+				Id:              workerId,
 			}
 			//starting worker control rpc instance
 			avaiblePort = NextUnassignedPort(Config.CHUNK_SERVICE_BASE_PORT, &AssignedPortsAll, true, true) //TODO HP AVAIBILITY FOR BASE PORT ASSIGNMENTS
@@ -95,9 +92,9 @@ func InitWorkers_LocalMock_WorkerSide(workers *[]Worker_node_internal,stopPingCh
 			CheckErr(e, true, "instantiating base instanc error...")
 			/////////// ping service start
 			avaiblePort = NextUnassignedPort(Config.PING_SERVICE_BASE_PORT, &AssignedPortsAll, true, true) //TODO HP AVAIBILITY FOR BASE PORT ASSIGNMENTS
-			conn,err:=PingHeartBitRcv(avaiblePort,stopPingChan)
-			CheckErr(err,true,"heart bit init error")
-			workerNode.PingConnection =conn
+			conn, err := PingHeartBitRcv(avaiblePort, stopPingChan)
+			CheckErr(err, true, "heart bit init error")
+			workerNode.PingConnection = conn
 
 			// evaluating special fields basing on worker type
 			if workerKind == WORKERS_MAP_REDUCE {
@@ -108,7 +105,7 @@ func InitWorkers_LocalMock_WorkerSide(workers *[]Worker_node_internal,stopPingCh
 				workerNode.ReducersClients = make(map[int]*rpc.Client, Config.WORKER_NUM_ONLY_REDUCE)
 			} //else if .....
 			println("started worker: ", workerId)
-			(*workers)[workerId]=workerNode
+			(*workers)[workerId] = workerNode
 			workerId++
 		}
 	}
@@ -131,7 +128,7 @@ func InitWorkers_LocalMock_MasterSide() (WorkersKinds, []Worker) {
 	var destWorkersContainer *[]Worker //dest variable for workers to init
 	//init out variables
 	workersAllsRef := make([]Worker, 0, totalWorkersNum) //refs to all created workers (for deallocation master side)
-	workersOut := *new(WorkersKinds)                      //actual workers to return
+	workersOut := *new(WorkersKinds)                     //actual workers to return
 	workersOut.WorkersMapReduce = make([]Worker, len(Addresses.WorkersMapReduce))
 	workersOut.WorkersOnlyReduce = make([]Worker, len(Addresses.WorkersOnlyReduce))
 	workersOut.WorkersBackup = make([]Worker, len(Addresses.WorkersBackup))
@@ -151,7 +148,7 @@ func InitWorkers_LocalMock_MasterSide() (WorkersKinds, []Worker) {
 		}
 		for i, address := range addressesWorkers {
 			port = NextUnassignedPort(Config.CHUNK_SERVICE_BASE_PORT, &AssignedPortsAll, true, false)
-			pingPort:=NextUnassignedPort(Config.PING_SERVICE_BASE_PORT,&AssignedPortsAll,true,false)
+			pingPort := NextUnassignedPort(Config.PING_SERVICE_BASE_PORT, &AssignedPortsAll, true, false)
 			client, err := rpc.Dial(Config.RPC_TYPE, worker.Address+":"+strconv.Itoa(port))
 			CheckErr(err, true, "init worker client")
 			//init control rpc instance
@@ -162,10 +159,10 @@ func InitWorkers_LocalMock_MasterSide() (WorkersKinds, []Worker) {
 				State: WorkerStateMasterControl{
 					ChunksIDs:       make([]int, 0),
 					WorkerNodeLinks: &worker,
-					ControlRPCInstance:WorkerIstanceControl{
-						Port:     port,
-						Kind:     CONTROL,
-						Client:   client,
+					ControlRPCInstance: WorkerIstanceControl{
+						Port:   port,
+						Kind:   CONTROL,
+						Client: client,
 					}}}
 
 			//setting refs
@@ -175,8 +172,8 @@ func InitWorkers_LocalMock_MasterSide() (WorkersKinds, []Worker) {
 			println("initiated worker: ", worker.Id)
 		}
 	}
-	workersAllsRef=append(workersOut.WorkersBackup,workersOut.WorkersMapReduce ...)
-	workersAllsRef=append(workersAllsRef,workersOut.WorkersOnlyReduce...)
+	workersAllsRef = append(workersOut.WorkersBackup, workersOut.WorkersMapReduce...)
+	workersAllsRef = append(workersAllsRef, workersOut.WorkersOnlyReduce...)
 	return workersOut, workersAllsRef
 }
 
@@ -224,7 +221,7 @@ func LoadChunksStorageService_localMock(filenames []string) []int {
 	return chunkIDS
 
 }
-func LoadChunks_multipleTimes_debug(filenames []string,replicationFactor int) []int {
+func LoadChunks_multipleTimes_debug(filenames []string, replicationFactor int) []int {
 	/*
 		simulate chunk distribuited storage service in a local
 		chunks will be generated and a map of ChunkID->chunk_data will be created
@@ -233,7 +230,7 @@ func LoadChunks_multipleTimes_debug(filenames []string,replicationFactor int) []
 	chunks := InitChunks(filenames)
 	chunkIDS := make([]int, len(chunks)*replicationFactor)
 	ChunksStorageMock = make(map[int]CHUNK, len(chunks)*replicationFactor)
-	chunkReplicatedIndex:=0
+	chunkReplicatedIndex := 0
 	for _, chunk := range chunks {
 		for j := 0; j < replicationFactor; j++ {
 			chunkIDS[chunkReplicatedIndex] = chunkReplicatedIndex

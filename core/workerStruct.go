@@ -6,7 +6,9 @@ import (
 	"strconv"
 	"sync"
 )
+
 const WORKER_CHUNKS_INITSIZE_DFLT = 3
+
 type CHUNK string
 
 const ( //WORKERS KINDS
@@ -31,11 +33,11 @@ type Worker struct { //worker istance master side
 type WorkerStateMasterControl struct {
 	//struct for all data that a worker node may have during computation
 	//because a worker may or may not become both Mapper and Reducer not all these filds will be used
-	ChunksIDs []int //all chunks located on Worker
-	MapIntermediateTokenIDs []int	//computed map interm.Tokens from assigned chunk (same id of chunk)
-	ReducersHostedIDs		[]int
+	ChunksIDs               []int //all chunks located on Worker
+	MapIntermediateTokenIDs []int //computed map interm.Tokens from assigned chunk (same id of chunk)
+	ReducersHostedIDs       []int
 	//WorkerIstances     map[int]WorkerIstanceControl //for each worker istance ID -> control info (port,state,internalData)
-	ControlRPCInstance WorkerIstanceControl         //chunkService worker node level instance
+	ControlRPCInstance WorkerIstanceControl //chunkService worker node level instance
 	WorkerNodeLinks    *Worker
 	Failed             bool
 	//backward link it
@@ -50,11 +52,10 @@ type MapperIstanceStateInternal struct {
 
 type ReducerIstanceStateInternal struct {
 	IntermediateTokensCumulative map[string]int //used by reduce calls to aggregate intermediate Tokens from the map executions
-	CumulativeCalls map[int]bool //cumulative number of reduce calls received per chunk ID (for exit condition) (
-	mutex           sync.Mutex   //protect cumulative vars from concurrent access
-	MasterClient    *rpc.Client  //to report back to master final token share of reducer
+	CumulativeCalls              map[int]bool   //cumulative number of reduce calls received per chunk ID (for exit condition) (
+	mutex                        sync.Mutex     //protect cumulative vars from concurrent access
+	MasterClient                 *rpc.Client    //to report back to master final token share of reducer
 }
-
 
 type GenericInternalState struct { //worker instance generic internal state ( field to use is discriminable from instance kind filed)
 	MapData    MapperIstanceStateInternal
@@ -69,9 +70,9 @@ type WorkerIstanceControl struct { //MASTER SIDE instance
 
 }
 type WorkerInstanceInternal struct {
-	Kind        int						//either MAP or REDUCE
+	Kind        int //either MAP or REDUCE
 	ListenerRpc net.Listener
-	ServerRpc 	*rpc.Server
+	ServerRpc   *rpc.Server
 	IntData     GenericInternalState //generic data carried by istance discriminated by kind //TODO REDUNDANT OTHER THAN intState=?
 }
 
@@ -108,8 +109,8 @@ type Worker_node_internal struct {
 	Id                         int
 	PingConnection             net.Conn
 	///////// local version chan for internal correct termination
-	ExitChan                   chan bool					 //on master exit req notify main routine of logic worker end
-	StartChan                  chan bool					 //on first rpc  from master notify this event //TODO 4 KILL SIMULATE
+	ExitChan chan bool //on master exit req notify main routine of logic worker end
+
 }
 type WorkerChunks struct { //WORKER NODE LEVEL STRUCT
 	//HOLD chunks stored in worker node pretected by a mutex
@@ -117,7 +118,6 @@ type WorkerChunks struct { //WORKER NODE LEVEL STRUCT
 	Chunks map[int]CHUNK //chunks stored by Id in worker
 
 }
-
 
 func InitRPCWorkerIstance(initData *GenericInternalState, port int, kind int, workerNodeInt *Worker_node_internal) (error, int) {
 	//Create an instance of structs which implements map and reduce interfaces
@@ -132,10 +132,10 @@ func InitRPCWorkerIstance(initData *GenericInternalState, port int, kind int, wo
 		return e, -1
 	}
 	workerIstanceData := WorkerInstanceInternal{
-		Kind:kind,
-		ListenerRpc:l,
-		ServerRpc:rpc.NewServer(),
-		}
+		Kind:        kind,
+		ListenerRpc: l,
+		ServerRpc:   rpc.NewServer(),
+	}
 	/*if kind == MAP {
 		mapper := new(MapperIstanceStateInternal)
 		if initData != nil {
@@ -144,14 +144,14 @@ func InitRPCWorkerIstance(initData *GenericInternalState, port int, kind int, wo
 		err = rpcServer.RegisterName("MAP", mapper)
 		mapper.WorkerChunks = &workerNodeInt.WorkerChunksStore //link to chunks for mapper
 		workerIstanceData.IntData.MapData = MapperIstanceStateInternal(*mapper)
-	} else*/ if kind == REDUCE {
+	} else*/if kind == REDUCE {
 		reducer := new(ReducerIstanceStateInternal)
 		if initData != nil {
 			reducer = &(initData.ReduceData)
 		}
 		err = workerIstanceData.ServerRpc.RegisterName("REDUCE", reducer)
 		workerIstanceData.IntData.ReduceData = ReducerIstanceStateInternal(*reducer)
-		(*workerNodeInt).Instances[maxId]=workerIstanceData
+		(*workerNodeInt).Instances[maxId] = workerIstanceData
 	} else if kind == CONTROL { //instances for controlRPCs and ChunksService at workerNodeLevel
 		//chunk service
 		workerNodeInt.WorkerChunksStore.Chunks = make(map[int]CHUNK, WORKER_CHUNKS_INITSIZE_DFLT)
@@ -191,8 +191,8 @@ func (workerNodeInt *Worker_node_internal) initLogicWorkerIstance(initData *Gene
 		newId = *id
 	}
 	workerIstanceData := WorkerInstanceInternal{
-		Kind:    kind,
-		}
+		Kind: kind,
+	}
 	if kind == MAP {
 		mapper := *new(MapperIstanceStateInternal)
 		mapper.IntermediateTokens = make(map[string]int)
