@@ -3,10 +3,12 @@ package main
 import (
 	"../aws_SDK_wrap"
 	"../core"
+	"fmt"
 	"math/rand"
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -25,12 +27,8 @@ instances running on a worker will have an progressive ID starting to first inst
 
 var WorkersNodeInternal_localVersion []core.Worker_node_internal //for each local simulated worker indexed by his own id -> intenal state
 var WorkersNodeInternal core.Worker_node_internal                //worker nod ref distribuited version
-
-const (
-	WORKER_CRUSH_SIMULATE_NUM = 3
-)
-
-var SIMULATE_WORKER_CRUSH_BEFORE time.Duration = 1 * time.Nanosecond
+var SIMULATE_WORKER_CRUSH_BEFORE time.Duration = 5 * time.Second
+var SIMULATE_WORKER_CRUSH_AFTER time.Duration = 500 * time.Millisecond
 
 func main() {
 	core.Config = new(core.Configuration)
@@ -56,7 +54,20 @@ func main() {
 		masterAddr, err := core.RegisterToMaster(downloader, portToComunicate)
 		core.CheckErr(err, true, "master register err")
 		WorkersNodeInternal.MasterAddr = masterAddr
-		if core.Config.SIMULATE_WORKERS_CRUSH {
+
+		//fault simulation
+		isUnluckyWorker := false //worker to crush
+		if len(os.Args) < 2 {
+			//no crush flag given, gen with random probability in respect with workers to crush
+			totalNumWorkers := core.Config.WORKER_NUM_ONLY_REDUCE + core.Config.WORKER_NUM_BACKUP_WORKER + core.Config.WORKER_NUM_MAP
+			crushProbability := float64(core.Config.SIMULATE_WORKERS_CRUSH_NUM) / float64(totalNumWorkers)
+			isUnluckyWorker = core.RandomBool(crushProbability, 4)
+		} else {
+			crushArg := strings.ToUpper(os.Args[1])
+			isUnluckyWorker = strings.Contains(crushArg, "TRUE")
+		}
+
+		if core.Config.SIMULATE_WORKERS_CRUSH && isUnluckyWorker {
 			simulateWorkerCrush()
 		}
 		waitWorkerEnd(stopPingService)
@@ -68,13 +79,15 @@ const EXIT_FORCED = 556
 
 func simulateWorkerCrush() {
 	///select a random time before simulate worker death
-	killAfterAbout := rand.Intn(int(SIMULATE_WORKER_CRUSH_BEFORE))
+	killAfterAbout := rand.Int63n(int64(SIMULATE_WORKER_CRUSH_BEFORE))
+	killAfterAbout += int64(SIMULATE_WORKER_CRUSH_AFTER)
 	time.Sleep(time.Duration(killAfterAbout))
 	///close every listening socket still open
 	_ = WorkersNodeInternal.ControlRpcInstance.ListenerRpc.Close()
 	for _, instance := range WorkersNodeInternal.Instances {
 		_ = instance.ListenerRpc.Close()
 	}
+	_, _ = fmt.Fprint(os.Stderr, "CRUSH SIMULATION ON WORKER with pid:", os.Getpid())
 	os.Exit(EXIT_FORCED)
 }
 
@@ -99,9 +112,7 @@ func waitWorkersEnd(stopPing chan bool) { ////local version
 		})
 	}
 	workersToWait := len(WorkersNodeInternal_localVersion)
-	if core.Config.SIMULATE_WORKERS_CRUSH {
-		workersToWait -= WORKER_CRUSH_SIMULATE_NUM
-	}
+
 	for i := 0; i < workersToWait; i++ {
 		//<-worker.ExitChan
 		endedWorkerID, chanOut, _ := reflect.Select(chanSet)

@@ -12,6 +12,8 @@ import (
 	"unicode"
 )
 
+const FINAL_TOKEN_FILENAME = "outTokens.list"
+
 //core functions of map reduce
 //control rpc used to trigger MAP and REDUCE calls over worker instances over worker nodes
 

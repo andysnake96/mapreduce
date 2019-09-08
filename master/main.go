@@ -33,7 +33,6 @@ var MasterControl core.MASTER_CONTROL
 
 const INIT_FINAL_TOKEN_SIZE = 500
 const TIMEOUT_PER_RPC time.Duration = time.Second
-const FINAL_TOKEN_FILENAME = "outTokens.list"
 
 func main() {
 	core.Config = new(core.Configuration)
@@ -43,37 +42,53 @@ func main() {
 
 	var masterAddress string
 
-	///distribuited  version vars
-	//var downloader *s3manager.Downloader
-	//var uploader *s3manager.Uploader
-	//var assignedPort []int
 	if core.Config.LOCAL_VERSION {
 		masterAddress = "localhost"
 		init_local_version(&MasterControl)
 	} else {
-		println("usage: publicIP master, upload to S3, source file1,...source fileN")
-		filenames := core.FILENAMES_LOCL
-		if len(os.Args) >= 3 { //TODO SWTICH TO ARGV TEMPLATE
-			filenames = os.Args[3:]
-		}
 
+		////// master working config
+		println("usage: isMasterCopy,publicIP master, data upload to S3, source file1,...source fileN")
+
+		//// master replica
+		isMasterReplicaStr := "false"
+		if len(os.Args) >= 2 { //TODO SWTICH TO ARGV TEMPLATE
+			isMasterReplicaStr = os.Args[1]
+		}
+		if strings.Contains(strings.ToUpper(isMasterReplicaStr), "TRUE") {
+			MasterReplicaStart()
+		}
+		//// master address
 		//masterAddress = "37.116.178.139" //dig +short myip.opendns.com @resolver1.opendns.com
 		masterAddress = ""     //dig +short myip.opendns.com @resolver1.opendns.com
 		if len(os.Args) >= 3 { //TODO SWTICH TO ARGV TEMPLATE
-			masterAddress = os.Args[1]
+			masterAddress = os.Args[2]
 		}
-
+		//// load chunks flag
 		loadChunksToS3 := false
 		loadChunksToS3Str := "false"
-		if len(os.Args) >= 3 { //TODO SWTICH TO ARGV TEMPLATE
-			loadChunksToS3Str = os.Args[2]
+		if len(os.Args) >= 4 {
+			loadChunksToS3Str = os.Args[3]
 		}
 		if strings.Contains(strings.ToUpper(loadChunksToS3Str), "TRUE") {
 			loadChunksToS3 = true
 		}
-		MasterControl.Addresses.Master = masterAddress
-		_, _, _ = core.Init_distribuited_version(&MasterControl, filenames, loadChunksToS3)
+
+		//// filenames
+		filenames := core.FILENAMES_LOCL
+		if len(os.Args) >= 5 { //TODO SWTICH TO ARGV TEMPLATE
+			filenames = os.Args[4:]
+		}
+		MasterControl.MasterAddress = masterAddress
+		startInitTime := time.Now()
+		_, _, _, err := core.Init_distribuited_version(&MasterControl, filenames, loadChunksToS3)
+		println("elapsed for initialization: ", time.Now().Sub(startInitTime).String())
+		if core.CheckErr(err, false, "") {
+			killAll(&MasterControl.WorkersAll)
+			os.Exit(96)
+		}
 	}
+
 	masterData := masterRpcInit()
 	MasterControl.MasterRpc = masterData
 	Workers := MasterControl.Workers
@@ -88,7 +103,9 @@ func main() {
 	workersChunksFairShares := assignChunksIDs(&Workers.WorkersMapReduce, &(MasterControl.ChunkIDS), core.Config.CHUNKS_REPLICATION_FACTOR, false, assignedChunkWorkers)
 	//core.GenericPrint(workersChunksFairShares)
 	assignChunksIDs(&Workers.WorkersBackup, &(MasterControl.ChunkIDS), core.Config.CHUNKS_REPLICATION_FACTOR_BACKUP_WORKERS, true, assignedChunkWorkers) //only replication assignement on backup workers
-	errs := comunicateChunksAssignementToWorkers(assignedChunkWorkers)                                                                                   //RPC 1 IN SEQ DIAGRAM
+	assignementChunksStartTime := time.Now()
+	errs := comunicateChunksAssignementToWorkers(assignedChunkWorkers) //RPC 1 IN SEQ DIAGRAM
+	println("elapsed for chunk assignement: ", time.Now().Sub(assignementChunksStartTime).String())
 	if len(errs) > 0 {
 		_, _ = fmt.Fprintf(os.Stderr, "ASSIGN CHUNK ERRD \n")
 		workersIdsToReschedule := make(map[int][]int, len(errs)) //map of worker->chunks assigned to reschedule
@@ -194,7 +211,7 @@ func main() {
 		tk := core.TokenSorter{MasterControl.MasterRpc.FinalTokens}
 		sort.Sort(sort.Reverse(tk))
 	}
-	core.SerializeToFile(MasterControl.MasterRpc.FinalTokens, FINAL_TOKEN_FILENAME)
+	core.SerializeToFile(MasterControl.MasterRpc.FinalTokens, core.FINAL_TOKEN_FILENAME)
 	println(masterData.FinalTokens)
 	os.Exit(0)
 
@@ -240,6 +257,9 @@ func assignChunksIDs(workers *[]core.Worker, chunksIds *[]int, replicationFactor
 		return the fair share assignements to each worker passed,
 
 	*/
+	if len(*workers) == 0 {
+		return nil
+	}
 	_fairChunkNumShare := len(*chunksIds) / len(*workers)
 	fairChunkNumShare := int(len(*chunksIds) / len(*workers))
 	if _fairChunkNumShare < 1 {
@@ -431,7 +451,7 @@ func comunicateReducersBindings(redBindings map[int]int, workers *core.WorkersKi
 		worker.State.ReducersHostedIDs = append(worker.State.ReducersHostedIDs, reducerIdLogic)
 	}
 	if len(errs) > 0 {
-		fmt.Fprint(os.Stderr, "some reducers activation has failed")
+		_, _ = fmt.Fprint(os.Stderr, "some reducers activation has failed")
 		return errs
 	}
 	/// RPC 5 ---> REDUCERS BINDINGS COMUNICATION TO MAPPERS WORKERS

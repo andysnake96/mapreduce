@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math"
+	"math/rand"
 	"net"
 	"os"
 	"reflect"
@@ -21,15 +23,16 @@ type ConfigInterface interface {
 	printFields()
 }
 type Configuration struct {
-	SORT_FINAL               bool //sort final file (extra computation)
-	LOCAL_VERSION            bool //use function for local deply
-	SIMULATE_WORKERS_CRUSH   bool
-	ISTANCES_NUM_REDUCE      int    //number of reducer to istantiate
-	WORKER_NUM_ONLY_REDUCE   int    //num of worker node that will exec only 1 reduce istance
-	WORKER_NUM_MAP           int    //num of mapper to istantiate
-	WORKER_NUM_BACKUP_WORKER int    //num of backup workers for crushed workers
-	WORKER_NUM_BACKUP_MASTER int    //num of backup masters
-	RPC_TYPE                 string //tcp or http
+	SORT_FINAL                 bool //sort final file (extra computation)
+	LOCAL_VERSION              bool //use function for local deply
+	SIMULATE_WORKERS_CRUSH     bool
+	SIMULATE_WORKERS_CRUSH_NUM int
+	ISTANCES_NUM_REDUCE        int    //number of reducer to istantiate
+	WORKER_NUM_ONLY_REDUCE     int    //num of worker node that will exec only 1 reduce istance
+	WORKER_NUM_MAP             int    //num of mapper to istantiate
+	WORKER_NUM_BACKUP_WORKER   int    //num of backup workers for crushed workers
+	WORKER_NUM_BACKUP_MASTER   int    //num of backup masters
+	RPC_TYPE                   string //tcp or http
 	// main rpc services base port (other istances on same worker will have progressive port
 	CHUNK_SERVICE_BASE_PORT           int
 	MAP_SERVICE_BASE_PORT             int
@@ -518,5 +521,20 @@ func CheckPortAvaibility(port int, network string) (status bool) {
 	}
 
 	return !CheckErrs(errs, false, "")
+
+}
+
+func RandomBool(probability float64, digitsNumSignificativance int) bool {
+	//return true with probability
+
+	rand.Seed(time.Now().UnixNano())
+	maxN := int(math.Pow10(digitsNumSignificativance))
+	trueThreashold := int(math.Round(probability * float64(maxN)))
+	v := rand.Intn(maxN)
+	if v < trueThreashold {
+		return true
+	} else {
+		return false
+	}
 
 }

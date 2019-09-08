@@ -2,6 +2,7 @@ package core
 
 import (
 	"../aws_SDK_wrap"
+	"errors"
 	"fmt"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"io"
@@ -18,24 +19,25 @@ const MASTER_ADDRESS_PUBLISH_S3_KEY = "MASTER_ADDRESS"
 
 //////////MASTER SIDE
 type MASTER_CONTROL struct {
-	MasterRpc  *MasterRpc
-	Workers    WorkersKinds //connected workers
-	WorkersAll []Worker     //list of all workers ref.
-	Addresses  WorkerAddresses
-	ChunkIDS   []int //list of all avaibles  chunks
+	MasterRpc     *MasterRpc
+	MasterAddress string
+	Workers       WorkersKinds //connected workers
+	WorkersAll    []Worker     //list of all workers ref.
+	ChunkIDS      []int        //list of all avaibles  chunks
 }
 
-func Init_distribuited_version(control *MASTER_CONTROL, filenames []string, loadChunksToS3 bool) (*s3manager.Downloader, *s3manager.Uploader, []int) {
+func Init_distribuited_version(control *MASTER_CONTROL, filenames []string, loadChunksToS3 bool) (*s3manager.Downloader, *s3manager.Uploader, []int, error) {
 	///initialize data and workers referement
 
 	barrier := new(sync.WaitGroup)
 	barrier.Add(2)
 	downloader, uploader := aws_SDK_wrap.InitS3Links(Config.S3_REGION)
 	assignedPorts := make([]int, 0, 10)
+	var err error = nil
 	//init workers,letting them register to master, he will populate different workers kind in ordered manner
 	go func() {
-		err := waitWorkersRegister(&barrier, control, &assignedPorts, uploader)
-		CheckErr(err, true, "workers initialization failed :(")
+		err = waitWorkersRegister(&barrier, control, &assignedPorts, uploader)
+		CheckErr(err, false, "workers initialization failed :(")
 	}()
 
 	chunks := InitChunks(filenames) //chunkize filenames
@@ -51,7 +53,7 @@ func Init_distribuited_version(control *MASTER_CONTROL, filenames []string, load
 	////// sync worker init routines
 	barrier.Wait()
 	println("initialization done")
-	return downloader, uploader, assignedPorts
+	return downloader, uploader, assignedPorts, err
 }
 
 func loadChunksToChunkStorage(chunks []CHUNK, waitGroup **sync.WaitGroup, control *MASTER_CONTROL, uploader *s3manager.Uploader) {
@@ -110,51 +112,42 @@ func waitWorkersRegister(waitGroup **sync.WaitGroup, control *MASTER_CONTROL, as
 	}
 	///////publish master address to workers
 	println("uploading master registration addresse: ", conn.Addr().String())
-	if (*control).Addresses.Master != "" {
-		masterRegServiceAddr := (*control).Addresses.Master + ":" + strconv.Itoa(port)
+	if (*control).MasterAddress != "" {
+		masterRegServiceAddr := (*control).MasterAddress + ":" + strconv.Itoa(port)
 		err = aws_SDK_wrap.UploadDATA(uploader, masterRegServiceAddr, MASTER_ADDRESS_PUBLISH_S3_KEY, Config.S3_BUCKET)
 		if CheckErr(err, false, "") {
 			return err
 		}
 	}
-	workerAddresses := WorkerAddresses{
-		WorkersMapReduce:  make([]string, Config.WORKER_NUM_MAP),
-		WorkersOnlyReduce: make([]string, Config.WORKER_NUM_ONLY_REDUCE),
-		WorkersBackup:     make([]string, Config.WORKER_NUM_BACKUP_WORKER),
-	}
+
 	workers := WorkersKinds{
-		WorkersMapReduce:  make([]Worker, Config.WORKER_NUM_MAP),
-		WorkersOnlyReduce: make([]Worker, Config.WORKER_NUM_ONLY_REDUCE),
-		WorkersBackup:     make([]Worker, Config.WORKER_NUM_BACKUP_WORKER),
+		WorkersMapReduce:  make([]Worker, 0, Config.WORKER_NUM_MAP),
+		WorkersOnlyReduce: make([]Worker, 0, Config.WORKER_NUM_ONLY_REDUCE),
+		WorkersBackup:     make([]Worker, 0, Config.WORKER_NUM_BACKUP_WORKER),
 	}
 	//// aggreagate worker registration with 2! for
 	workersKindsNums := map[string]int{
 		WORKERS_MAP_REDUCE: Config.WORKER_NUM_MAP, WORKERS_ONLY_REDUCE: Config.WORKER_NUM_ONLY_REDUCE, WORKERS_BACKUP_W: Config.WORKER_NUM_BACKUP_WORKER,
 	}
-	var destWorkersAddrList []string  //will hold destination container for  worker
-	var destWorkersContainer []Worker //dest variable for workers to init
-	id := 0                           //worker id
+	var destWorkersContainer *[]Worker //dest variable for workers to init
+	id := 0                            //worker id
 	for workerKind, numToInit := range workersKindsNums {
 		println("initiating: ", numToInit, "of workers kind: ", workerKind)
 		//taking worker kind addresses list
 		if workerKind == WORKERS_MAP_REDUCE {
-			destWorkersAddrList = workerAddresses.WorkersMapReduce
-			destWorkersContainer = (workers.WorkersMapReduce)
+			destWorkersContainer = &(workers.WorkersMapReduce)
 		} else if workerKind == WORKERS_ONLY_REDUCE {
-			destWorkersAddrList = workerAddresses.WorkersOnlyReduce
-			destWorkersContainer = (workers.WorkersOnlyReduce)
+			destWorkersContainer = &(workers.WorkersOnlyReduce)
 		} else if workerKind == WORKERS_BACKUP_W {
-			destWorkersAddrList = workerAddresses.WorkersBackup
-			destWorkersContainer = (workers.WorkersBackup)
+			destWorkersContainer = &(workers.WorkersBackup)
 		}
 		for i := 0; i < numToInit; i++ {
 			//WAIT WORKERS TO REGISTER TO COMUNICATED MASTER ADDRESS EXTRACTING ADDRESS FROM PROBE SYNs
 			workerConn, err := conn.AcceptTCP()
 			if CheckErr(err, false, "worker connection error") {
-				return err
+				continue
 			}
 			workerAddr := strings.Split(workerConn.LocalAddr().String(), ":")[0]
-			destWorkersAddrList[i] = workerAddr
 			portPing := Config.PING_SERVICE_BASE_PORT
 			portControlRpc := Config.CHUNK_SERVICE_BASE_PORT
 			if !Config.FIXED_PORT { ///TODO
@@ -177,8 +170,11 @@ func waitWorkersRegister(waitGroup **sync.WaitGroup, control *MASTER_CONTROL, as
 			//// init workers connections
 			println("initiating worker with controPort", portControlRpc, "ping port ", portPing)
 			client, err := rpc.Dial(Config.RPC_TYPE, workerAddr+":"+strconv.Itoa(portControlRpc))
-			CheckErr(err, true, "dialing connected worker errd")
-			destWorkersContainer[i] = Worker{
+			if CheckErr(err, false, "dialing connected worker errd") {
+				_ = workerConn.Close()
+				continue
+			}
+			newWorker := Worker{
 				Address:         workerAddr,
 				PingServicePort: portPing,
 				Id:              id,
@@ -192,11 +188,15 @@ func waitWorkersRegister(waitGroup **sync.WaitGroup, control *MASTER_CONTROL, as
 					Failed: false,
 				},
 			}
+			*destWorkersContainer = append(*destWorkersContainer, newWorker)
 			_ = workerConn.Close()
 			id++
 		}
 	}
-	(*control).Addresses = workerAddresses
+	//check eventual init errors accumulated
+	if !CheckAndSolveInitErr(&workers) {
+		err = errors.New("WORKERS INIT ERROR")
+	}
 	//build all worker ref
 	workersAll := append(workers.WorkersMapReduce, workers.WorkersOnlyReduce...)
 	workersAll = append(workersAll, workers.WorkersBackup...)
@@ -204,7 +204,57 @@ func waitWorkersRegister(waitGroup **sync.WaitGroup, control *MASTER_CONTROL, as
 	(*control).WorkersAll = workersAll
 
 	(*waitGroup).Done()
-	return nil
+	return err
+}
+
+func CheckAndSolveInitErr(workersKinds *WorkersKinds) bool {
+	//check for failed workers inspecting configuration file for workers nums
+	//substitute failed workers with backup workers
+	//return false if eventual errors are unsolvable (needed more backup workers)
+
+	failedWorkers := 0
+	maxTollerableFails := Config.WORKER_NUM_BACKUP_WORKER
+
+	//check backup workres
+	expectedNumWorkers := Config.WORKER_NUM_BACKUP_WORKER
+	actualNumWorkers := len(workersKinds.WorkersBackup)
+	fails := expectedNumWorkers - actualNumWorkers
+	if fails > 0 {
+		failedWorkers += fails
+		maxTollerableFails -= fails
+	}
+	//check mapReduceWorkers
+	expectedNumWorkers = Config.WORKER_NUM_MAP
+	actualNumWorkers = len(workersKinds.WorkersMapReduce)
+	fails = expectedNumWorkers - actualNumWorkers
+	if fails > 0 {
+		failedWorkers += fails
+		maxTollerableFails -= fails
+	}
+	if maxTollerableFails < 0 {
+		return false //too few backup workers
+	}
+	for i := 0; i < fails; i++ {
+		workersKinds.WorkersMapReduce = append(workersKinds.WorkersMapReduce, workersKinds.WorkersBackup[i])
+	}
+	workersKinds.WorkersBackup = workersKinds.WorkersBackup[:len(workersKinds.WorkersBackup)-fails]
+	//check only reduce workers
+	expectedNumWorkers = Config.WORKER_NUM_ONLY_REDUCE
+	actualNumWorkers = len(workersKinds.WorkersOnlyReduce)
+	fails = expectedNumWorkers - actualNumWorkers
+	if fails > 0 {
+		failedWorkers += fails
+		maxTollerableFails -= fails
+	}
+	if maxTollerableFails < 0 {
+		return false //too few backup workers
+	}
+	for i := 0; i < fails; i++ {
+		workersKinds.WorkersOnlyReduce = append(workersKinds.WorkersOnlyReduce, workersKinds.WorkersBackup[i])
+	}
+	workersKinds.WorkersBackup = workersKinds.WorkersBackup[:len(workersKinds.WorkersBackup)-fails]
+	println("substituted all failed workers at initialization, residue backup workers :", maxTollerableFails)
+	return true
 }
 
 ////////// WORKER SIDE
