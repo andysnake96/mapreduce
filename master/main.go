@@ -42,7 +42,6 @@ func main() {
 	core.ReadConfigFile(core.ADDRESSES_GEN_FILENAME, core.Addresses)
 
 	var masterAddress string
-	masterRpcPort := core.Config.MASTER_BASE_PORT
 
 	///distribuited  version vars
 	//var downloader *s3manager.Downloader
@@ -58,8 +57,9 @@ func main() {
 			filenames = os.Args[3:]
 		}
 
-		masterAddress = "37.116.178.139" //dig +short myip.opendns.com @resolver1.opendns.com
-		if len(os.Args) >= 3 {           //TODO SWTICH TO ARGV TEMPLATE
+		//masterAddress = "37.116.178.139" //dig +short myip.opendns.com @resolver1.opendns.com
+		masterAddress = ""     //dig +short myip.opendns.com @resolver1.opendns.com
+		if len(os.Args) >= 3 { //TODO SWTICH TO ARGV TEMPLATE
 			masterAddress = os.Args[1]
 		}
 
@@ -88,8 +88,7 @@ func main() {
 	workersChunksFairShares := assignChunksIDs(&Workers.WorkersMapReduce, &(MasterControl.ChunkIDS), core.Config.CHUNKS_REPLICATION_FACTOR, false, assignedChunkWorkers)
 	//core.GenericPrint(workersChunksFairShares)
 	assignChunksIDs(&Workers.WorkersBackup, &(MasterControl.ChunkIDS), core.Config.CHUNKS_REPLICATION_FACTOR_BACKUP_WORKERS, true, assignedChunkWorkers) //only replication assignement on backup workers
-	time.Sleep(time.Second)
-	errs := comunicateChunksAssignementToWorkers(assignedChunkWorkers) //RPC 1 IN SEQ DIAGRAM
+	errs := comunicateChunksAssignementToWorkers(assignedChunkWorkers)                                                                                   //RPC 1 IN SEQ DIAGRAM
 	if len(errs) > 0 {
 		_, _ = fmt.Fprintf(os.Stderr, "ASSIGN CHUNK ERRD \n")
 		workersIdsToReschedule := make(map[int][]int, len(errs)) //map of worker->chunks assigned to reschedule
@@ -120,9 +119,9 @@ func main() {
 	if err {
 		_, _ = fmt.Fprintf(os.Stderr, "ASSIGN MAP JOBS ERRD\n RETRY ON FAILED WORKERS EXPLOITING ASSIGNED CHUNKS REPLICATION")
 		workerMapJobsToReassign := make(map[int][]int) //workerId--> map job to redo (chunkID previusly assigned)
+		core.PingProbeAlivenessFilter(&WorkersAll)     //filter in place failed workers
 		for indx, mapResult := range mapResults {
 			if core.CheckErr(mapResult.err, false, "WORKER id:"+strconv.Itoa(mapResult.workerId)+" ON MAPS JOB ASSIGN") {
-				core.PingProbeAlivenessFilter(&WorkersAll) //filter in place failed workers
 				workerMapJobsToReassign[mapResult.workerId] = mapResult.chunkIds
 				/// remove failed element from map
 				if indx < len(mapResults)-1 {
@@ -155,8 +154,7 @@ func main() {
 		they will aggregate reduce calls to individual reducers propagating  eventual errors
 	*/
 
-	masterRpcAddress := masterAddress + ":" + strconv.Itoa(masterRpcPort)
-	rpcErrs := comunicateReducersBindings(reducerSmartBindingsToWorkersID, &Workers, masterRpcAddress) //RPC 4,5 IN SEQ DIAGRAM;
+	rpcErrs := comunicateReducersBindings(reducerSmartBindingsToWorkersID, &Workers) //RPC 4,5 IN SEQ DIAGRAM;
 	if len(errs) > 0 {
 		//set up list for failed instances inside failed workers (mapper & reducer)
 		core.PingProbeAlivenessFilter(&WorkersAll) //filter in place failed workers
@@ -183,7 +181,7 @@ func main() {
 			core.GenericPrint(newReducersBindings)
 		}
 		//as before comunicate newly re spawned reducer on worker -> NB mappers will trasparently re send per reducer intermediate data
-		errs := comunicateReducersBindings(reducerSmartBindingsToWorkersID, &Workers, masterRpcAddress)
+		errs := comunicateReducersBindings(reducerSmartBindingsToWorkersID, &Workers)
 		if errs != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "error on map RE reduce comunication")
 			killAll(&WorkersAll)
@@ -410,7 +408,7 @@ func aggregateMappersCosts(workerMapResults []MapWorkerArgs, workers *core.Worke
 	return routeInfosAggregated
 }
 
-func comunicateReducersBindings(redBindings map[int]int, workers *core.WorkersKinds, masterRpcAddress string) []error {
+func comunicateReducersBindings(redBindings map[int]int, workers *core.WorkersKinds) []error {
 	//for each reducer ID (logic) activate an actual reducer on a worker following redBindings dict
 	// init each reducer with expected reduce calls from mappers indified by their assigned chunk (that has produced map result -> reduce calls)
 	//RPC 4,5 in SEQ diagram
@@ -425,19 +423,17 @@ func comunicateReducersBindings(redBindings map[int]int, workers *core.WorkersKi
 		worker, err := core.GetWorker(placementWorker, workers) //get dest worker for the new Reduce Instance
 		core.CheckErr(err, true, "reducerBindings in comunication")
 		//instantiate the new reducer instance with expected calls # from mapper for termination and faultTollerant
-
-		newReducerArg := core.ReducerActivateArgs{
-			NumChunks:     len(MasterControl.ChunkIDS),
-			MasterAddress: masterRpcAddress,
-		}
-		err = (worker).State.ControlRPCInstance.Client.Call("CONTROL.ActivateNewReducer", newReducerArg, &redNewInstancePort)
+		err = (worker).State.ControlRPCInstance.Client.Call("CONTROL.ActivateNewReducer", len(MasterControl.ChunkIDS), &redNewInstancePort)
 		if core.CheckErr(err, false, "instantiating reducer: "+strconv.Itoa(reducerIdLogic)) {
 			errs = append(errs, errors.New(core.REDUCER_ACTIVATE+core.ERROR_SEPARATOR+strconv.Itoa(reducerIdLogic)))
 		}
 		reducerBindings[reducerIdLogic] = worker.Address + ":" + strconv.Itoa(redNewInstancePort) //note the binding to reducer correctly instantiated
 		worker.State.ReducersHostedIDs = append(worker.State.ReducersHostedIDs, reducerIdLogic)
 	}
-
+	if len(errs) > 0 {
+		fmt.Fprint(os.Stderr, "some reducers activation has failed")
+		return errs
+	}
 	/// RPC 5 ---> REDUCERS BINDINGS COMUNICATION TO MAPPERS WORKERS
 	//comunicate to all mappers final Reducer location
 	ends := make([]*rpc.Call, len(workers.WorkersMapReduce))
@@ -449,7 +445,7 @@ func comunicateReducersBindings(redBindings map[int]int, workers *core.WorkersKi
 	//wait rpc return
 	for i, end := range ends {
 		<-end.Done
-		if core.CheckErr(end.Error, true, "error on bindings comunication") {
+		if core.CheckErr(end.Error, false, "error on bindings comunication") {
 			errs = append(errs, errors.New(core.REDUCERS_ADDR_COMUNICATION+core.ERROR_SEPARATOR+strconv.Itoa(workers.WorkersMapReduce[i].Id)))
 		}
 	}

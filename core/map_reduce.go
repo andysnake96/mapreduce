@@ -1,6 +1,7 @@
 package core
 
 import (
+	"../aws_SDK_wrap"
 	"errors"
 	"net/rpc"
 	"runtime"
@@ -18,27 +19,59 @@ import (
 func (workerNode *Worker_node_internal) Get_chunk_ids(chunkIDs []int, voidReply *int) error {
 
 	sort.Ints(chunkIDs)
-	println("GETTING CHUNKS AT ", workerNode.Id)
-	GenericPrint(chunkIDs)
 	chunksDownloaded := make([]CHUNK, len(chunkIDs))
+	chunksDownloadedErrors := make([]error, len(chunkIDs))
 	barrierDownload := new(sync.WaitGroup)
 	barrierDownload.Add(len(chunkIDs))
 	for i, chunkId := range chunkIDs {
 		//check if chunk already downloaded
-		if getChunk(chunkId, &(workerNode.WorkerChunksStore)) != CHUNK("") {
+		_, chunksPresent := workerNode.WorkerChunksStore.Chunks[chunkId]
+		if chunksPresent {
 			println("already have chunk Id :", chunkId)
 			barrierDownload.Add(-1)
-			continue
+		} else {
+			go workerNode.downloadChunk(chunkId, &barrierDownload, &chunksDownloaded[i], &chunksDownloadedErrors[i]) //download chunk from data store and save in isolated position
 		}
-		go downloadChunk(chunkId, &barrierDownload, &chunksDownloaded[i]) //download chunk from data store and save in isolated position
 	}
 	//println("wait download\t",workerNode.Id)
 	barrierDownload.Wait() //wait end of concurrent downloads
-	//settings downloaded chunksDownloaded in datastore
-	for i, chunkId := range chunkIDs { //chunkIDS and chunksDownloaded has same indexing semanting
-		workerNode.WorkerChunksStore.Chunks[chunkId] = chunksDownloaded[i]
+	//check if some error occurred during download
+	for _, err := range chunksDownloadedErrors {
+		if err != nil {
+			return err
+		}
+	}
+	for indx, chunk := range chunksDownloaded {
+		if len(chunk) > 0 {
+			workerNode.WorkerChunksStore.Chunks[chunkIDs[indx]] = chunk
+		}
 	}
 	return nil
+}
+
+func (workerNode *Worker_node_internal) downloadChunk(chunkId int, downloadBarrier **sync.WaitGroup, chunkLocation *CHUNK, errorLocation *error) {
+	/*
+		download chunk from data store, allowing concurrent download with waitgroup to notify downloads progress
+		chunk will be written in given location, thread safe if chunkLocation is isolated and readed only after waitgroup has compleated
+	*/
+	if Config.LOCAL_VERSION {
+		chunk, present := ChunksStorageMock[chunkId]
+		if !present {
+			panic("NOT PRESENT CHUNK IN MOCK\nidchunk: " + strconv.Itoa(chunkId)) //TODO ROBUSTENESS PRE EBUG
+		}
+		*chunkLocation = chunk //write chunk to his isolated position
+	} else {
+		chunkBuf := make([]byte, Config.CHUNK_SIZE)
+		err := aws_SDK_wrap.DownloadDATA(workerNode.Downloader, Config.S3_BUCKET, strconv.Itoa(chunkId), chunkBuf, false)
+		if CheckErr(err, false, "downloading chunk: "+strconv.Itoa(chunkId)) {
+			(*downloadBarrier).Done()
+			*errorLocation = err
+			return
+		}
+		*chunkLocation = CHUNK(chunkBuf)
+	}
+	(*downloadBarrier).Done() //notify other chunk download compleated
+	*errorLocation = nil
 }
 
 func (workerNode *Worker_node_internal) RemoteControl_NewInstance(instanceKind int, chosenPort *int) error {
@@ -58,21 +91,17 @@ func (workerNode *Worker_node_internal) RemoteControl_NewInstance(instanceKind i
 	return err
 } //TODO OTHER BRANCH
 
-type ReducerActivateArgs struct {
-	NumChunks     int
-	MasterAddress string
-}
-
-func (workerNode *Worker_node_internal) ActivateNewReducer(redArg ReducerActivateArgs, chosenPort *int) error {
+func (workerNode *Worker_node_internal) ActivateNewReducer(NumChunks int, ChosenPort *int) error {
 	//create a new reducer actual instance on top of workerNode, returning the chosen port for the new instance
-	*chosenPort = NextUnassignedPort(Config.REDUCE_SERVICE_BASE_PORT, &AssignedPortsAll, true, true, "tcp")
-	masterClient, err := rpc.Dial(Config.RPC_TYPE, redArg.MasterAddress) //init master client for future final return
-	if CheckErr(err, false, "reducer activation master link fail") {
+	*ChosenPort = NextUnassignedPort(Config.REDUCE_SERVICE_BASE_PORT, &AssignedPortsAll, true, true, "tcp")
+	masterRpcAddr := workerNode.MasterAddr + ":" + strconv.Itoa(Config.MASTER_BASE_PORT)
+	masterClient, err := rpc.Dial(Config.RPC_TYPE, masterRpcAddr) //init master client for future final return
+	if CheckErr(err, false, "reducer activation master link fail on addr= "+masterRpcAddr) {
 		return err
 	}
 	//init expected intermdiate data shares for the new reducer
 	cumulativesCalls := make(map[int]bool)
-	for i := 0; i < redArg.NumChunks; i++ {
+	for i := 0; i < NumChunks; i++ {
 		cumulativesCalls[i] = false
 	}
 	redInitData := GenericInternalState{ReduceData: ReducerIstanceStateInternal{
@@ -82,7 +111,7 @@ func (workerNode *Worker_node_internal) ActivateNewReducer(redArg ReducerActivat
 		MasterClient:                 masterClient,
 	},
 	}
-	err, newReducerId := InitRPCWorkerIstance(&redInitData, *chosenPort, REDUCE, workerNode)
+	err, newReducerId := InitRPCWorkerIstance(&redInitData, *ChosenPort, REDUCE, workerNode)
 	println("activated new reducer:", newReducerId)
 	return err
 }
@@ -203,7 +232,9 @@ func (m *MapperIstanceStateInternal) Map_parse_builtin_quick_route(rawChunkId in
 			route destination returned to caller via Go channel
 	*/
 	m.ChunkID = rawChunkId
-	rawChunk := getChunk(rawChunkId, m.WorkerChunks)
+	m.WorkerChunks.Mutex.Lock()
+	rawChunk := m.WorkerChunks.Chunks[rawChunkId]
+	m.WorkerChunks.Mutex.Unlock()
 	//m.IntermediateTokens = make(map[string]int)
 	destinationsCosts := Map2ReduceRouteCost{
 		RouteCosts: make(map[int]int, Config.ISTANCES_NUM_REDUCE),

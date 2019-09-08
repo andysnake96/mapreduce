@@ -13,6 +13,7 @@ func NextUnassignedPort(basePort int, assignedPorts *[]int, assignNewPort bool, 
 	//find next avaible port among the assignedPorts starting search from basePort,
 	//will be returned the closest next assignable port
 	//the new port will be assigned if true assignNewFoundedPort
+
 	sort.Ints(*assignedPorts)
 	conflict := false
 	var nextPortAssigned int
@@ -95,6 +96,7 @@ func InitWorkers_LocalMock_WorkerSide(workers *[]Worker_node_internal, stopPingC
 				ReducersClients: make(map[int]*rpc.Client),
 				ExitChan:        make(chan bool),
 				Id:              workerId,
+				MasterAddr:      "localhost",
 			}
 			//starting worker control rpc instance
 			avaiblePort = NextUnassignedPort(Config.CHUNK_SERVICE_BASE_PORT, &AssignedPortsAll, true, true, "tcp") //TODO HP AVAIBILITY FOR BASE PORT ASSIGNMENTS

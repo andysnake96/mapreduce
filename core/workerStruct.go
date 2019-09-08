@@ -1,6 +1,7 @@
 package core
 
 import (
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"net"
 	"net/rpc"
 	"strconv"
@@ -73,6 +74,7 @@ type WorkerInstanceInternal struct {
 	Kind        int //either MAP or REDUCE
 	ListenerRpc net.Listener
 	ServerRpc   *rpc.Server
+	Port        int
 	IntData     GenericInternalState //generic data carried by istance discriminated by kind //TODO REDUNDANT OTHER THAN intState=?
 }
 
@@ -108,9 +110,12 @@ type Worker_node_internal struct {
 	ReducersClients            map[int]*rpc.Client
 	Id                         int
 	PingConnection             net.Conn
+	PingPort                   int
 	///////// local version chan for internal correct termination
-	ExitChan chan bool //on master exit req notify main routine of logic worker end
-
+	ExitChan chan bool
+	//on master exit req notify main routine of logic worker end
+	Downloader *s3manager.Downloader
+	MasterAddr string
 }
 type WorkerChunks struct { //WORKER NODE LEVEL STRUCT
 	//HOLD chunks stored in worker node pretected by a mutex
@@ -135,6 +140,7 @@ func InitRPCWorkerIstance(initData *GenericInternalState, port int, kind int, wo
 		Kind:        kind,
 		ListenerRpc: l,
 		ServerRpc:   rpc.NewServer(),
+		Port:        port,
 	}
 	/*if kind == MAP {
 		mapper := new(MapperIstanceStateInternal)

@@ -36,6 +36,7 @@ type Configuration struct {
 	REDUCE_SERVICE_BASE_PORT          int
 	MASTER_BASE_PORT                  int
 	PING_SERVICE_BASE_PORT            int
+	FIXED_PORT                        bool
 	WORKER_REGISTER_SERVICE_BASE_PORT int
 	// main loadBalacing vars
 	MAX_REDUCERS_PER_WORKER int
@@ -388,9 +389,10 @@ func CheckErr(e error, fatal bool, supplementMsg string) bool {
 	//check error, exit if fatal is true
 	//return bool, true if err is not nil
 	if e != nil {
-		baseMsg := e.Error()
+		//baseMsg := e.Error()		//noted that errors always pre print before return to caller
+		baseMsg := ""
 		if fatal == true {
-			log.Fatal("\n\n"+baseMsg+supplementMsg, e)
+			log.Fatal("\n\n"+supplementMsg, e)
 		} else {
 			log.Println("\n\n"+baseMsg+supplementMsg, e)
 		}
@@ -515,6 +517,6 @@ func CheckPortAvaibility(port int, network string) (status bool) {
 		errs = append(errs, err)
 	}
 
-	return !CheckErrs(errs, false, "checking port avaibility"+strconv.Itoa(port))
+	return !CheckErrs(errs, false, "")
 
 }

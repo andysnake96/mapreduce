@@ -12,11 +12,6 @@ import (
 	"os"
 )
 
-const (
-	S3_REGION = "eu-central-1"
-	S3_BUCKET = "mapreducechunks"
-)
-
 func InitS3Links(region string) (*s3manager.Downloader, *s3manager.Uploader) {
 	// create 2 s3 session for S3 downloader and uploader
 	// Create a single AWS session

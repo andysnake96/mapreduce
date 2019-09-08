@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"os"
 	"reflect"
+	"strconv"
 	"time"
 )
 
@@ -45,11 +46,16 @@ func main() {
 	} else { //////distribuited  version
 		///s3 links
 		downloader, _ := aws_SDK_wrap.InitS3Links(core.Config.S3_REGION)
-		assignedPorts, err := core.InitWorker(&WorkersNodeInternal, stopPingService)
+		assignedPorts, err := core.InitWorker(&WorkersNodeInternal, stopPingService, downloader)
 		core.GenericPrint(assignedPorts)
 		core.CheckErr(err, true, "worker init error")
-		_, err = core.RegisterToMaster(downloader)
+		portToComunicate := ""
+		if !core.Config.FIXED_PORT {
+			portToComunicate = strconv.Itoa(WorkersNodeInternal.ControlRpcInstance.Port) + core.PORT_SEPARATOR + strconv.Itoa(WorkersNodeInternal.PingPort) + core.PORT_TERMINATOR
+		}
+		masterAddr, err := core.RegisterToMaster(downloader, portToComunicate)
 		core.CheckErr(err, true, "master register err")
+		WorkersNodeInternal.MasterAddr = masterAddr
 		if core.Config.SIMULATE_WORKERS_CRUSH {
 			simulateWorkerCrush()
 		}
@@ -75,9 +81,9 @@ func simulateWorkerCrush() {
 func waitWorkerEnd(stopPing chan bool) { //// distribuited version
 	<-WorkersNodeInternal.ExitChan ///wait worker end setted by the master
 	_ = WorkersNodeInternal.ControlRpcInstance.ListenerRpc.Close()
-	for _, instance := range WorkersNodeInternal.Instances {
-		_ = instance.ListenerRpc.Close()
-	}
+	//for _, instance := range WorkersNodeInternal.Instances {
+	//	_ = instance.ListenerRpc.Close()
+	//}
 	//chanOut := valValue.Interface().(int)
 	println("ended worker")
 	//_ = worker.PingConnection.Close()
