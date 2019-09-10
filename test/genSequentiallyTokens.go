@@ -4,15 +4,25 @@ package main
 import (
 	"../core"
 	"bufio"
+	"bytes"
+	"encoding/base64"
+	"encoding/gob"
 	"fmt"
+	"sort"
+	"time"
+
+	//"net/rpc"
+
+	//"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"io/ioutil"
 	"math"
+	//"net/rpc"
 	"os"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
-	"time"
+	//"sort"
+	//"time"
 )
 
 const (
@@ -32,7 +42,7 @@ func main() {
 	sort.Sort(sort.Reverse(tk))
 	core.SerializeToFile(finalTokens, TEST_TOKENS_OUTPUT_FILE)
 	println("elapsed: ", endTime.Sub(startTime).String())
-	checkDifferenceInFinaleTokens(core.FINAL_TOKEN_FILENAME, TEST_TOKENS_OUTPUT_FILE)
+	//checkDifferenceInFinaleTokens(core.FINAL_TOKEN_FILENAME, TEST_TOKENS_OUTPUT_FILE)
 }
 func checkDifferenceInFinaleTokens(tokensFile1, tokensFile2 string) {
 	/////// getting raw data from out tokens files

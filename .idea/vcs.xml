@@ -5,6 +5,10 @@
     <mapping directory="$PROJECT_DIR$/aws_SDK_wrap/src/github.com/aws/aws-sdk-go" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/aws_SDK_wrap/src/golang.org/x/net" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/aws_SDK_wrap/src/golang.org/x/text" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/binary" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/go/src/github.com/aws/aws-sdk-go" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/go/src/golang.org/x/net" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/go/src/golang.org/x/text" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/src/github.com/aws/aws-sdk-go" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/src/golang.org/x/net" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/src/golang.org/x/text" vcs="Git" />

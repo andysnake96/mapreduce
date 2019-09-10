@@ -27,8 +27,8 @@ instances running on a worker will have an progressive ID starting to first inst
 
 var WorkersNodeInternal_localVersion []core.Worker_node_internal //for each local simulated worker indexed by his own id -> intenal state
 var WorkersNodeInternal core.Worker_node_internal                //worker nod ref distribuited version
-var SIMULATE_WORKER_CRUSH_BEFORE time.Duration = 5 * time.Second
-var SIMULATE_WORKER_CRUSH_AFTER time.Duration = 500 * time.Millisecond
+var SIMULATE_WORKER_CRUSH_BEFORE time.Duration = 17 * time.Second
+var SIMULATE_WORKER_CRUSH_AFTER time.Duration = 1 * time.Second
 
 func main() {
 	core.Config = new(core.Configuration)
@@ -45,7 +45,7 @@ func main() {
 		///s3 links
 		downloader, _ := aws_SDK_wrap.InitS3Links(core.Config.S3_REGION)
 		assignedPorts, err := core.InitWorker(&WorkersNodeInternal, stopPingService, downloader)
-		core.GenericPrint(assignedPorts)
+		core.GenericPrint(assignedPorts, "")
 		core.CheckErr(err, true, "worker init error")
 		portToComunicate := ""
 		if !core.Config.FIXED_PORT {
@@ -83,10 +83,10 @@ func simulateWorkerCrush() {
 	killAfterAbout += int64(SIMULATE_WORKER_CRUSH_AFTER)
 	time.Sleep(time.Duration(killAfterAbout))
 	///close every listening socket still open
-	_ = WorkersNodeInternal.ControlRpcInstance.ListenerRpc.Close()
-	for _, instance := range WorkersNodeInternal.Instances {
-		_ = instance.ListenerRpc.Close()
-	}
+	//_ = WorkersNodeInternal.ControlRpcInstance.ListenerRpc.Close()
+	//for _, instance := range WorkersNodeInternal.Instances {
+	//	_ = instance.ListenerRpc.Close()
+	//}
 	_, _ = fmt.Fprint(os.Stderr, "CRUSH SIMULATION ON WORKER with pid:", os.Getpid())
 	os.Exit(EXIT_FORCED)
 }
@@ -116,11 +116,11 @@ func waitWorkersEnd(stopPing chan bool) { ////local version
 	for i := 0; i < workersToWait; i++ {
 		//<-worker.ExitChan
 		endedWorkerID, chanOut, _ := reflect.Select(chanSet)
-		worker := WorkersNodeInternal_localVersion[endedWorkerID]
-		_ = worker.ControlRpcInstance.ListenerRpc.Close()
-		for _, instance := range worker.Instances {
-			_ = instance.ListenerRpc.Close()
-		}
+		//worker := WorkersNodeInternal_localVersion[endedWorkerID]
+		//_ = worker.ControlRpcInstance.ListenerRpc.Close()
+		//for _, instance := range worker.Instances {
+		//	_ = instance.ListenerRpc.Close()
+		//}
 		//chanOut := valValue.Interface().(int)
 		println("ended worker: ", endedWorkerID, reflect.ValueOf(chanOut).Interface())
 	}

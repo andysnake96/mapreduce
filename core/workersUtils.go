@@ -1,31 +1,30 @@
 package core
 
 import (
-	"errors"
 	"net/rpc"
 	"strconv"
 )
 
 ////WORKERS UTIL FUNCTIONS
 
-func GetWorker(id int, workers *WorkersKinds) (Worker, error) {
+func GetWorker(id int, workers *WorkersKinds) *Worker {
 	//return worker with id, nil if not found
-	for _, worker := range (*workers).WorkersMapReduce {
+	for i, worker := range (*workers).WorkersMapReduce {
 		if worker.Id == id {
-			return worker, nil
+			return &((*workers).WorkersMapReduce[i])
 		}
 	}
-	for _, worker := range (*workers).WorkersOnlyReduce {
+	for i, worker := range (*workers).WorkersOnlyReduce {
 		if worker.Id == id {
-			return worker, nil
+			return &((*workers).WorkersOnlyReduce[i])
 		}
 	}
-	for _, worker := range (*workers).WorkersBackup {
+	for i, worker := range (*workers).WorkersBackup {
 		if worker.Id == id {
-			return worker, nil
+			return &((*workers).WorkersBackup[i])
 		}
 	}
-	return Worker{}, errors.New("NOT FOUNDED WORKER :" + strconv.Itoa(id))
+	panic("NOT FOUNDED WORKER: " + strconv.Itoa(id))
 }
 
 func routeInfosCombiner(mappersRouteCosts Map2ReduceRouteCost, workerAggregateRouteCosts *Map2ReduceRouteCost) {

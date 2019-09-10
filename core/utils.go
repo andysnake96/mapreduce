@@ -2,8 +2,14 @@ package core
 
 import (
 	"bufio"
+	"bytes"
+	"encoding/base64"
+	"encoding/binary"
+	"encoding/gob"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"golang.org/x/text/encoding/unicode"
 	"io/ioutil"
 	"log"
 	"math"
@@ -16,6 +22,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unsafe"
 )
 
 //////////// FLEX CONFIGURATION
@@ -31,7 +38,7 @@ type Configuration struct {
 	WORKER_NUM_ONLY_REDUCE     int    //num of worker node that will exec only 1 reduce istance
 	WORKER_NUM_MAP             int    //num of mapper to istantiate
 	WORKER_NUM_BACKUP_WORKER   int    //num of backup workers for crushed workers
-	WORKER_NUM_BACKUP_MASTER   int    //num of backup masters
+	BACKUP_MASTER              bool   //num of backup masters
 	RPC_TYPE                   string //tcp or http
 	// main rpc services base port (other istances on same worker will have progressive port
 	CHUNK_SERVICE_BASE_PORT           int
@@ -94,7 +101,7 @@ const ( //errors kinds
 
 func ParseReduceErrString(reduceRpcErrs []error, reducerCollocation map[int]int, workers *WorkersKinds) (map[int][]int, map[int][]int) {
 	//parse reduce rpc error string, find failed worker setting map/reduce JOB to reset
-	var workerFailed Worker
+	var workerFailed *Worker
 	mapsToRedo := make(map[int][]int)
 	reduceToRedo := make(map[int][]int)
 
@@ -102,9 +109,9 @@ func ParseReduceErrString(reduceRpcErrs []error, reducerCollocation map[int]int,
 		tmpErrString := strings.Split(err.Error(), ERROR_SEPARATOR) //key value in 2 string FAIL_TYPE-->ID OF FAILED
 		failedId, _ := strconv.Atoi(tmpErrString[1])
 		if tmpErrString[0] == REDUCERS_ADDR_COMUNICATION { //worker fail during bindings comunication
-			workerFailed, _ = GetWorker(failedId, workers)
+			workerFailed = GetWorker(failedId, workers)
 		} else {
-			workerFailed, _ = GetWorker(reducerCollocation[failedId], workers) //get worker hosting reducer logic
+			workerFailed = GetWorker(reducerCollocation[failedId], workers) //get worker hosting reducer logic
 		}
 		workerFailed.State.Failed = true
 		mapsToRedo[workerFailed.Id] = workerFailed.State.MapIntermediateTokenIDs
@@ -242,13 +249,69 @@ func (r RoutingCostsSorter) Less(i, j int) bool {
 	return r.routingCosts[i].RoutingCost < r.routingCosts[j].RoutingCost
 }
 
+func GetEndianess() unicode.Endianness {
+	var i int = 0x0100
+	ptr := unsafe.Pointer(&i)
+	if 0x01 == *(*byte)(ptr) {
+		fmt.Println("Big Endian")
+		return unicode.BigEndian
+	} else {
+		fmt.Println("Little Endian")
+		return unicode.LittleEndian
+	}
+
+}
+
 /////	HEARTBIT 	/////
-const PING_LEN = 1
-const PONG = 1
-const PING = 0
+const PING_LEN = 4
+
+const (
+	PING = iota
+	PONG
+	CHUNK_ASSIGN
+	MAP_ASSIGN
+	LOCALITY_AWARE_LINK_REDUCE
+	ENDED
+)
 const PING_TRY_NUM = 5
 
 var PING_TIMEOUT time.Duration = time.Millisecond * 960
+
+func PingHeartBitRcvMaster(port int, stateChan chan uint32) (net.Conn, error) {
+	//ping receve and reply service under port implemented with ping/pong of 1 byte readed/written by a routine
+	//stopPing has to be a initiated and 1 buffered channel for non blocking read
+	//return the listen udp connection to caller or error
+	conn, err := net.ListenUDP("udp", &net.UDPAddr{
+		Port: port,
+		IP:   net.ParseIP("0.0.0.0"),
+	})
+	if CheckErr(err, false, "ping rcv error") {
+		return conn, err
+	}
+	message := make([]byte, PING_LEN)
+	masterDead := false
+	var state uint32
+	/// go ping reaceiver rountine
+	go func() {
+		for masterDead {
+			_, remoteAddr, err := conn.ReadFromUDP(message) //PING
+			if CheckErr(err, false, "udp read err") {
+				break
+			}
+			/// read state if changed and append to next pong message
+			if len(stateChan) > 0 {
+				state = <-stateChan //unblocking chan read
+			}
+			binary.BigEndian.PutUint32(message, state)
+			_, err = conn.WriteToUDP(message, remoteAddr) //PONG
+			if CheckErr(err, false, "udp write err") {
+				break
+			}
+		}
+	}()
+	_ = conn.Close()
+	return nil, nil
+}
 
 func PingHeartBitRcv(port int, stopPing chan bool) (net.Conn, error) {
 	//ping receve and reply service under port implemented with ping/pong of 1 byte readed/written by a routine
@@ -287,8 +350,8 @@ func PingHeartBitRcv(port int, stopPing chan bool) (net.Conn, error) {
 	return conn, nil
 }
 
-func PingHeartBitSnd(addr string) error {
-	//ping host at addr with 1byte ping msg waiting for a pong or a timeout expire
+func PingHeartBitSnd(addr string) (error, uint32) {
+	//ping host at addr with 1byte ping msg waiting for a pongBuf or a timeout expire
 	//fixed num of trys performed
 
 	/// setup destination
@@ -311,9 +374,11 @@ func PingHeartBitSnd(addr string) error {
 	//CheckErr(err,true,"ephemeral conn listen error");
 	//defer ephemeralConn.Close();
 
-	pong := make([]byte, PING_LEN)
+	pongBuf := make([]byte, PING_LEN)
+	var pong uint32
 	ping := make([]byte, PING_LEN)
-	ping[0] = PING
+	binary.BigEndian.PutUint32(ping, PING)
+	myEndianess := GetEndianess()
 	socketFail := true
 	err = udpConn.SetReadDeadline(time.Now().Add(PING_TIMEOUT))
 	CheckErr(err, true, "set deadline to ping socket error")
@@ -321,34 +386,66 @@ func PingHeartBitSnd(addr string) error {
 	for i := 0; i < PING_TRY_NUM && socketFail; i++ {
 		//// write ping
 		_, err = udpConn.Write(ping) //PING
-		CheckErr(err, true, "udp write 1 byte ping error")
-		//// read pong
-		_, err := udpConn.Read(pong) //PONG rcv
-		if CheckErr(err, false, "pong read error") {
+		CheckErr(err, true, "udp write ping error")
+		//// read pongBuf converting from netw byte order to host byte order
+		_, err = udpConn.Read(pongBuf) //PONG rcv
+		if CheckErr(err, false, "pongBuf read error") {
 			socketFail = true //no error exit ping try loop
-		} else {
-			socketFail = false
+			continue
 		}
+		//// convert received pong to host endianess
+		if myEndianess == unicode.LittleEndian {
+			pong = binary.LittleEndian.Uint32(pongBuf)
+		} else {
+			pong = binary.BigEndian.Uint32(pongBuf)
+		}
+		socketFail = false
 	}
 	if socketFail {
-		return err
+		return err, 0
 	}
-	return nil
+	return nil, pong
 }
 
-func PingProbeAlivenessFilter(workers *[]Worker) {
+func PingProbeAlivenessFilter(control *MASTER_CONTROL) map[int]bool {
+	workers := &(control.Workers)
+	failedWorkersUnMarked := make(map[int]bool, len(control.WorkersAll))
 	//probe each worker for aliveness, filter away dead workers
-	for indx, worker := range *workers {
-		err := PingHeartBitSnd(worker.Address + ":" + strconv.Itoa(worker.PingServicePort))
-		if err != nil { //dead worker, delete from list in place
-			worker.State.Failed = true
-			if indx < len(*workers) {
-				*workers = append((*workers)[:indx], (*workers)[indx+1:]...)
+	workersKindsNums := map[string]int{
+		WORKERS_MAP_REDUCE: len(workers.WorkersMapReduce), WORKERS_ONLY_REDUCE: len(workers.WorkersOnlyReduce), WORKERS_BACKUP_W: len(workers.WorkersBackup),
+	}
+	var destWorkersContainer *[]Worker //dest variable for workers to init
+	var err error
+	for workerKind, _ := range workersKindsNums {
+		if workerKind == WORKERS_MAP_REDUCE {
+			destWorkersContainer = &(workers.WorkersMapReduce)
+		} else if workerKind == WORKERS_ONLY_REDUCE {
+			destWorkersContainer = &(workers.WorkersOnlyReduce)
+		} else if workerKind == WORKERS_BACKUP_W {
+			destWorkersContainer = &(workers.WorkersBackup)
+		}
+		//taking worker kind addresses list
+		workersNotFailed := make([]Worker, 0, len(*destWorkersContainer))
+		for i := 0; i < len(*destWorkersContainer); i++ {
+			worker := (*destWorkersContainer)[i]
+
+			if worker.State.Failed { //avoid useless ping probe
+				err = errors.New("failed worker")
 			} else {
-				*workers = (*workers)[:indx]
+				err, _ = PingHeartBitSnd(worker.Address + ":" + strconv.Itoa(worker.PingServicePort))
+				if err != nil {
+					failedWorkersUnMarked[worker.Id] = true
+				}
+			}
+			if err == nil {
+				workersNotFailed = append(workersNotFailed, worker)
 			}
 		}
+		*destWorkersContainer = workersNotFailed
 	}
+	(*control).WorkersAll = append((*workers).WorkersMapReduce, (*workers).WorkersOnlyReduce...)
+	(*control).WorkersAll = append((*control).WorkersAll, (*workers).WorkersBackup...)
+	return failedWorkersUnMarked
 }
 
 ////	INSTANCES FUNCs
@@ -418,6 +515,7 @@ func Min(a int64, b int64) int64 {
 	}
 }
 
+/////////// (DE) Serializaiton
 func SerializeToFile(defTokens []Token, filename string) {
 	/////	SERIALIZE RESULT TO FILE
 	n := 0
@@ -439,6 +537,34 @@ func SerializeToFile(defTokens []Token, filename string) {
 		}
 		lw = 0
 	}
+}
+
+// go binary encoder
+func SerializeMasterStateBase64(m MASTER_CONTROL) string {
+	b := bytes.Buffer{}
+	e := gob.NewEncoder(&b)
+	err := e.Encode(m)
+	if err != nil {
+		fmt.Println(`failed gob Encode`, err)
+	}
+	return base64.StdEncoding.EncodeToString(b.Bytes())
+}
+
+// go binary decoder
+func DeSerializeMasterStateBase64(str string) MASTER_CONTROL {
+	out := MASTER_CONTROL{}
+	by, err := base64.StdEncoding.DecodeString(str)
+	if err != nil {
+		fmt.Println(`failed base64 Decode`, err)
+	}
+	b := bytes.Buffer{}
+	b.Write(by)
+	d := gob.NewDecoder(&b)
+	err = d.Decode(&out)
+	if err != nil {
+		fmt.Println(`failed gob Decode`, err)
+	}
+	return out
 }
 func ListOfDictCumulativeSize(dictList []map[int]int) int {
 	cumulativeSum := 0
@@ -484,11 +610,11 @@ func ReflectionFieldsGet(strct interface{}) {
 	fmt.Println(values)
 
 }
-func GenericPrint(slice interface{}) bool {
+func GenericPrint(slice interface{}, prefixMsg string) bool {
+	print(prefixMsg)
 	sv := reflect.ValueOf(slice)
-
 	for i := 0; i < sv.Len(); i++ {
-		fmt.Printf("%d\t", sv.Index(i).Interface())
+		fmt.Printf("	\t%d\t", sv.Index(i).Interface())
 	}
 	fmt.Printf("\n\n")
 	return false
@@ -537,4 +663,28 @@ func RandomBool(probability float64, digitsNumSignificativance int) bool {
 		return false
 	}
 
+}
+
+func SlicesEQ(ints1 []int, ints2 []int) bool {
+	if len(ints1) != len(ints2) {
+		return false
+	}
+	for i, value := range ints1 {
+		if ints2[i] != value {
+			return false
+		}
+	}
+	return true
+}
+func MapsEq(map1 map[int]string, map2 map[int]string) bool {
+	if len(map1) != len(map2) {
+		return false
+	}
+	for key, value := range map1 {
+		val, present := map2[key]
+		if !present || val != value {
+			return false
+		}
+	}
+	return true
 }

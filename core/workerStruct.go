@@ -1,9 +1,11 @@
 package core
 
 import (
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"../aws_SDK_wrap"
+	"fmt"
 	"net"
 	"net/rpc"
+	"os"
 	"strconv"
 	"sync"
 )
@@ -25,6 +27,13 @@ type WorkersKinds struct { //refs to up&running workers
 	WorkersOnlyReduce []Worker //separated worker for reduce
 	WorkersBackup     []Worker //idle workers for backup
 }
+type CLIENT rpc.Client
+
+func (*CLIENT) GobDecode([]byte) error     { return nil }
+func (*CLIENT) GobEncode() ([]byte, error) { return nil, nil }
+func (*CHUNK) GobDecode([]byte) error      { return nil }
+func (*CHUNK) GobEncode() ([]byte, error)  { return nil, nil }
+
 type Worker struct { //worker istance master side
 	Address         string
 	PingServicePort int //TODO USEFUL ON LOCAL VERSION ONLY
@@ -39,7 +48,6 @@ type WorkerStateMasterControl struct {
 	ReducersHostedIDs       []int
 	//WorkerIstances     map[int]WorkerIstanceControl //for each worker istance ID -> control info (port,state,internalData)
 	ControlRPCInstance WorkerIstanceControl //chunkService worker node level instance
-	WorkerNodeLinks    *Worker
 	Failed             bool
 	//backward link it
 }
@@ -56,6 +64,7 @@ type ReducerIstanceStateInternal struct {
 	CumulativeCalls              map[int]bool   //cumulative number of reduce calls received per chunk ID (for exit condition) (
 	mutex                        sync.Mutex     //protect cumulative vars from concurrent access
 	MasterClient                 *rpc.Client    //to report back to master final token share of reducer
+	LogicID                      int
 }
 
 type GenericInternalState struct { //worker instance generic internal state ( field to use is discriminable from instance kind filed)
@@ -66,8 +75,9 @@ type WorkerIstanceControl struct { //MASTER SIDE instance
 	Id       int
 	Port     int
 	Kind     int
-	IntState int         //internal state of the istance
-	Client   *rpc.Client //not nil only at master
+	IntState int     //internal state of the istance
+	Client   *CLIENT //not nil only at master
+	//Client   *rpc.Client //not nil only at master
 
 }
 type WorkerInstanceInternal struct {
@@ -98,9 +108,14 @@ const (
 type AggregatedIntermediateTokens struct {
 	ChunksSouces                 []int
 	PerReducerIntermediateTokens []map[string]int
+	MasterOutputCache            Map2ReduceRouteCost
 }
 
 ///WORKER SIDE STRUCTS
+type ReduceOutputCache struct {
+	reducerBindings map[int]string
+	Errs            []error
+}
 type Worker_node_internal struct {
 	//global worker istance worker node side
 	WorkerChunksStore          WorkerChunks //chunks stored in the worker node
@@ -111,11 +126,13 @@ type Worker_node_internal struct {
 	Id                         int
 	PingConnection             net.Conn
 	PingPort                   int
+	Downloader                 *aws_SDK_wrap.DOWNLOADER
+	MasterAddr                 string
+	//////////////// master fault tollerant idempotent
+	cacheLock   sync.Mutex
+	reduceChace ReduceOutputCache
 	///////// local version chan for internal correct termination
 	ExitChan chan bool
-	//on master exit req notify main routine of logic worker end
-	Downloader *s3manager.Downloader
-	MasterAddr string
 }
 type WorkerChunks struct { //WORKER NODE LEVEL STRUCT
 	//HOLD chunks stored in worker node pretected by a mutex
@@ -192,7 +209,7 @@ func (workerNodeInt *Worker_node_internal) initLogicWorkerIstance(initData *Gene
 	if id != nil { //try to assign id to the new instance if not assigned already
 		_, present := workerNodeInt.Instances[*id]
 		if present {
-			panic("WORKER INSTANCE ID COLLISION")
+			_, _ = fmt.Fprint(os.Stderr, "re instantiation of logic instance on worker")
 		}
 		newId = *id
 	}

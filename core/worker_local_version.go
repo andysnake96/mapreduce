@@ -2,6 +2,7 @@ package core
 
 import (
 	"errors"
+	"math/rand"
 	"net/rpc"
 	"sort"
 	"strconv"
@@ -65,7 +66,7 @@ foundedPort:
 		*assignedPorts = append(*assignedPorts, port)
 	}
 	println("founded avaible port ", port, "\t", checkExternalPortBindings, "\n assigned ports:")
-	GenericPrint(*assignedPorts)
+	GenericPrint(*assignedPorts, "")
 	return port
 }
 
@@ -169,12 +170,11 @@ func InitWorkers_LocalMock_MasterSide() (WorkersKinds, []Worker) {
 				PingServicePort: pingPort,
 				Id:              idWorker,
 				State: WorkerStateMasterControl{
-					ChunksIDs:       make([]int, 0),
-					WorkerNodeLinks: &worker,
+					ChunksIDs: make([]int, 0),
 					ControlRPCInstance: WorkerIstanceControl{
 						Port:   port,
 						Kind:   CONTROL,
-						Client: client,
+						Client: (*CLIENT)(client),
 					}}}
 
 			//setting refs
@@ -191,12 +191,11 @@ func InitWorkers_LocalMock_MasterSide() (WorkersKinds, []Worker) {
 
 func GetChunksNotAlreadyAssignedRR(chunksIds *[]int, numChunkToFind int, chunksIdsAssignedAlready []int) ([]int, error) {
 	/*
-			find first numChunkToFind not already present in list chunkAssignedAlready (not already assigned to worker
-
-		//TODO SMART REPLICATION->sort global assignement Desc for redundancy num(placed chunk replicas)->select first numChunkToFind low replicated chunks to assign
+		find  numChunkToFind not already present in list chunkAssignedAlready (not already assigned to worker
 	*/
-	chunksToAssign := make([]int, 0)
-	for i := 0; i < len(*chunksIds) && len(chunksToAssign) < numChunkToFind; i++ {
+	chunksToAssignable := make([]int, 0, len(*chunksIds)-len(chunksIdsAssignedAlready))
+	chunksToAssign := make([]int, numChunkToFind)
+	for i := 0; i < len(*chunksIds); i++ {
 		chunkId := (*chunksIds)[i]
 		alreadyAssignedChunk := false
 		for _, chunkIdsAssignedAlready := range chunksIdsAssignedAlready {
@@ -205,11 +204,21 @@ func GetChunksNotAlreadyAssignedRR(chunksIds *[]int, numChunkToFind int, chunksI
 			}
 		}
 		if !alreadyAssignedChunk {
-			chunksToAssign = append(chunksToAssign, chunkId)
+			chunksToAssignable = append(chunksToAssignable, chunkId)
 		}
 	}
-	if len(chunksToAssign) < numChunkToFind {
-		return chunksToAssign, errors.New("not finded all replication chunk to assign")
+	for i := 0; i < numChunkToFind; i++ {
+		redundantChunkToAssignIndx := rand.Intn(len(chunksToAssignable))
+		chunksToAssign[i] = chunksToAssignable[redundantChunkToAssignIndx]
+		/// remove assignable chunk from list
+		if redundantChunkToAssignIndx == (len(chunksToAssignable) - 1) {
+			chunksToAssignable = chunksToAssignable[:redundantChunkToAssignIndx]
+		} else {
+			chunksToAssignable = append(chunksToAssignable[:redundantChunkToAssignIndx], chunksToAssignable[redundantChunkToAssignIndx+1:]...)
+		}
+	}
+	if len(chunksToAssignable) < numChunkToFind {
+		return chunksToAssignable, errors.New("not finded all replication chunk to assign")
 
 	}
 	return chunksToAssign, nil

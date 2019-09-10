@@ -12,7 +12,15 @@ import (
 	"os"
 )
 
-func InitS3Links(region string) (*s3manager.Downloader, *s3manager.Uploader) {
+type UPLOADER s3manager.Uploader
+type DOWNLOADER s3manager.Downloader
+
+func (*UPLOADER) GobDecode([]byte) error       { return nil }
+func (*UPLOADER) GobEncode() ([]byte, error)   { return nil, nil }
+func (*DOWNLOADER) GobDecode([]byte) error     { return nil }
+func (*DOWNLOADER) GobEncode() ([]byte, error) { return nil, nil }
+
+func InitS3Links(region string) (*DOWNLOADER, *UPLOADER) {
 	// create 2 s3 session for S3 downloader and uploader
 	// Create a single AWS session
 	sessionS3, err := session.NewSession(&aws.Config{Region: aws.String(region)})
@@ -28,7 +36,7 @@ func InitS3Links(region string) (*s3manager.Downloader, *s3manager.Uploader) {
 	}
 	// Create an uploader with the session and default options
 	uploader := s3manager.NewUploader(sessionS3)
-	return downloader, uploader
+	return (*DOWNLOADER)(downloader), (*UPLOADER)(uploader)
 }
 
 /*func main(){
@@ -40,7 +48,7 @@ func InitS3Links(region string) (*s3manager.Downloader, *s3manager.Uploader) {
 	_= DownloadDATA(downloader,S3_BUCKET,key,buf)
 }*/
 //  will  be set file info like content type and encryption on the uploaded file.
-func UploadDATA(uploader *s3manager.Uploader, dataStr string, strKey string, bucket string) error {
+func UploadDATA(uploader *UPLOADER, dataStr string, strKey string, bucket string) error {
 
 	// Upload input parameters
 	upParams := &s3manager.UploadInput{
@@ -51,7 +59,7 @@ func UploadDATA(uploader *s3manager.Uploader, dataStr string, strKey string, buc
 	}
 
 	// Perform upload with options different than the those in the Uploader.
-	result, err := uploader.Upload(upParams)
+	result, err := (*s3manager.Uploader)(uploader).Upload(upParams)
 	if err != nil {
 		_, _ = fmt.Fprint(os.Stderr, err, "<-->", result)
 		return err
@@ -60,14 +68,14 @@ func UploadDATA(uploader *s3manager.Uploader, dataStr string, strKey string, buc
 	return nil
 }
 
-func DownloadDATA(downloader *s3manager.Downloader, bucket, key string, bufOut []byte, sizeCheck bool) error {
+func DownloadDATA(downloader *DOWNLOADER, bucket, key string, bufOut []byte, sizeCheck bool) error {
 	//download data from s3 and put it i bufOut, byte buffer pre allocated with expected size, propagated eventual errors
 	writer := aws.NewWriteAtBuffer(bufOut)
 	s3InputOption := &s3.GetObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
 	}
-	downloadedSize, err := downloader.Download(writer, s3InputOption)
+	downloadedSize, err := (*s3manager.Downloader)(downloader).Download(writer, s3InputOption)
 	if err != nil {
 		_, _ = fmt.Fprint(os.Stderr, err)
 	}

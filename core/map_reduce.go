@@ -3,12 +3,14 @@ package core
 import (
 	"../aws_SDK_wrap"
 	"errors"
+	"math/rand"
 	"net/rpc"
 	"runtime"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 	"unicode"
 )
 
@@ -19,13 +21,18 @@ const FINAL_TOKEN_FILENAME = "outTokens.list"
 
 /////	CONTROL-RPC	/////////////////
 func (workerNode *Worker_node_internal) Get_chunk_ids(chunkIDs []int, voidReply *int) error {
-
+	/*
+		download from distributed storage, chunks corresponding  to passed chunksID
+		it's safe to recall this function because will download only chunks not cached on worker node
+		because of internal storage of chunks (go map) is not thread safe to call this function concurrently on same worker
+		void return
+	*/
 	sort.Ints(chunkIDs)
 	chunksDownloaded := make([]CHUNK, len(chunkIDs))
 	chunksDownloadedErrors := make([]error, len(chunkIDs))
 	barrierDownload := new(sync.WaitGroup)
 	barrierDownload.Add(len(chunkIDs))
-	for i, chunkId := range chunkIDs {
+	for i, chunkId := range chunkIDs { //concurrent download of not cached chunks
 		//check if chunk already downloaded
 		_, chunksPresent := workerNode.WorkerChunksStore.Chunks[chunkId]
 		if chunksPresent {
@@ -44,13 +51,29 @@ func (workerNode *Worker_node_internal) Get_chunk_ids(chunkIDs []int, voidReply 
 		}
 	}
 	for indx, chunk := range chunksDownloaded {
-		if len(chunk) > 0 {
-			workerNode.WorkerChunksStore.Chunks[chunkIDs[indx]] = chunk
+		if len(chunk) < 5 {
+			panic("INVALID DOWNLOAD")
+		}
+		workerNode.WorkerChunksStore.Chunks[chunkIDs[indx]] = chunk
+	}
+	return nil
+}
+func (workerNode *Worker_node_internal) Get_chunk_data(chunks map[int]CHUNK, voidReply *int) error {
+	/*
+		master pass chunk data directly to worker
+	*/
+
+	for id, chunk := range chunks { //concurrent download of not cached chunks
+		//check if chunk already downloaded
+		_, chunksPresent := workerNode.WorkerChunksStore.Chunks[id]
+		if chunksPresent {
+			println("already have chunk Id :", id)
+		} else {
+			workerNode.WorkerChunksStore.Chunks[id] = chunk
 		}
 	}
 	return nil
 }
-
 func (workerNode *Worker_node_internal) downloadChunk(chunkId int, downloadBarrier **sync.WaitGroup, chunkLocation *CHUNK, errorLocation *error) {
 	/*
 		download chunk from data store, allowing concurrent download with waitgroup to notify downloads progress
@@ -93,8 +116,27 @@ func (workerNode *Worker_node_internal) RemoteControl_NewInstance(instanceKind i
 	return err
 } //TODO OTHER BRANCH
 
-func (workerNode *Worker_node_internal) ActivateNewReducer(NumChunks int, ChosenPort *int) error {
-	//create a new reducer actual instance on top of workerNode, returning the chosen port for the new instance
+type ReduceActiveArg struct {
+	NumChunks int
+	LogicID   int
+}
+
+const MAX_RND_SLEEP time.Duration = time.Millisecond / 2
+
+func (workerNode *Worker_node_internal) ActivateNewReducer(arg ReduceActiveArg, ChosenPort *int) error {
+	//create a new reducer instance on top of workerNode, returning the chosen port for the new instance
+	//Idempontent function, it's safe to Re Activate a Reducer on same worker and same reducer port will be returned
+
+	//check if already exist desidered reducer
+	for _, instance := range workerNode.Instances {
+		if instance.Kind == REDUCE && instance.IntData.ReduceData.LogicID == arg.LogicID {
+			*ChosenPort = instance.Port
+			return nil
+		}
+	}
+	//TODO ON LOCAL RACE CONDITION ON PORT BIND
+	rndSleep := rand.Int63n(int64(MAX_RND_SLEEP))
+	time.Sleep(time.Duration(rndSleep))
 	*ChosenPort = NextUnassignedPort(Config.REDUCE_SERVICE_BASE_PORT, &AssignedPortsAll, true, true, "tcp")
 	masterRpcAddr := workerNode.MasterAddr + ":" + strconv.Itoa(Config.MASTER_BASE_PORT)
 	masterClient, err := rpc.Dial(Config.RPC_TYPE, masterRpcAddr) //init master client for future final return
@@ -103,7 +145,7 @@ func (workerNode *Worker_node_internal) ActivateNewReducer(NumChunks int, Chosen
 	}
 	//init expected intermdiate data shares for the new reducer
 	cumulativesCalls := make(map[int]bool)
-	for i := 0; i < NumChunks; i++ {
+	for i := 0; i < arg.NumChunks; i++ {
 		cumulativesCalls[i] = false
 	}
 	redInitData := GenericInternalState{ReduceData: ReducerIstanceStateInternal{
@@ -111,8 +153,8 @@ func (workerNode *Worker_node_internal) ActivateNewReducer(NumChunks int, Chosen
 		CumulativeCalls:              cumulativesCalls,
 		mutex:                        sync.Mutex{},
 		MasterClient:                 masterClient,
-	},
-	}
+		LogicID:                      arg.LogicID,
+	}}
 	err, newReducerId := InitRPCWorkerIstance(&redInitData, *ChosenPort, REDUCE, workerNode)
 	println("activated new reducer:", newReducerId)
 	return err
@@ -129,13 +171,30 @@ type Map2ReduceRouteCost struct {
 	RouteCosts map[int]int //for each reducerID (logic) --> cumulative data routing cost
 	RouteNum   map[int]int //for each reducerID (logic) --> expected num calls reduce() //TODO HASH PERF DEBUG ONLY.
 }
+type MapWorkerArgs struct {
+	ChunkIds []int
+	WorkerId int
+	Reply    Map2ReduceRouteCost
+	End      *rpc.Call
+	Err      error
+}
 
 func (workerNode *Worker_node_internal) DoMAPs(MapChunkIds []int, DestinationsCosts *Map2ReduceRouteCost) error {
 	/*
 		for each chunk assigned to this worker concurrent map operation will be started
 		intermediate Tokens will be aggregated at worker level
 		routing cost of this intermediate data to reducers will be returned to master as well eventual errors
+		eventual multiple calls will cause re computation only if MapChunkIds has not been processed before
 	*/
+	//if Config.BACKUP_MASTER{
+	//	workerNode.cacheLock.Lock()
+	//	//// check if same maps has been requested before
+	//	if &(workerNode.IntermediateDataAggregated.ChunksSouces)!=nil && SlicesEQ(MapChunkIds,workerNode.IntermediateDataAggregated.ChunksSouces){
+	//		*DestinationsCosts=workerNode.IntermediateDataAggregated.MasterOutputCache
+	//		workerNode.cacheLock.Unlock()
+	//		return nil
+	//	}
+	//}
 	destCostOut := make([]chan Map2ReduceRouteCost, len(MapChunkIds))
 	var newInstance *WorkerInstanceInternal
 	//concurrent do map on go rountines
@@ -150,8 +209,8 @@ func (workerNode *Worker_node_internal) DoMAPs(MapChunkIds []int, DestinationsCo
 		RouteCosts: make(map[int]int, Config.ISTANCES_NUM_REDUCE),
 		RouteNum:   make(map[int]int, Config.ISTANCES_NUM_REDUCE),
 	}
-	//join rountines
-	for _, destCostChan := range destCostOut { //aggreagate mappers routings listening on passed channels
+	/// mapper routine sync && outputs fetch :)
+	for _, destCostChan := range destCostOut {
 		mapperDestCosts := <-destCostChan
 		routeInfosCombiner(mapperDestCosts, DestinationsCosts)
 	}
@@ -159,6 +218,7 @@ func (workerNode *Worker_node_internal) DoMAPs(MapChunkIds []int, DestinationsCo
 	workerNode.IntermediateDataAggregated = AggregatedIntermediateTokens{
 		ChunksSouces:                 MapChunkIds,
 		PerReducerIntermediateTokens: make([]map[string]int, Config.ISTANCES_NUM_REDUCE),
+		MasterOutputCache:            *DestinationsCosts, //cache result for same redundant call
 	}
 	//init aggregation var
 	for i := 0; i < Config.ISTANCES_NUM_REDUCE; i++ {
@@ -166,15 +226,15 @@ func (workerNode *Worker_node_internal) DoMAPs(MapChunkIds []int, DestinationsCo
 	}
 	for _, instance := range workerNode.Instances {
 		if instance.Kind == MAP {
-			if len(instance.IntData.MapData.IntermediateTokens) < 5 {
-				panic("fuck") //TODO DEBUG
-			}
 			for key, value := range instance.IntData.MapData.IntermediateTokens {
 				destReducer := HashKeyReducerSum(key, Config.ISTANCES_NUM_REDUCE)
 				workerNode.IntermediateDataAggregated.PerReducerIntermediateTokens[destReducer][key] += value //aggregate token per destination reducer
 			}
 		}
 	}
+	//if Config.BACKUP_MASTER{
+	//	workerNode.cacheLock.Unlock()
+	//}
 	return nil
 }
 
@@ -185,6 +245,18 @@ func (workerNode *Worker_node_internal) ReducersCollocations(ReducersAddresses m
 		wrapped errors in list structurated over constant sub parts for fault recovery
 		for fault tollerant will be triggered async rpc only to reducers in ReducersAddresses (that may be the respawned one)
 	*/
+	//if Config.BACKUP_MASTER{
+	//	workerNode.cacheLock.Lock()
+	//	//// check if same maps has been requested before
+	//	if &(workerNode.reduceChace.reducerBindings)!=nil && MapsEq(ReducersAddresses,workerNode.reduceChace.reducerBindings){
+	//		*Errs=workerNode.reduceChace.Errs
+	//		workerNode.cacheLock.Unlock()
+	//		if len(*Errs)>0{
+	//			return errors.New("old fail report")
+	//		}
+	//		return nil
+	//	}
+	//}
 	*Errs = make([]error, 0)
 	hasErrd := false
 	var err error
@@ -204,12 +276,9 @@ func (workerNode *Worker_node_internal) ReducersCollocations(ReducersAddresses m
 	ends := make([]*rpc.Call, len(ReducersAddresses))
 	sourcesChunks := workerNode.IntermediateDataAggregated.ChunksSouces
 	for reducerLogicId, intermediateTokens := range workerNode.IntermediateDataAggregated.PerReducerIntermediateTokens {
-		_, isNewlySpawnedReducer := ReducersAddresses[reducerLogicId]
-		if !isNewlySpawnedReducer {
-			continue //skip not spawned reducers
-		}
 		ends[reducerLogicId] = workerNode.ReducersClients[reducerLogicId].Go("REDUCE.Reduce", ReduceArgs{intermediateTokens, sourcesChunks}, nil, nil)
 	}
+	//GenericPrint(sourcesChunks, "SOURCE CHUNKS SENT TO REDUCERS")
 	for reducerLogicId, end := range ends {
 		<-end.Done
 		if end.Error != nil {
@@ -217,6 +286,13 @@ func (workerNode *Worker_node_internal) ReducersCollocations(ReducersAddresses m
 			*Errs = append(*Errs, errors.New(REDUCE_CALL+ERROR_SEPARATOR+strconv.Itoa(reducerLogicId)))
 		}
 	}
+	//if Config.BACKUP_MASTER{
+	//	workerNode.reduceChace=ReduceOutputCache{
+	//		reducerBindings: ReducersAddresses,
+	//		Errs:            *Errs,
+	//	}
+	//	workerNode.cacheLock.Unlock()
+	//}
 	if hasErrd {
 		return errors.New("reduce failed")
 	}
@@ -236,6 +312,10 @@ func (m *MapperIstanceStateInternal) Map_parse_builtin_quick_route(rawChunkId in
 	m.ChunkID = rawChunkId
 	m.WorkerChunks.Mutex.Lock()
 	rawChunk := m.WorkerChunks.Chunks[rawChunkId]
+	if len(rawChunk) < 5 {
+		println(string(rawChunk))
+		panic("fetched invalid chunk" + string(rawChunk))
+	}
 	m.WorkerChunks.Mutex.Unlock()
 	//m.IntermediateTokens = make(map[string]int)
 	destinationsCosts := Map2ReduceRouteCost{
@@ -252,7 +332,7 @@ func (m *MapperIstanceStateInternal) Map_parse_builtin_quick_route(rawChunkId in
 		m.IntermediateTokens[word]++
 	}
 	if len(m.IntermediateTokens) < 5 {
-		panic("intermdiate token error") //TODO DEBUG
+		panic("intermdiate token error:" + rawChunk) //TODO DEBUG
 	}
 	//building reverse map for smart activations of ReducerNodes
 	var destReducerNodeId int
@@ -327,6 +407,9 @@ func (r *ReducerIstanceStateInternal) Reduce(RedArgs ReduceArgs, voidReply *int)
 			r.CumulativeCalls[chunkId] = true //set that intermediate Tokens share has being received
 		}
 	}
+	if r.LogicID == 0 {
+		GenericPrint(RedArgs.Source, "reducer received chunks")
+	}
 	if duplicateIntermdiateData {
 		r.mutex.Unlock()
 		return nil
@@ -352,19 +435,25 @@ func (r *ReducerIstanceStateInternal) Reduce(RedArgs ReduceArgs, voidReply *int)
 }
 
 ////////		MASTER		///////////////////////////////
+type MUTEX sync.Mutex
+
+func (*MUTEX) GobDecode([]byte) error     { return nil }
+func (*MUTEX) GobEncode() ([]byte, error) { return nil, nil }
+
 type MasterRpc struct {
 	FinalTokens     []Token
-	Mutex           sync.Mutex
+	Mutex           MUTEX
 	ReturnedReducer *chan bool
 }
 
 func (master *MasterRpc) ReturnReduce(FinalTokensPartial map[string]int, VoidReply *int) error {
-	master.Mutex.Lock()
+	mutex := (sync.Mutex)(master.Mutex)
+	mutex.Lock()
 	for k, v := range FinalTokensPartial {
 		master.FinalTokens = append(master.FinalTokens, Token{k, v})
 	}
 	*master.ReturnedReducer <- true //notify returned reducer
-	master.Mutex.Unlock()
+	mutex.Unlock()
 	return nil
 }
 

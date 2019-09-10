@@ -41,14 +41,13 @@ func ReducersBindingsLocallityAwareEuristic(reducersIdsTrafficIN ReducersDataRou
 	reducersTrafficsCostListSorted := extractCostsListSorted(reducersIdsTrafficIN)
 	reducersBindings := make(map[int]int) //final binding of reducerID -> actual worker id for placement
 
-	MaxContractions := Config.ISTANCES_NUM_REDUCE - Config.WORKER_NUM_ONLY_REDUCE //max Num of reducers contractions
+	maxContractions := Config.ISTANCES_NUM_REDUCE - len(workers.WorkersOnlyReduce) //max Num of reducers contractions
 	contractedR := 0
-	for i := 0; i < len(reducersTrafficsCostListSorted) && contractedR < MaxContractions; i++ {
+	for i := 0; i < len(reducersTrafficsCostListSorted) && contractedR < maxContractions; i++ {
 		record := reducersTrafficsCostListSorted[i]
 		_, contractedReducer := reducersBindings[record.ReducerID]
 		if !contractedReducer { //NOT ALREADY CONTRACTED THE REDUCER
-			workerNode, err := GetWorker(record.WorkerID, workers)
-			CheckErr(err, true, "binding to reducers")
+			workerNode := GetWorker(record.WorkerID, workers)
 			//if NumHealthyReducerOnWorker(&workerNode) <= Config.MAX_REDUCERS_PER_WORKER { //NOT TOO MUCH CONTRACTION ON SAME WORKER
 			//} //TODO SIMLPF&&=>LOAD DISTRIB
 			reducersBindings[record.ReducerID] = workerNode.Id //CONTRACT  edge
@@ -56,14 +55,14 @@ func ReducersBindingsLocallityAwareEuristic(reducersIdsTrafficIN ReducersDataRou
 		}
 	}
 	onlyReducerIndx := 0 //index of worker (type only reduce) in last reducer placement
-	for rid := 0; rid < Config.ISTANCES_NUM_REDUCE && contractedR < Config.ISTANCES_NUM_REDUCE; rid++ {
+	for rid := 0; rid < Config.ISTANCES_NUM_REDUCE && onlyReducerIndx < len(workers.WorkersOnlyReduce); rid++ {
 		_, contractedReducer := reducersBindings[rid]
 		if !contractedReducer {
 			reducersBindings[rid] = workers.WorkersOnlyReduce[onlyReducerIndx].Id
 			onlyReducerIndx++
 		}
 	}
-	if len(reducersBindings) < Config.ISTANCES_NUM_REDUCE {
+	if len(reducersBindings) < Config.ISTANCES_NUM_REDUCE { //TODO ASSERTION CHECK
 		panic("reducers placement error")
 	}
 

@@ -4,7 +4,6 @@ import (
 	"../aws_SDK_wrap"
 	"errors"
 	"fmt"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"io"
 	"net"
 	"net/rpc"
@@ -23,15 +22,33 @@ type MASTER_CONTROL struct {
 	MasterAddress string
 	Workers       WorkersKinds //connected workers
 	WorkersAll    []Worker     //list of all workers ref.
-	ChunkIDS      []int        //list of all avaibles  chunks
+	//list of all avaibles  chunks
+	MasterData MASTER_STATE_DATA
+	////////// master fault tollerant
+	StateChan chan uint32
+	State     uint32
+	PingConn  net.Conn
+	Chunks    []CHUNK
+
+	//UploaderState *aws_SDK_wrap.UPLOADER
 }
 
-func Init_distribuited_version(control *MASTER_CONTROL, filenames []string, loadChunksToS3 bool) (*s3manager.Downloader, *s3manager.Uploader, []int, error) {
+type MASTER_STATE_DATA struct {
+	AssignedChunkWorkers            map[int][]int
+	AssignedChunkWorkersFairShare   map[int][]int
+	ChunkIDS                        []int
+	MapResults                      []MapWorkerArgs
+	ReducerRoutingInfos             ReducersRouteInfos
+	ReducerSmartBindingsToWorkersID map[int]int
+}
+
+func Init_distribuited_version(control *MASTER_CONTROL, filenames []string, loadChunksToS3 bool) (*aws_SDK_wrap.UPLOADER, []int, error) {
 	///initialize data and workers referement
 
 	barrier := new(sync.WaitGroup)
 	barrier.Add(2)
-	downloader, uploader := aws_SDK_wrap.InitS3Links(Config.S3_REGION)
+	_, uploader := aws_SDK_wrap.InitS3Links(Config.S3_REGION)
+	//control.UploaderState=uploader
 	assignedPorts := make([]int, 0, 10)
 	var err error = nil
 	//init workers,letting them register to master, he will populate different workers kind in ordered manner
@@ -41,22 +58,32 @@ func Init_distribuited_version(control *MASTER_CONTROL, filenames []string, load
 	}()
 
 	chunks := InitChunks(filenames) //chunkize filenames
+	control.Chunks = chunks         //save in memory loaded chunks -> they will not be backup in master checkpointing
 	if loadChunksToS3 {             //avoid usless aws put waste if chunks are already loaded to S3
 		//init chunks loading to storage service
 		println("loading chunks of file to S3")
 		go loadChunksToChunkStorage(chunks, &barrier, control, uploader)
 	} else {
-		(*control).ChunkIDS = BuildSequentialIDsListUpTo(len(chunks))
+		(*control).MasterData.ChunkIDS = BuildSequentialIDsListUpTo(len(chunks))
 		barrier.Add(-1)
 	}
 
 	////// sync worker init routines
 	barrier.Wait()
+	if Config.BACKUP_MASTER {
+		pingPort := NextUnassignedPort(Config.PING_SERVICE_BASE_PORT, &assignedPorts, true, true, "udp")
+		control.StateChan = make(chan uint32, 1)
+		conn, e := PingHeartBitRcvMaster(pingPort, control.StateChan)
+		if CheckErr(e, false, "PING SERVICE STARTING ERR") {
+			return uploader, assignedPorts, errors.New(e.Error() + err.Error())
+		}
+		control.PingConn = conn
+	}
 	println("initialization done")
-	return downloader, uploader, assignedPorts, err
+	return uploader, assignedPorts, err
 }
 
-func loadChunksToChunkStorage(chunks []CHUNK, waitGroup **sync.WaitGroup, control *MASTER_CONTROL, uploader *s3manager.Uploader) {
+func loadChunksToChunkStorage(chunks []CHUNK, waitGroup **sync.WaitGroup, control *MASTER_CONTROL, uploader *aws_SDK_wrap.UPLOADER) {
 	//chunkize filenames and upload to storage service
 
 	//initialize upload stuff
@@ -84,7 +111,7 @@ func loadChunksToChunkStorage(chunks []CHUNK, waitGroup **sync.WaitGroup, contro
 	}
 	uploadAllBarrier.Wait()
 	stopTime := time.Now()
-	(*control).ChunkIDS = chunkIDS
+	(*control).MasterData.ChunkIDS = chunkIDS
 	(*waitGroup).Done()
 	println("loaded: ", len(chunks), " approx in : ", stopTime.Sub(startTime).String())
 }
@@ -97,12 +124,14 @@ func BuildSequentialIDsListUpTo(maxID int) []int {
 	return list
 }
 
-func waitWorkersRegister(waitGroup **sync.WaitGroup, control *MASTER_CONTROL, assignedPorts *[]int, uploader *s3manager.Uploader) error {
+const WORKER_REGISTER_TIMEOUT time.Duration = 4 * time.Second
+
+func waitWorkersRegister(waitGroup **sync.WaitGroup, control *MASTER_CONTROL, assignedPorts *[]int, uploader *aws_SDK_wrap.UPLOADER) error {
 	//setup worker register service tcp port at master
 	//publish this address to workers
 	//wait workers to registry to master
 
-	port := NextUnassignedPort(Config.WORKER_REGISTER_SERVICE_BASE_PORT, assignedPorts, true, true, "tcp")
+	port := Config.WORKER_REGISTER_SERVICE_BASE_PORT
 	conn, err := net.ListenTCP("tcp", &net.TCPAddr{
 		Port: port,
 		IP:   net.ParseIP("0.0.0.0"),
@@ -131,6 +160,7 @@ func waitWorkersRegister(waitGroup **sync.WaitGroup, control *MASTER_CONTROL, as
 	}
 	var destWorkersContainer *[]Worker //dest variable for workers to init
 	id := 0                            //worker id
+
 	for workerKind, numToInit := range workersKindsNums {
 		println("initiating: ", numToInit, "of workers kind: ", workerKind)
 		//taking worker kind addresses list
@@ -144,8 +174,18 @@ func waitWorkersRegister(waitGroup **sync.WaitGroup, control *MASTER_CONTROL, as
 		for i := 0; i < numToInit; i++ {
 			//WAIT WORKERS TO REGISTER TO COMUNICATED MASTER ADDRESS EXTRACTING ADDRESS FROM PROBE SYNs
 			workerConn, err := conn.AcceptTCP()
+			if id == 0 {
+				//set timeout to conn only 1 time after first succesfully connection (assuming at least 1 worker will register)
+				err = conn.SetDeadline(time.Now().Add(WORKER_REGISTER_TIMEOUT))
+				CheckErr(err, true, "connection timeout err")
+			}
+
 			if CheckErr(err, false, "worker connection error") {
-				continue
+				if err, ok := err.(*net.OpError); ok && err.Timeout() {
+					println("time out")
+					goto exit //timeout=> no more worker to accept
+				}
+				continue //some fail in connection estamblish...skip worker
 			}
 			workerAddr := strings.Split(workerConn.LocalAddr().String(), ":")[0]
 			portPing := Config.PING_SERVICE_BASE_PORT
@@ -183,7 +223,7 @@ func waitWorkersRegister(waitGroup **sync.WaitGroup, control *MASTER_CONTROL, as
 					ControlRPCInstance: WorkerIstanceControl{
 						Port:   portControlRpc,
 						Kind:   CONTROL,
-						Client: client,
+						Client: (*CLIENT)(client),
 					},
 					Failed: false,
 				},
@@ -193,6 +233,7 @@ func waitWorkersRegister(waitGroup **sync.WaitGroup, control *MASTER_CONTROL, as
 			id++
 		}
 	}
+exit:
 	//check eventual init errors accumulated
 	if !CheckAndSolveInitErr(&workers) {
 		err = errors.New("WORKERS INIT ERROR")
@@ -261,7 +302,7 @@ func CheckAndSolveInitErr(workersKinds *WorkersKinds) bool {
 const PORT_SEPARATOR = ";"  // for flexible port assignement worker will comunicate during registration CONTROL_RPC_PORT;PING_SERVICE_PORT
 const PORT_TERMINATOR = "-" // for flexible port assignement worker will comunicate during registration CONTROL_RPC_PORT;PING_SERVICE_PORT
 
-func InitWorker(worker *Worker_node_internal, stopPingChan chan bool, downloader *s3manager.Downloader) ([]int, error) {
+func InitWorker(worker *Worker_node_internal, stopPingChan chan bool, downloader *aws_SDK_wrap.DOWNLOADER) ([]int, error) {
 	////// start ping service and initialize worker
 	assignedPorts := make([]int, 0, 5)
 	/// init worker struct
@@ -290,7 +331,9 @@ func InitWorker(worker *Worker_node_internal, stopPingChan chan bool, downloader
 		PingPort:        pingPort,
 		Downloader:      downloader,
 	}
-
+	if Config.BACKUP_MASTER {
+		(*worker).cacheLock = sync.Mutex{}
+	}
 	err, _ = InitRPCWorkerIstance(nil, controlRpcPort, CONTROL, worker)
 	if CheckErr(err, false, "control rpc init on worker failed") {
 		return assignedPorts, err
@@ -300,28 +343,16 @@ func InitWorker(worker *Worker_node_internal, stopPingChan chan bool, downloader
 
 const masterADDR = "37.116.178.139:6000"
 
-func RegisterToMaster(downloader *s3manager.Downloader, portsComunication string) (string, error) {
+func RegisterToMaster(downloader *aws_SDK_wrap.DOWNLOADER, portsComunication string) (string, error) {
 	//get master published address from s3
 	//register as new worker to master
 	//if setted flexible port assignement for worker servieces (control rpc instance and ping service) comunicate to master portsComunication
 
-	//get master address
-	//masterAddress := make([]byte, len("255.255.255.255:9696"))
-	//for v := 0; v < len(masterAddress); v++ { //GO memset (xD)
-	//	masterAddress[v] = 0
-	//}
-	//err := aws_SDK_wrap.DownloadDATA(downloader, Config.S3_BUCKET, MASTER_ADDRESS_PUBLISH_S3_KEY, masterAddress, false)
-	//if CheckErr(err, false, "master addr fetch err") {
+	////////fetch master address
+	//masterAddressStr,err := GetMasterAddr(downloader,Config.S3_BUCKET,MASTER_ADDRESS_PUBLISH_S3_KEY)
+	//if CheckErr(err, false, "") {
 	//	return "", err
 	//}
-	//masterAddressStr := string(masterAddress)
-	//i := 0
-	//for i = len(masterAddress) - 1; i >= 0; i-- { //eliminate residue part from downloaded string
-	//	if masterAddress[i] != 0 { //enough to go back until !0
-	//		break
-	//	}
-	//}
-	//masterAddressStr = masterAddressStr[:i+1]
 	masterAddressStr := masterADDR //TODO TEMP SAVE S3 GET limit free tier
 	println("fetched master address for my registration: ", masterAddressStr)
 
@@ -339,6 +370,27 @@ func RegisterToMaster(downloader *s3manager.Downloader, portsComunication string
 	}
 	masterAddressStr = strings.Split(conn.RemoteAddr().String(), ":")[0]
 	println("registered to master", portsComunication)
+	return masterAddressStr, nil
+}
+
+func GetMasterAddr(downloader *aws_SDK_wrap.DOWNLOADER, bucketKey string, masterAddrKey string) (string, error) {
+	//get master address
+	masterAddress := make([]byte, len("255.255.255.255:9696"))
+	for v := 0; v < len(masterAddress); v++ { //GO memset (xD)
+		masterAddress[v] = 0
+	}
+	err := aws_SDK_wrap.DownloadDATA(downloader, Config.S3_BUCKET, MASTER_ADDRESS_PUBLISH_S3_KEY, masterAddress, false)
+	if CheckErr(err, false, "master addr fetch err") {
+		return "", err
+	}
+	masterAddressStr := string(masterAddress)
+	i := 0
+	for i = len(masterAddress) - 1; i >= 0; i-- { //eliminate residue part from downloaded string
+		if masterAddress[i] != 0 { //enough to go back until !0
+			break
+		}
+	}
+	masterAddressStr = masterAddressStr[:i+1]
 	return masterAddressStr, nil
 }
 
