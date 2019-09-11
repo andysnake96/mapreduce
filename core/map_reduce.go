@@ -3,6 +3,7 @@ package core
 import (
 	"../aws_SDK_wrap"
 	"errors"
+	"fmt"
 	"math/rand"
 	"net/rpc"
 	"runtime"
@@ -58,22 +59,6 @@ func (workerNode *Worker_node_internal) Get_chunk_ids(chunkIDs []int, voidReply 
 	}
 	return nil
 }
-func (workerNode *Worker_node_internal) Get_chunk_data(chunks map[int]CHUNK, voidReply *int) error {
-	/*
-		master pass chunk data directly to worker
-	*/
-
-	for id, chunk := range chunks { //concurrent download of not cached chunks
-		//check if chunk already downloaded
-		_, chunksPresent := workerNode.WorkerChunksStore.Chunks[id]
-		if chunksPresent {
-			println("already have chunk Id :", id)
-		} else {
-			workerNode.WorkerChunksStore.Chunks[id] = chunk
-		}
-	}
-	return nil
-}
 func (workerNode *Worker_node_internal) downloadChunk(chunkId int, downloadBarrier **sync.WaitGroup, chunkLocation *CHUNK, errorLocation *error) {
 	/*
 		download chunk from data store, allowing concurrent download with waitgroup to notify downloads progress
@@ -99,7 +84,7 @@ func (workerNode *Worker_node_internal) downloadChunk(chunkId int, downloadBarri
 	*errorLocation = nil
 }
 
-func (workerNode *Worker_node_internal) RemoteControl_NewInstance(instanceKind int, chosenPort *int) error {
+/*func (workerNode *Worker_node_internal) RemoteControl_NewInstance(instanceKind int, chosenPort *int) error {
 	//create a new worker instance on top of workerNode, returning the chosen port for the new instance
 	var dfltPort int
 	if instanceKind == CONTROL {
@@ -114,7 +99,7 @@ func (workerNode *Worker_node_internal) RemoteControl_NewInstance(instanceKind i
 	//} //else { worker node level assigned ports
 	err, _ := InitRPCWorkerIstance(nil, *chosenPort, instanceKind, workerNode) //init instance propagating errors
 	return err
-} //TODO OTHER BRANCH
+} */ //TODO OTHER BRANCH
 
 type ReduceActiveArg struct {
 	NumChunks int
@@ -155,8 +140,8 @@ func (workerNode *Worker_node_internal) ActivateNewReducer(arg ReduceActiveArg, 
 		MasterClient:                 masterClient,
 		LogicID:                      arg.LogicID,
 	}}
-	err, newReducerId := InitRPCWorkerIstance(&redInitData, *ChosenPort, REDUCE, workerNode)
-	println("activated new reducer:", newReducerId)
+	err, _ = InitRPCWorkerIstance(&redInitData, *ChosenPort, REDUCE, workerNode)
+	//println("activated new reducer:", arg.LogicID)
 	return err
 }
 
@@ -171,21 +156,27 @@ type Map2ReduceRouteCost struct {
 	RouteCosts map[int]int //for each reducerID (logic) --> cumulative data routing cost
 	RouteNum   map[int]int //for each reducerID (logic) --> expected num calls reduce() //TODO HASH PERF DEBUG ONLY.
 }
+
+type MapWorkerArgsWrap struct {
+	WorkerId   int
+	Reply      Map2ReduceRouteCost
+	End        *rpc.Call
+	Err        error
+	MapJobArgs MapWorkerArgs
+}
 type MapWorkerArgs struct {
-	ChunkIds []int
-	WorkerId int
-	Reply    Map2ReduceRouteCost
-	End      *rpc.Call
-	Err      error
+	ChunkIds []int //map jobs assigned chunks
+	Chunks   []CHUNK
 }
 
+/*
 func (workerNode *Worker_node_internal) DoMAPs(MapChunkIds []int, DestinationsCosts *Map2ReduceRouteCost) error {
-	/*
-		for each chunk assigned to this worker concurrent map operation will be started
-		intermediate Tokens will be aggregated at worker level
-		routing cost of this intermediate data to reducers will be returned to master as well eventual errors
-		eventual multiple calls will cause re computation only if MapChunkIds has not been processed before
-	*/
+		//
+		//for each chunk assigned to this worker concurrent map operation will be started
+		//intermediate Tokens will be aggregated at worker level
+		//routing cost of this intermediate data to reducers will be returned to master as well eventual errors
+		//eventual multiple calls will cause re computation only if MapChunkIds has not been processed before
+		//
 	//if Config.BACKUP_MASTER{
 	//	workerNode.cacheLock.Lock()
 	//	//// check if same maps has been requested before
@@ -236,9 +227,90 @@ func (workerNode *Worker_node_internal) DoMAPs(MapChunkIds []int, DestinationsCo
 	//	workerNode.cacheLock.Unlock()
 	//}
 	return nil
+}*/
+func (workerNode *Worker_node_internal) AssignMaps(arg MapWorkerArgs, DestinationsCosts *Map2ReduceRouteCost) error {
+	/*
+		for each chunk assigned to this worker concurrent map operation will be started
+		intermediate Tokens will be aggregated at worker level
+		routing cost of this intermediate data to reducers will be returned to master as well eventual errors
+		eventual multiple calls will cause re computation only if mapJobsTODO has not been processed before
+	*/
+
+	//if Config.BACKUP_MASTER{
+	//	workerNode.cacheLock.Lock()
+	//	//// check if same maps has been requested before
+	//	if &(workerNode.IntermediateDataAggregated.ChunksSouces)!=nil && SlicesEQ(mapJobsTODO,workerNode.IntermediateDataAggregated.ChunksSouces){
+	//		*DestinationsCosts=workerNode.IntermediateDataAggregated.MasterOutputCache
+	//		workerNode.cacheLock.Unlock()
+	//		return nil
+	//	}
+	//}
+
+	/////////// filter away already did map jobs
+	mapJobsTODO := make([]int, 0, len(arg.ChunkIds)) //map jobs assigned to this worker
+	if Config.LoadChunksToS3 {
+		err := workerNode.Get_chunk_ids(arg.ChunkIds, nil)
+		if CheckErr(err, false, "") {
+			return err
+		}
+	} else {
+		//TODO SLOW DOWN FOR DEBUG --> RANDOM KILL
+		SLOW_DOWN_MAX_MAP := 800 * time.Millisecond
+		sleepFor := rand.Int63n(int64(SLOW_DOWN_MAX_MAP))
+		sleepFor += 100
+		if sleepFor > 1 {
+			time.Sleep(time.Duration(sleepFor))
+		}
+		for i, chunkID := range arg.ChunkIds {
+			//workerMapJobs.Chunks[i]=data.Chunks[chunkId]	TODO PREVIUSLY SETTED
+			_, isAlreadyOwnedChunk := workerNode.WorkerChunksStore.Chunks[chunkID]
+			if !isAlreadyOwnedChunk {
+				workerNode.WorkerChunksStore.Chunks[chunkID] = arg.Chunks[i]
+				mapJobsTODO = append(mapJobsTODO, chunkID)
+				if len(arg.Chunks[i]) < 5 {
+					panic("invalid chunk received ")
+				}
+			}
+		}
+	}
+
+	GenericPrint(mapJobsTODO, "maps job on "+strconv.Itoa(workerNode.ControlRpcInstance.Port))
+	destCostOut := make([]chan Map2ReduceRouteCost, len(mapJobsTODO))
+	//concurrent do map on go rountines
+	for i, chunkId := range mapJobsTODO {
+		newMapper := MapperIstanceStateInternal{
+			IntermediateTokens: make(map[string]int),
+			WorkerChunks:       &(workerNode.WorkerChunksStore),
+			ChunkID:            chunkId,
+		}
+		workerNode.MapperInstances[chunkId] = newMapper
+		destCostOut[i] = make(chan Map2ReduceRouteCost)
+		go newMapper.Map_parse_builtin_quick_route(chunkId, &(destCostOut[i])) //concurrent map computations
+	}
+	*DestinationsCosts = Map2ReduceRouteCost{
+		RouteCosts: make(map[int]int, Config.ISTANCES_NUM_REDUCE),
+		RouteNum:   make(map[int]int, Config.ISTANCES_NUM_REDUCE),
+	}
+	/// mapper routine sync && outputs fetch :)
+	for _, destCostChan := range destCostOut {
+		mapperDestCosts := <-destCostChan
+		routeInfosCombiner(mapperDestCosts, DestinationsCosts)
+	}
+	//println("::route infos-->",len(DestinationsCosts.RouteCosts),len(DestinationsCosts.RouteNum))
+	//workerNode.aggregateIntermediateTokens(mapJobsTODO,*DestinationsCosts)
+
+	//if Config.BACKUP_MASTER{
+	//	workerNode.cacheLock.Unlock()
+	//}
+	return nil
 }
 
-func (workerNode *Worker_node_internal) ReducersCollocations(ReducersAddresses map[int]string, Errs *[]error) error {
+type ReduceTriggerArg struct {
+	ReducersAddresses map[int]string
+	ChunksToAggregate []int
+}
+
+func (workerNode *Worker_node_internal) ReducersCollocations(arg ReduceTriggerArg, Errs *[]error) error {
 	/*
 		set rpc connection clients to reducer located from the master to worker nodes exploiting data locality among workers
 		async rpc reduce calls propagating to caller eventual errors occurred during both connections or reduce calls
@@ -261,7 +333,7 @@ func (workerNode *Worker_node_internal) ReducersCollocations(ReducersAddresses m
 	hasErrd := false
 	var err error
 	///	setup reducer connections
-	for reducerId, reducerFinalAddress := range ReducersAddresses {
+	for reducerId, reducerFinalAddress := range arg.ReducersAddresses {
 		workerNode.ReducersClients[reducerId], err = rpc.Dial(Config.RPC_TYPE, reducerFinalAddress)
 		if CheckErr(err, false, "dialing reducer") {
 			hasErrd = true
@@ -271,12 +343,26 @@ func (workerNode *Worker_node_internal) ReducersCollocations(ReducersAddresses m
 	if hasErrd {
 		return errors.New("setUp Clients error")
 	}
-
+	workerNode.aggregateIntermediateTokens(arg.ChunksToAggregate)
+	fmt.Println("aggreagated chunks")
 	///	reduce calls over aggregated intermediate Tokens on newly created reduccers in ReducersAddresses
-	ends := make([]*rpc.Call, len(ReducersAddresses))
+	ends := make([]*rpc.Call, 0, len(arg.ReducersAddresses))
 	sourcesChunks := workerNode.IntermediateDataAggregated.ChunksSouces
 	for reducerLogicId, intermediateTokens := range workerNode.IntermediateDataAggregated.PerReducerIntermediateTokens {
-		ends[reducerLogicId] = workerNode.ReducersClients[reducerLogicId].Go("REDUCE.Reduce", ReduceArgs{intermediateTokens, sourcesChunks}, nil, nil)
+		//avoid useless retrasmission of interm. data to reducers
+		/*_,isReductionOrdered:=arg.ReducersAddresses[reducerLogicId]
+		alreadyFlushedIntermData:=workerNode.IntermediateDataAggregated.FlushedIntermediateTokens[reducerLogicId]
+		if !isReductionOrdered && alreadyFlushedIntermData{
+			continue
+		}*/
+
+		//TODO DEBUG PRINT
+		if reducerLogicId == 0 {
+			GenericPrint(sourcesChunks, "chunks sending to reducer: "+strconv.Itoa(reducerLogicId))
+		}
+		end := workerNode.ReducersClients[reducerLogicId].Go("REDUCE.Reduce", ReduceArgs{intermediateTokens, sourcesChunks}, nil, nil)
+		workerNode.IntermediateDataAggregated.FlushedIntermediateTokens[reducerLogicId] = true //mark interm.data as flushed
+		ends = append(ends, end)
 	}
 	//GenericPrint(sourcesChunks, "SOURCE CHUNKS SENT TO REDUCERS")
 	for reducerLogicId, end := range ends {
@@ -426,7 +512,7 @@ func (r *ReducerIstanceStateInternal) Reduce(RedArgs ReduceArgs, voidReply *int)
 		}
 	}
 	if allEnded {
-		println("ALL ENDED at reducer :", r)
+		println("ALL ENDED at reducer :", r.LogicID)
 		err := r.MasterClient.Call("MASTER.ReturnReduce", r.IntermediateTokensCumulative, nil)
 		CheckErr(err, false, "master return failed ") //TODO MASTER FAIL POCO PRIMA DI ULTIME REDUCE END
 	}

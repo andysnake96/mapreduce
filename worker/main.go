@@ -27,8 +27,8 @@ instances running on a worker will have an progressive ID starting to first inst
 
 var WorkersNodeInternal_localVersion []core.Worker_node_internal //for each local simulated worker indexed by his own id -> intenal state
 var WorkersNodeInternal core.Worker_node_internal                //worker nod ref distribuited version
-var SIMULATE_WORKER_CRUSH_BEFORE time.Duration = 17 * time.Second
-var SIMULATE_WORKER_CRUSH_AFTER time.Duration = 1 * time.Second
+var SIMULATE_WORKER_CRUSH_BEFORE time.Duration = 19 * time.Millisecond
+var SIMULATE_WORKER_CRUSH_AFTER time.Duration = 55 * time.Nanosecond
 
 func main() {
 	core.Config = new(core.Configuration)
@@ -81,7 +81,9 @@ func simulateWorkerCrush() {
 	///select a random time before simulate worker death
 	killAfterAbout := rand.Int63n(int64(SIMULATE_WORKER_CRUSH_BEFORE))
 	killAfterAbout += int64(SIMULATE_WORKER_CRUSH_AFTER)
-	time.Sleep(time.Duration(killAfterAbout))
+	if killAfterAbout > 1 {
+		time.Sleep(time.Duration(killAfterAbout))
+	}
 	///close every listening socket still open
 	//_ = WorkersNodeInternal.ControlRpcInstance.ListenerRpc.Close()
 	//for _, instance := range WorkersNodeInternal.Instances {

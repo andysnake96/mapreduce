@@ -28,7 +28,6 @@ type MASTER_CONTROL struct {
 	StateChan chan uint32
 	State     uint32
 	PingConn  net.Conn
-	Chunks    []CHUNK
 
 	//UploaderState *aws_SDK_wrap.UPLOADER
 }
@@ -37,7 +36,8 @@ type MASTER_STATE_DATA struct {
 	AssignedChunkWorkers            map[int][]int
 	AssignedChunkWorkersFairShare   map[int][]int
 	ChunkIDS                        []int
-	MapResults                      []MapWorkerArgs
+	Chunks                          CHUNKS //each chunk here has same indexing of chunkIDs
+	MapResults                      []MapWorkerArgsWrap
 	ReducerRoutingInfos             ReducersRouteInfos
 	ReducerSmartBindingsToWorkersID map[int]int
 }
@@ -53,13 +53,13 @@ func Init_distribuited_version(control *MASTER_CONTROL, filenames []string, load
 	var err error = nil
 	//init workers,letting them register to master, he will populate different workers kind in ordered manner
 	go func() {
-		err = waitWorkersRegister(&barrier, control, &assignedPorts, uploader)
+		err = waitWorkersRegister(&barrier, control, uploader)
 		CheckErr(err, false, "workers initialization failed :(")
 	}()
 
-	chunks := InitChunks(filenames) //chunkize filenames
-	control.Chunks = chunks         //save in memory loaded chunks -> they will not be backup in master checkpointing
-	if loadChunksToS3 {             //avoid usless aws put waste if chunks are already loaded to S3
+	chunks := InitChunks(filenames)    //chunkize filenames
+	control.MasterData.Chunks = chunks //save in memory loaded chunks -> they will not be backup in master checkpointing
+	if loadChunksToS3 {                //avoid usless aws put waste if chunks are already loaded to S3
 		//init chunks loading to storage service
 		println("loading chunks of file to S3")
 		go loadChunksToChunkStorage(chunks, &barrier, control, uploader)
@@ -124,9 +124,9 @@ func BuildSequentialIDsListUpTo(maxID int) []int {
 	return list
 }
 
-const WORKER_REGISTER_TIMEOUT time.Duration = 4 * time.Second
+const WORKER_REGISTER_TIMEOUT time.Duration = 11 * time.Second
 
-func waitWorkersRegister(waitGroup **sync.WaitGroup, control *MASTER_CONTROL, assignedPorts *[]int, uploader *aws_SDK_wrap.UPLOADER) error {
+func waitWorkersRegister(waitGroup **sync.WaitGroup, control *MASTER_CONTROL, uploader *aws_SDK_wrap.UPLOADER) error {
 	//setup worker register service tcp port at master
 	//publish this address to workers
 	//wait workers to registry to master
@@ -190,7 +190,7 @@ func waitWorkersRegister(waitGroup **sync.WaitGroup, control *MASTER_CONTROL, as
 			workerAddr := strings.Split(workerConn.LocalAddr().String(), ":")[0]
 			portPing := Config.PING_SERVICE_BASE_PORT
 			portControlRpc := Config.CHUNK_SERVICE_BASE_PORT
-			if !Config.FIXED_PORT { ///TODO
+			if !Config.FIXED_PORT {
 				portBuf := make([]byte, len("6666;7777"))
 				readed := 0
 				rd := 0
@@ -323,9 +323,9 @@ func InitWorker(worker *Worker_node_internal, stopPingChan chan bool, downloader
 			ChunksSouces:                 make([]int, 0, 5),
 			PerReducerIntermediateTokens: make([]map[string]int, Config.ISTANCES_NUM_REDUCE),
 		},
-		Instances: make(map[int]WorkerInstanceInternal),
-
-		ReducersClients: make(map[int]*rpc.Client),
+		Instances:       make(map[int]WorkerInstanceInternal),
+		MapperInstances: make(map[int]MapperIstanceStateInternal),
+		ReducersClients: make([]*rpc.Client, Config.ISTANCES_NUM_REDUCE),
 		ExitChan:        make(chan bool),
 		PingConnection:  pingConn,
 		PingPort:        pingPort,

@@ -83,7 +83,7 @@ func main() {
 		uploader, _, err = core.Init_distribuited_version(&masterControl, filenames, loadChunksToS3)
 		println("elapsed for initialization: ", time.Now().Sub(startInitTime).String())
 		if core.CheckErr(err, false, "") {
-			killAll(&masterControl.WorkersAll)
+			killAll(&masterControl.Workers)
 			os.Exit(96)
 		}
 	}
@@ -96,13 +96,13 @@ func masterLogic(startPoint uint32, masterControl *core.MASTER_CONTROL, uploader
 
 	var startTime time.Time
 	var err bool
-	var errs []error
+	//var errs []error
 	//// from given starting point
 	switch startPoint {
 	case core.CHUNK_ASSIGN:
 		goto chunk_assign
-	case core.MAP_ASSIGN:
-		goto map_assign
+	//case core.MAP_ASSIGN:
+	//	goto map_assign
 	case core.LOCALITY_AWARE_LINK_REDUCE:
 		goto locality_aware_link_reduce
 	}
@@ -115,7 +115,7 @@ chunk_assign:
 		err := backUpMasterState(masterControl, uploader)
 		if core.CheckErr(err, false, "") {
 			_, _ = fmt.Fprint(os.Stderr, "MASTER STATE BACKUP FAILED, ABORTING")
-			killAll(&masterControl.WorkersAll)
+			killAll(&masterControl.Workers)
 		}
 	}
 
@@ -129,100 +129,85 @@ chunk_assign:
 	masterControl.MasterData.AssignedChunkWorkersFairShare = assignChunksIDs(&masterControl.Workers.WorkersMapReduce, &(masterControl.MasterData.ChunkIDS), core.Config.CHUNKS_REPLICATION_FACTOR, false, masterControl.MasterData.AssignedChunkWorkers)
 	assignChunksIDs(&masterControl.Workers.WorkersBackup, &(masterControl.MasterData.ChunkIDS), core.Config.CHUNKS_REPLICATION_FACTOR_BACKUP_WORKERS, true, masterControl.MasterData.AssignedChunkWorkers) //only replication assignement on backup workers
 
-	errs = comunicateChunksAssignementToWorkers(masterControl.MasterData.AssignedChunkWorkers, &masterControl.Workers) //RPC 1 IN SEQ DIAGRAM
-	println("elapsed for chunk assignement: ", time.Now().Sub(startTime).String())
-	if len(errs) > 0 {
-		_, _ = fmt.Fprintf(os.Stderr, "ASSIGN CHUNK ERRD \n")
-		workersIdsToReschedule := make(map[int][]int, len(errs)) //map of worker->chunks assigned to reschedule
-		for _, err := range errs {
-			workerIdErrd, _ := strconv.Atoi(err.Error()) //failed worker ID appended during comunication
-			workerErrd := core.GetWorker(workerIdErrd, &(masterControl.Workers))
-			workerErrd.State.Failed = true
-			core.CheckErr(err, false, "failed worker id:"+strconv.Itoa(workerIdErrd))
-			chunkIds := masterControl.MasterData.AssignedChunkWorkers[workerIdErrd]
-			workersIdsToReschedule[workerIdErrd] = chunkIds
-			//workerErrd,err:=core.GetWorker(workerIdErrd,&masterControl.Workers)
+	/*errs = comunicateChunksAssignementToWorkers(masterControl.MasterData.AssignedChunkWorkers, &masterControl.Workers) //RPC 1 IN SEQ DIAGRAM
+		println("elapsed for chunk assignement: ", time.Now().Sub(startTime).String())
+		if len(errs) > 0 {
+			_, _ = fmt.Fprintf(os.Stderr, "ASSIGN CHUNK ERRD \n")
+			workersIdsToReschedule := make(map[int][]int, len(errs)) //map of worker->chunks assigned to reschedule
+			for _, err := range errs {
+				workerIdErrd, _ := strconv.Atoi(err.Error()) //failed worker ID appended during comunication
+				workerErrd := core.GetWorker(workerIdErrd, &(masterControl.Workers))
+				workerErrd.State.Failed = true
+				core.CheckErr(err, false, "failed worker id:"+strconv.Itoa(workerIdErrd))
+				chunkIds := masterControl.MasterData.AssignedChunkWorkers[workerIdErrd]
+				workersIdsToReschedule[workerIdErrd] = chunkIds
+				//workerErrd,err:=core.GetWorker(workerIdErrd,&masterControl.Workers)
+			}
+			moreFailsIDs := core.PingProbeAlivenessFilter(masterControl) //filter in place failed workers
+			//evaluate possible extra fails not reported in chunk assign errs reuturn (failed between assignEND<->ping filter
+			for id, _ := range moreFailsIDs {
+				chunksAssigned := masterControl.MasterData.AssignedChunkWorkersFairShare[id]
+				if chunksAssigned != nil {
+					workersIdsToReschedule[id] = chunksAssigned
+				}
+			}
+			newChunksAssignements := AssignChunksIDsRecovery(&masterControl.Workers, workersIdsToReschedule,
+				&(masterControl.MasterData.AssignedChunkWorkers), &(masterControl.MasterData.AssignedChunkWorkersFairShare))
+			errs = comunicateChunksAssignementToWorkers(newChunksAssignements, &masterControl.Workers) //RPC 1 IN SEQ DIAGRAM
+			if len(errs) > 0 {
+				_, _ = fmt.Fprintf(os.Stderr, "REASSIGNEMENT OF CHUNK ID FAILED...\n \t aborting all\n")
+				killAll(&masterControl.WorkersAll)
+				os.Exit(96)
+			}
+
 		}
-		moreFailsIDs := core.PingProbeAlivenessFilter(masterControl) //filter in place failed workers
-		//evaluate possible extra fails not reported in chunk assign errs reuturn (failed between assignEND<->ping filter
-		for id, _ := range moreFailsIDs {
-			chunksAssigned := masterControl.MasterData.AssignedChunkWorkersFairShare[id]
-			if chunksAssigned != nil {
-				workersIdsToReschedule[id] = chunksAssigned
+
+		////	MAP
+	map_assign:
+		if core.Config.BACKUP_MASTER {
+			masterControl.State = core.MAP_ASSIGN
+			<-masterControl.StateChan //TODO MASTER BACKUP OFF TEST
+			masterControl.StateChan <- core.MAP_ASSIGN
+			println("backup master state...")
+			err := backUpMasterState(masterControl, uploader)
+			if core.CheckErr(err, false, "") {
+				_, _ = fmt.Fprint(os.Stderr, "MASTER STATE BACKUP FAILED, ABORTING")
+				killAll(&masterControl.WorkersAll)
 			}
 		}
-		newChunksAssignements := AssignChunksIDsRecovery(&masterControl.Workers, workersIdsToReschedule,
-			&(masterControl.MasterData.AssignedChunkWorkers), &(masterControl.MasterData.AssignedChunkWorkersFairShare))
-		errs = comunicateChunksAssignementToWorkers(newChunksAssignements, &masterControl.Workers) //RPC 1 IN SEQ DIAGRAM
-		if len(errs) > 0 {
-			_, _ = fmt.Fprintf(os.Stderr, "REASSIGNEMENT OF CHUNK ID FAILED...\n \t aborting all\n")
-			killAll(&masterControl.WorkersAll)
-			os.Exit(96)
-		}
-
-	}
-
-	////	MAP
-map_assign:
-	if core.Config.BACKUP_MASTER {
-		masterControl.State = core.MAP_ASSIGN
-		<-masterControl.StateChan //TODO MASTER BACKUP OFF TEST
-		masterControl.StateChan <- core.MAP_ASSIGN
-		println("backup master state...")
-		err := backUpMasterState(masterControl, uploader)
-		if core.CheckErr(err, false, "") {
-			_, _ = fmt.Fprint(os.Stderr, "MASTER STATE BACKUP FAILED, ABORTING")
-			killAll(&masterControl.WorkersAll)
-		}
-	}
-
+	*/ //TODO RPC1-2-3 MERGED
 	/*
 		assign individual map jobs to specific workers,
 		they will retun control information about distribution of their intermediate token to (logic) reducers
 		With these information logic reducers will be instantiated on workers exploiting intermediate data locality to route
 	*/
-	masterControl.MasterData.MapResults, err = assignMapWorks(masterControl.MasterData.AssignedChunkWorkersFairShare, &masterControl.Workers) //RPC 2,3 IN SEQ DIAGRAM
+
+	masterControl.MasterData.MapResults, err = assignMapJobsWithRedundancy(&masterControl.MasterData, &masterControl.Workers, masterControl.MasterData.AssignedChunkWorkers) //RPC 2,3 IN SEQ DIAGRAM
+	println("elapsed: ", time.Now().Sub(startTime).String())
+
 	if err {
 		_, _ = fmt.Fprintf(os.Stderr, "ASSIGN MAP JOBS ERRD\n RETRY ON FAILED WORKERS EXPLOITING ASSIGNED CHUNKS REPLICATION")
-		workerMapJobsToReassign := make(map[int][]int) //workerId--> map job to redo (chunkID previusly assigned)
 
-		//// filter failed workers in map results
-		filteredMapResults := make([]core.MapWorkerArgs, 0, len((*masterControl).MasterData.MapResults))
-		moreFails := core.PingProbeAlivenessFilter(masterControl) //filter in place failed workers ( other eventually failed among calls
-		for _, mapResult := range (*masterControl).MasterData.MapResults {
-			failedWorker := core.CheckErr(mapResult.Err, false, "WORKER id:"+strconv.Itoa(mapResult.WorkerId)+" ON MAPS JOB ASSIGN") || moreFails[mapResult.WorkerId]
-			if failedWorker {
-				workerMapJobsToReassign[mapResult.WorkerId] = mapResult.ChunkIds
-			} else {
-				filteredMapResults = append(filteredMapResults, mapResult)
-			}
-		}
-		((*masterControl).MasterData.MapResults) = filteredMapResults
-
-		//re assign failed map job exploiting chunk replication among workers
-		newMapBindings := AssignMapWorksRecovery(workerMapJobsToReassign, &masterControl.Workers, &(masterControl.MasterData.AssignedChunkWorkers))
-		/// retry map
-		mapResultsNew, err := assignMapWorks(newMapBindings, &masterControl.Workers)
-		if err {
-			_, _ = fmt.Fprintf(os.Stderr, "error on map RE assign\n aborting all")
-			killAll(&masterControl.WorkersAll)
+		reassignementResult := MapPhaseRecovery(masterControl, nil)
+		if !reassignementResult {
+			killAll(&masterControl.Workers)
 			os.Exit(96)
 		}
-		masterControl.MasterData.MapResults = mergeMapResults(mapResultsNew, masterControl.MasterData.MapResults)
 	}
 
 	////DATA LOCALITY AWARE REDUCER COMPUTATION && map intermadiate data set
 locality_aware_link_reduce:
-	if core.Config.BACKUP_MASTER {
+	/*if core.Config.BACKUP_MASTER {
 		masterControl.State = core.LOCALITY_AWARE_LINK_REDUCE
 		<-masterControl.StateChan //TODO MASTER BACKUP OFF TEST
 		masterControl.StateChan <- core.LOCALITY_AWARE_LINK_REDUCE
 		err := backUpMasterState(masterControl, uploader)
 		if core.CheckErr(err, false, "") {
 			_, _ = fmt.Fprint(os.Stderr, "MASTER STATE BACKUP FAILED, ABORTING")
-			killAll(&masterControl.WorkersAll)
+			killAll(&masterControl.Workers)
 		}
-	}
+	}*/
+	startTime = time.Now()
 	masterControl.MasterData.ReducerRoutingInfos = aggregateMappersCosts(masterControl.MasterData.MapResults, &masterControl.Workers)
 	masterControl.MasterData.ReducerSmartBindingsToWorkersID = core.ReducersBindingsLocallityAwareEuristic(masterControl.MasterData.ReducerRoutingInfos.DataRoutingCosts, &masterControl.Workers)
 	////DATA LOCALITY AWARE REDUCER BINDINGS COMMUNICATION
@@ -231,38 +216,42 @@ locality_aware_link_reduce:
 		they will aggregate reduce calls to individual reducers propagating  eventual errors
 	*/
 
-	rpcErrs := comunicateReducersBindings(masterControl) //RPC 4,5 IN SEQ DIAGRAM;
+	reduceCallsOk, errs := comunicateReducersBindings(masterControl, masterControl.MasterData.ReducerSmartBindingsToWorkersID) //RPC 4,5 IN SEQ DIAGRAM;
+	println("elapsed: ", time.Now().Sub(startTime).String())
+
 	if len(errs) > 0 {
 		//set up list for failed instances inside failed workers (mapper & reducer)
-		core.PingProbeAlivenessFilter(masterControl) //filter in place failed workers
-		mapToRedo, reduceToRedo := core.ParseReduceErrString(rpcErrs, masterControl.MasterData.ReducerSmartBindingsToWorkersID, &masterControl.Workers)
+		moreFails := core.PingProbeAlivenessFilter(masterControl) //filter in place failed workers
+		mapToRedo, reduceToRedo := core.ParseReduceErrString(errs, &masterControl.MasterData, moreFails)
 		///MAPS REDO
 		var newMapBindings map[int][]int = nil
 		if len(mapToRedo) > 0 {
-			newMapBindings = AssignMapWorksRecovery(mapToRedo, &masterControl.Workers, &(masterControl.MasterData.AssignedChunkWorkers)) //re bind maps work to workers
-			mapResultsNew, err := assignMapWorks(newMapBindings, &masterControl.Workers)                                                 //re do maps
-			_ = aggregateMappersCosts(mapResultsNew, &masterControl.Workers)                                                             //TODO USELESS IF NOT MULTIPLE RETRIED THIS PHASE
-			core.GenericPrint(mapResultsNew, "")
-			//mapResults=mergeMapResults(mapResultsNew,mapResults)
-			if err {
-				_, _ = fmt.Fprintf(os.Stderr, "error on map RE assign\n aborting ...")
-				killAll(&masterControl.WorkersAll)
+			reassignementResult := MapPhaseRecovery(masterControl, mapToRedo)
+			if !reassignementResult {
+				killAll(&masterControl.Workers)
 				os.Exit(96)
 			}
 		}
 
-		///REDUCE RESTART on failed reducers
+		///REDUCES REDO
+		recoveryBindings := make(map[int]int)
 		if len(reduceToRedo) > 0 {
 			//re assign failed reducer on avaible workers following custom order for better assignements in accord with load balance
-			newReducersBindings := ReducersReplacementRecovery(reduceToRedo, newMapBindings, &masterControl.MasterData.ReducerSmartBindingsToWorkersID, &masterControl.Workers)
-			core.GenericPrint(newReducersBindings, "")
-		}
-		//as before comunicate newly re spawned reducer on worker -> NB mappers will trasparently re send per reducer intermediate data
-		errs := comunicateReducersBindings(masterControl)
-		if errs != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "error on map RE reduce comunication")
-			killAll(&masterControl.WorkersAll)
-			os.Exit(96)
+			recoveryBindings = ReducersReplacementRecovery(reduceToRedo, newMapBindings, &masterControl.MasterData.ReducerSmartBindingsToWorkersID, &masterControl.Workers)
+
+			//as before comunicate newly re spawned reducer on worker -> NB mappers will trasparently re send per reducer intermediate data
+			if reduceCallsOk > 0 {
+				//if reduce bindings has been already comunicated but an error occurred, re activate/comunicate only newly spawned reducers
+				_, errs = comunicateReducersBindings(masterControl, recoveryBindings)
+			} else {
+				_, errs = comunicateReducersBindings(masterControl, masterControl.MasterData.ReducerSmartBindingsToWorkersID)
+			}
+			if len(errs) > 0 {
+				_, _ = fmt.Fprintf(os.Stderr, "error on map RE reduce comunication")
+				panic("")
+				//killAll(&masterControl.Workers)
+				os.Exit(96)
+			}
 		}
 	}
 	// will be triggered in 6
@@ -274,6 +263,26 @@ locality_aware_link_reduce:
 	core.SerializeToFile(masterControl.MasterRpc.FinalTokens, core.FINAL_TOKEN_FILENAME)
 	println(masterControl.MasterRpc.FinalTokens)
 	os.Exit(0)
+}
+
+func checkMapRes(control *core.MASTER_CONTROL) {
+	allChunksAssigned := make([]int, 0, len(control.MasterData.ChunkIDS))
+	for _, mapRes := range control.MasterData.MapResults {
+		allChunksAssigned = append(allChunksAssigned, mapRes.MapJobArgs.ChunkIds...)
+	}
+
+	sort.Ints(allChunksAssigned)
+	core.GenericPrint(allChunksAssigned, "global assignement of chunks")
+	allChunksAssigned = make([]int, 0, len(control.MasterData.ChunkIDS))
+	for _, chunks := range control.MasterData.AssignedChunkWorkersFairShare {
+
+		allChunksAssigned = append(allChunksAssigned, chunks...)
+	}
+	sort.Ints(allChunksAssigned)
+	core.GenericPrint(allChunksAssigned, "global assignement of chunks")
+	if len(allChunksAssigned) != len(control.MasterData.ChunkIDS) {
+		panic("WTF")
+	}
 }
 
 func init_local_version(control *core.MASTER_CONTROL) {
@@ -375,7 +384,7 @@ func comunicateChunksAssignementToWorkers(assignementChunkWorkers map[int][]int,
 	workersAssigned := make([]*core.Worker, len(assignementChunkWorkers))
 	for workerId, chunksIds := range assignementChunkWorkers {
 		if len(chunksIds) > 0 {
-			workerPntr := core.GetWorker(workerId, workers)
+			workerPntr := core.GetWorker(workerId, workers, true)
 			time.Sleep(time.Second * 2)
 			ends[i] = (*rpc.Client)(workerPntr.State.ControlRPCInstance.Client).Go("CONTROL.Get_chunk_ids", chunksIds, nil, nil)
 			workersAssigned[i] = workerPntr
@@ -408,40 +417,90 @@ func comunicateChunksAssignementToWorkers(assignementChunkWorkers map[int][]int,
 	return errs
 }
 
-func assignMapWorks(workerMapperChunks map[int][]int, workers *core.WorkersKinds) ([]core.MapWorkerArgs, bool) {
+func assignMapJobsWithRedundancy(data *core.MASTER_STATE_DATA, workers *core.WorkersKinds, chunkShare map[int][]int) ([]core.MapWorkerArgsWrap, bool) {
 	/*
 		assign MAP input data (chunks) to designed workers that will trigger several concurrent MAP execution
 		intermediate tokens data buffered inside workers and routing cost of data to reducers (logic) returned aggregated at worker node level
 		that reflect data locality of interm.data over workers,
+		if newChunks is not nil it will be used to filter appended chunk data to map request to workers (
 	*/
-
 	hasErrd := false
-	mapRpcWrap := make([]core.MapWorkerArgs, len(workerMapperChunks))
-	i := 0
-	for workerId, chunkIDs := range workerMapperChunks {
-		workerPntr := core.GetWorker(workerId, workers)
-		mapRpcWrap[i] = core.MapWorkerArgs{
-			ChunkIds: chunkIDs,
+	mapRpcWrap := make([]core.MapWorkerArgsWrap, 0, len(chunkShare))
+	/// building worker map jobs arg for rpc
+	for workerId, chunkIDs := range chunkShare {
+		workerMapJobs := core.MapWorkerArgsWrap{
+			MapJobArgs: core.MapWorkerArgs{
+				ChunkIds: chunkIDs,
+			},
 			WorkerId: workerId,
 			Err:      nil,
 			Reply:    core.Map2ReduceRouteCost{},
 		}
-		//async start map
-		mapRpcWrap[i].End = (*rpc.Client)(workerPntr.State.ControlRPCInstance.Client).Go("CONTROL.DoMAPs", mapRpcWrap[i].ChunkIds, &(mapRpcWrap[i].Reply), nil)
-		i++
+		if !core.Config.LoadChunksToS3 {
+			workerMapJobs.MapJobArgs.Chunks = make([]core.CHUNK, len(chunkIDs))
+			//// append chunk data only if not already cached in dest worker
+			for i, chunkId := range chunkIDs {
+				workerMapJobs.MapJobArgs.Chunks[i] = data.Chunks[chunkId]
+			}
+
+		}
+		mapRpcWrap = append(mapRpcWrap, workerMapJobs)
 	}
-	for _, mapArg := range mapRpcWrap {
-		<-mapArg.End.Done
-		err := mapArg.End.Error
-		if core.CheckErr(err, false, "error on workerMap:"+strconv.Itoa(mapArg.WorkerId)) {
-			mapArg.Err = err
+
+	////////////// MAP RPC CALLS
+	for i := 0; i < len(mapRpcWrap); i++ {
+		workerPntr := core.GetWorker(mapRpcWrap[i].WorkerId, workers, true)
+		//async start map
+		core.GenericPrint(mapRpcWrap[i].MapJobArgs.ChunkIds, "assigning map jobs to worker"+strconv.Itoa(mapRpcWrap[i].WorkerId)+"\t"+strconv.Itoa(workerPntr.State.ControlRPCInstance.Port))
+		mapRpcWrap[i].End = (*rpc.Client)(workerPntr.State.ControlRPCInstance.Client).Go("CONTROL.AssignMaps", mapRpcWrap[i].MapJobArgs, &(mapRpcWrap[i].Reply), nil)
+	}
+	for i := 0; i < len(mapRpcWrap); i++ {
+		<-mapRpcWrap[i].End.Done
+		err := mapRpcWrap[i].End.Error
+		if core.CheckErr(err, false, "error on workerMap:"+strconv.Itoa(mapRpcWrap[i].WorkerId)) {
+			mapRpcWrap[i].Err = err
 			hasErrd = true
+			(core.GetWorker(mapRpcWrap[i].WorkerId, workers, true)).State.Failed = true
+
 		}
 	}
 	return mapRpcWrap, hasErrd
 }
 
-func aggregateMappersCosts(workerMapResults []core.MapWorkerArgs, workers *core.WorkersKinds) core.ReducersRouteInfos {
+//func assignMapWorks(workerMapperChunks map[int][]int, workers *core.WorkersKinds) ([]core.MapWorkerArgs, bool) {
+//	/*
+//		assign MAP input data (chunks) to designed workers that will trigger several concurrent MAP execution
+//		intermediate tokens data buffered inside workers and routing cost of data to reducers (logic) returned aggregated at worker node level
+//		that reflect data locality of interm.data over workers,
+//	*/
+//
+//	hasErrd := false
+//	mapRpcWrap := make([]core.MapWorkerArgs, len(workerMapperChunks))
+//	i := 0
+//	for workerId, chunkIDs := range workerMapperChunks {
+//		workerPntr := core.GetWorker(workerId, workers)
+//		mapRpcWrap[i] = core.MapWorkerArgs{
+//			ChunkIds: chunkIDs,
+//			WorkerId: workerId,
+//			Err:      nil,
+//			Reply:    core.Map2ReduceRouteCost{},
+//		}
+//		//async start map
+//		mapRpcWrap[i].End = (*rpc.Client)(workerPntr.State.ControlRPCInstance.Client).Go("CONTROL.DoMAPs", mapRpcWrap[i].ChunkIds, &(mapRpcWrap[i].Reply), nil)
+//		i++
+//	}
+//	for _, mapArg := range mapRpcWrap {
+//		<-mapArg.End.Done
+//		err := mapArg.End.Error
+//		if core.CheckErr(err, false, "error on workerMap:"+strconv.Itoa(mapArg.WorkerId)) {
+//			mapArg.Err = err
+//			hasErrd = true
+//		}
+//	}
+//	return mapRpcWrap, hasErrd
+//}
+
+func aggregateMappersCosts(workerMapResults []core.MapWorkerArgsWrap, workers *core.WorkersKinds) core.ReducersRouteInfos {
 	//for each mapper worker aggregate route infos
 
 	//nested dict for route infos
@@ -450,8 +509,8 @@ func aggregateMappersCosts(workerMapResults []core.MapWorkerArgs, workers *core.
 	for _, workerResult := range workerMapResults {
 		//init aggreagate infos nested dicts
 		workerId := workerResult.WorkerId
-		worker := core.GetWorker(workerId, workers)
-		worker.State.MapIntermediateTokenIDs = append(worker.State.MapIntermediateTokenIDs, workerResult.ChunkIds...) //set intermadiate data inside worker
+		worker := core.GetWorker(workerId, workers, true)
+		worker.State.MapIntermediateTokenIDs = append(worker.State.MapIntermediateTokenIDs, workerResult.MapJobArgs.ChunkIds...) //set intermadiate data inside worker
 		workersMapRouteCosts[workerId] = make(map[int]int, core.Config.ISTANCES_NUM_REDUCE)
 		workersMapExpectedReduceCalls[workerId] = make(map[int]int, core.Config.ISTANCES_NUM_REDUCE)
 		//aggreagate infos
@@ -469,7 +528,7 @@ func aggregateMappersCosts(workerMapResults []core.MapWorkerArgs, workers *core.
 	return routeInfosAggregated
 }
 
-func comunicateReducersBindings(control *core.MASTER_CONTROL) []error {
+func comunicateReducersBindings(control *core.MASTER_CONTROL, reducersBindings map[int]int) (int, []error) {
 	//for each reducer ID (logic) activate an actual reducer on a worker following redBindings dict
 	// init each reducer with expected reduce calls from mappers indified by their assigned chunk (that has produced map result -> reduce calls)
 	//RPC 4,5 in SEQ diagram
@@ -479,9 +538,8 @@ func comunicateReducersBindings(control *core.MASTER_CONTROL) []error {
 
 	/// RPC 4 ---> REDUCERS INSTANCES ACTIVATION
 	reducerBindings := make(map[int]string, core.Config.ISTANCES_NUM_REDUCE)
-	for reducerIdLogic, placementWorker := range control.MasterData.ReducerSmartBindingsToWorkersID {
-		println("reducer with logic ID: ", reducerIdLogic, " on worker : ", placementWorker)
-		worker := core.GetWorker(placementWorker, &control.Workers) //get dest worker for the new Reduce Instance
+	for reducerIdLogic, placementWorker := range reducersBindings {
+		worker := core.GetWorker(placementWorker, &control.Workers, true) //get dest worker for the new Reduce Instance
 		//instantiate the new reducer instance with expected calls # from mapper for termination and faultTollerant
 		arg := core.ReduceActiveArg{
 			NumChunks: len(control.MasterData.ChunkIDS),
@@ -489,38 +547,54 @@ func comunicateReducersBindings(control *core.MASTER_CONTROL) []error {
 		}
 		err := (*rpc.Client)(worker.State.ControlRPCInstance.Client).Call("CONTROL.ActivateNewReducer", arg, &redNewInstancePort)
 		if core.CheckErr(err, false, "instantiating reducer: "+strconv.Itoa(reducerIdLogic)) {
+			worker.State.Failed = true
 			errs = append(errs, errors.New(core.REDUCER_ACTIVATE+core.ERROR_SEPARATOR+strconv.Itoa(reducerIdLogic)))
+			continue //don't appending failed reducer until activation
 		}
 		reducerBindings[reducerIdLogic] = worker.Address + ":" + strconv.Itoa(redNewInstancePort) //note the binding to reducer correctly instantiated
+		println("reducer with logic ID: ", reducerIdLogic, " on worker : ", placementWorker, "\t", reducerBindings[reducerIdLogic])
 		worker.State.ReducersHostedIDs = append(worker.State.ReducersHostedIDs, reducerIdLogic)
 	}
 	if len(errs) > 0 {
 		_, _ = fmt.Fprint(os.Stderr, "some reducers activation has failed")
-		return errs
+		return 0, errs
 	}
 	/// RPC 5 ---> REDUCERS BINDINGS COMUNICATION TO MAPPERS WORKERS
 	//comunicate to all mappers final Reducer location
+	correctReduceCalls := 0
 	ends := make([]*rpc.Call, 0, len(control.MasterData.MapResults))
 	mappersErrs := make([][]error, len(control.MasterData.MapResults))
-	//endsRpc:=make([]*rpc.Call,0,len(workers.WorkersMapReduce)*len(workers.WorkersMapReduce[0].State.WorkerIstances))
-	for i, workerMapRes := range control.MasterData.MapResults {
-		worker := core.GetWorker(workerMapRes.WorkerId, &(control.Workers))
-		callAsync := (*rpc.Client)(worker.State.ControlRPCInstance.Client).Go("CONTROL.ReducersCollocations", reducerBindings, &(mappersErrs[i]), nil)
+	i := 0
+
+	checkMapRes(control)
+	for workerID, chunksShare := range control.MasterData.AssignedChunkWorkersFairShare {
+		worker := core.GetWorker(workerID, &(control.Workers), true)
+		arg := core.ReduceTriggerArg{
+			ReducersAddresses: reducerBindings,
+			ChunksToAggregate: chunksShare,
+		}
+		callAsync := (*rpc.Client)(worker.State.ControlRPCInstance.Client).Go("CONTROL.ReducersCollocations", arg, &(mappersErrs[i]), nil)
 		ends = append(ends, callAsync)
+		correctReduceCalls++
+		i++
 	}
 	//wait rpc return
 	for i, end := range ends {
 		<-end.Done
 		if core.CheckErr(end.Error, false, "error on bindings comunication") {
-			errs = append(errs, errors.New(core.REDUCERS_ADDR_COMUNICATION+core.ERROR_SEPARATOR+strconv.Itoa(control.Workers.WorkersMapReduce[i].Id)))
+			failedWorkerID := control.MasterData.MapResults[i].WorkerId
+			errs = append(errs, errors.New(core.REDUCERS_ADDR_COMUNICATION+core.ERROR_SEPARATOR+strconv.Itoa(failedWorkerID)))
+			correctReduceCalls--
 		}
 	}
-	return errs
+	return correctReduceCalls, errs
 }
 
-func killAll(workers *[]core.Worker) {
+func killAll(workersKinds *core.WorkersKinds) {
 	//now reducers has returned, workers can end safely
-	for _, worker := range *workers {
+	workers := append(workersKinds.WorkersMapReduce, workersKinds.WorkersOnlyReduce...)
+	workers = append(workersKinds.WorkersBackup, workers...)
+	for _, worker := range workers {
 		println("Exiting worker: ", worker.Id)
 		err := (*rpc.Client)(worker.State.ControlRPCInstance.Client).Call("CONTROL.ExitWorker", 0, nil)
 		core.CheckErr(err, false, "error in shutdowning worker: "+strconv.Itoa(worker.Id))
@@ -534,5 +608,5 @@ func jobsEnd(control *core.MASTER_CONTROL) {
 		<-*(*control).MasterRpc.ReturnedReducer //wait end of all reducers
 		println("ENDED REDUCER!!!", r)
 	}
-	killAll(&(control.WorkersAll))
+	killAll(&(control.Workers))
 }

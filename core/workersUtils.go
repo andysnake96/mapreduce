@@ -7,7 +7,7 @@ import (
 
 ////WORKERS UTIL FUNCTIONS
 
-func GetWorker(id int, workers *WorkersKinds) *Worker {
+func GetWorker(id int, workers *WorkersKinds, fatal bool) *Worker {
 	//return worker with id, nil if not found
 	for i, worker := range (*workers).WorkersMapReduce {
 		if worker.Id == id {
@@ -24,7 +24,10 @@ func GetWorker(id int, workers *WorkersKinds) *Worker {
 			return &((*workers).WorkersBackup[i])
 		}
 	}
-	panic("NOT FOUNDED WORKER: " + strconv.Itoa(id))
+	if fatal {
+		panic("NOT FOUNDED WORKER: " + strconv.Itoa(id))
+	}
+	return nil
 }
 
 func routeInfosCombiner(mappersRouteCosts Map2ReduceRouteCost, workerAggregateRouteCosts *Map2ReduceRouteCost) {

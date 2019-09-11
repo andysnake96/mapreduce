@@ -3,7 +3,7 @@ package main
 import (
 	"../aws_SDK_wrap"
 	"../core"
-	"math/rand"
+	"fmt"
 	"net/rpc"
 	"os"
 	"strconv"
@@ -12,10 +12,12 @@ import (
 
 func ReducersReplacementRecovery(failedWorkersReducers map[int][]int, newMapBindings map[int][]int, oldReducersBindings *map[int]int, workersKinds *core.WorkersKinds) map[int]int {
 	//re decide reduce placement on workers selecting a random healty worker
+	//old bindings modified in place
+	//returned new bindings
 	failedReducersIDs := make([]int, 0, len(failedWorkersReducers))
 	newReducersPlacements := make(map[int]int) //new placement for failed reducers
 	// setup workers in preferential order of reducer reschedule
-	workers := append(workersKinds.WorkersBackup, workersKinds.WorkersOnlyReduce...)
+	workers := append(workersKinds.WorkersOnlyReduce, workersKinds.WorkersBackup...)
 	workers = append(workers, workersKinds.WorkersMapReduce...)
 
 	//filter active workers and bindings
@@ -44,7 +46,7 @@ func ReducersReplacementRecovery(failedWorkersReducers map[int][]int, newMapBind
 	for i, worker := range workers {
 		reducersForWorker := reducersPerWoker
 		if i == len(workers)-1 {
-			reducersPerWoker += reducersPerWokerResidue
+			reducersForWorker += reducersPerWokerResidue
 		}
 		for i := 0; i < reducersForWorker; i++ {
 			failedReducerID := failedReducersIDs[reducerToAssign+i]
@@ -53,11 +55,14 @@ func ReducersReplacementRecovery(failedWorkersReducers map[int][]int, newMapBind
 			(*oldReducersBindings)[failedReducerID] = worker.Id
 		}
 		reducerToAssign += reducersPerWoker
+		if reducerToAssign >= len(failedReducersIDs) {
+			break
+		}
 	}
 	return newReducersPlacements
 }
 
-func AssignMapWorksRecovery(failedWorkerMapJobs map[int][]int, workersKinds *core.WorkersKinds, oldChunksWorkersAssignement *map[int][]int) map[int][]int {
+/*func AssignMapWorksRecovery(failedWorkerMapJobs map[int][]int, workersKinds *core.WorkersKinds, oldChunksWorkersAssignement *map[int][]int) map[int][]int {
 	//reassign map jobs exploiting previusly chunk replication, so map jobs will be instantiated on worker with necessary chunk
 	chunkToReMap := make([]int, 0, len(failedWorkerMapJobs))
 	newMapAssignements := make(map[int][]int) //new assigmenets only map: worker-->mapJobs to redo
@@ -110,15 +115,51 @@ func AssignMapWorksRecovery(failedWorkerMapJobs map[int][]int, workersKinds *cor
 	return newMapAssignements
 
 }
+*/
+func MapPhaseRecovery(masterControl *core.MASTER_CONTROL, failedJobs map[int][]int) bool {
+	//// filter failed workers in map results
+	workerMapJobsToReassign := make(map[int][]int) //workerId--> map job to redo (chunkID previusly assigned)
+	filteredMapResults := make([]core.MapWorkerArgsWrap, 0, len((*masterControl).MasterData.MapResults))
+	moreFails := core.PingProbeAlivenessFilter(masterControl) //filter in place failed workers ( other eventually failed among calls
+	for _, mapResult := range (*masterControl).MasterData.MapResults {
+		errdMap := core.CheckErr(mapResult.Err, false, "WORKER id:"+strconv.Itoa(mapResult.WorkerId)+" ON MAPS JOB ASSIGN")
+		failedWorker := errdMap || moreFails[mapResult.WorkerId]
+		if failedWorker {
+			workerMapJobsToReassign[mapResult.WorkerId] = mapResult.MapJobArgs.ChunkIds //schedule to reassign only not redundant share of chunks on worker
+		} else {
 
+			filteredMapResults = append(filteredMapResults, mapResult)
+		}
+	}
+	if failedJobs != nil { //eventually insert passed failed jobs
+		for workerID, jobs := range failedJobs {
+			workerMapJobsToReassign[workerID] = jobs
+		}
+	}
+	((*masterControl).MasterData.MapResults) = filteredMapResults
+
+	//re assign failed map job exploiting chunk replication among workers
+	newChunks := AssignChunksIDsRecovery(&masterControl.Workers, workerMapJobsToReassign, &(masterControl.MasterData.AssignedChunkWorkers), &(masterControl.MasterData.AssignedChunkWorkersFairShare))
+	/// retry map
+	mapResultsNew, err := assignMapJobsWithRedundancy(&masterControl.MasterData, &masterControl.Workers, newChunks) //RPC 2,3 IN SEQ DIAGRAM
+
+	masterControl.MasterData.MapResults = append(masterControl.MasterData.MapResults, mapResultsNew...)
+	checkMapRes(masterControl)
+	if err {
+		_, _ = fmt.Fprintf(os.Stderr, "error on map RE assign\n aborting all")
+		print(&mapResultsNew)
+		return err
+	}
+	return true
+}
 func AssignChunksIDsRecovery(workerKinds *core.WorkersKinds, workerChunksToReassign map[int][]int,
 	oldAssignementsGlbl, oldAssignementsFairShare *(map[int][]int)) map[int][]int {
 	//reassign chunks evaluating existent replication old assignmenets and reducing assignement only at fundamental chunk to reassign
 	//old assignements map will be modified in place
 
 	failedChunk := make(map[int]bool, len(*oldAssignementsGlbl))
-	newAssignements := make(map[int][]int)
 	workers := append(workerKinds.WorkersBackup, workerKinds.WorkersMapReduce...) //preferential order for chunk re assignement
+	workers = append(workers, workerKinds.WorkersOnlyReduce...)                   //preferential order for chunk re assignement
 
 	//extract chunks to reassign filtering duplications introduced for fault tollerant (less reassignment here)
 	chunksFoundamentalToReassign := make([]int, 0, len(workerChunksToReassign))
@@ -142,9 +183,9 @@ func AssignChunksIDsRecovery(workerKinds *core.WorkersKinds, workerChunksToReass
 	///// select foundamental chunk to reassign in accord with prev replication, eventually append to fair share missing chunk
 	for _, chunks := range workerChunksToReassign {
 		for _, chunkId := range chunks {
-			workerInPossess, alreadyAssigned := reverseGlblChunkMap[chunkId]
+			workerInPossess, isAlreadyAssigned := reverseGlblChunkMap[chunkId]
 			_, presentInFairShare := reverseChunkMapFairShare[chunkId]
-			if !alreadyAssigned && !presentInFairShare {
+			if !isAlreadyAssigned && !presentInFairShare {
 				failedChunk[chunkId] = true
 			} else if !presentInFairShare { //update fair share with prev. redundant chunk now useful
 				(*oldAssignementsFairShare)[workerInPossess] = append((*oldAssignementsFairShare)[workerInPossess], chunkId)
@@ -156,8 +197,7 @@ func AssignChunksIDsRecovery(workerKinds *core.WorkersKinds, workerChunksToReass
 	for chunkID, _ := range failedChunk {
 		chunksFoundamentalToReassign = append(chunksFoundamentalToReassign, chunkID)
 	}
-	println("CHUNKS TO REASSIGN: ", len(chunksFoundamentalToReassign))
-	core.GenericPrint(chunksFoundamentalToReassign, "")
+	core.GenericPrint(chunksFoundamentalToReassign, "CHUNKS TO REASSIGN")
 
 	//select avaible worker not failed and set new assignement until all foundamental chunk are assigned or not enought workers
 	chunksToReassignPerWorker := 1
@@ -168,6 +208,8 @@ func AssignChunksIDsRecovery(workerKinds *core.WorkersKinds, workerChunksToReass
 	}
 	chunkToAssignIndexEnd := 0
 	assignedChunks := 0
+	newAssignements := make(map[int][]int)
+
 	for i := 0; i < len(workers) && assignedChunks < len(chunksFoundamentalToReassign); i++ {
 		chunkToAssignIndexEnd = assignedChunks + chunksToReassignPerWorker
 		if i == len(workers)-1 {
@@ -175,16 +217,20 @@ func AssignChunksIDsRecovery(workerKinds *core.WorkersKinds, workerChunksToReass
 		}
 		chunksPerWorker := chunksFoundamentalToReassign[assignedChunks:chunkToAssignIndexEnd]
 		workerId := (workers)[i].Id
+
+		//// assignement recovery
+		core.GenericPrint(chunksPerWorker, "assigning to : "+strconv.Itoa(workerId))
+		newAssignements[workerId] = chunksPerWorker                                                               //only new assignements map set
 		(*oldAssignementsGlbl)[workerId] = append((*oldAssignementsGlbl)[workerId], chunksPerWorker...)           //update in place assignements
 		(*oldAssignementsFairShare)[workerId] = append((*oldAssignementsFairShare)[workerId], chunksPerWorker...) //update in place assignements
-		newAssignements[workerId] = chunksPerWorker                                                               //only new assignements map set
+
 		assignedChunks += chunksToReassignPerWorker
 	} //compleated assignements
 	return newAssignements
 }
-func mergeMapResults(mapResBase []core.MapWorkerArgs, mapRes2 []core.MapWorkerArgs) []core.MapWorkerArgs {
+func mergeMapResults(mapResBase []core.MapWorkerArgsWrap, mapRes2 []core.MapWorkerArgsWrap) []core.MapWorkerArgsWrap {
 	//merge a base list of map resoults filtering failed maps job and appending mapRes2 to it
-	mapResultsMerged := make([]core.MapWorkerArgs, 0, len(mapResBase))
+	mapResultsMerged := make([]core.MapWorkerArgsWrap, 0, len(mapResBase))
 	for _, mapperRes := range mapResBase {
 		if mapperRes.Err == nil { //good result from map output
 			mapResultsMerged = append(mapResultsMerged, mapperRes)

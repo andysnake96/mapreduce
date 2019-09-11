@@ -55,8 +55,9 @@ type Configuration struct {
 	CHUNKS_REPLICATION_FACTOR_BACKUP_WORKERS int
 	CHUNK_SIZE                               int64
 	// AWS
-	S3_REGION string
-	S3_BUCKET string
+	LoadChunksToS3 bool
+	S3_REGION      string
+	S3_BUCKET      string
 }
 
 func (config *Configuration) printFields() {
@@ -99,23 +100,47 @@ const ( //errors kinds
 
 )
 
-func ParseReduceErrString(reduceRpcErrs []error, reducerCollocation map[int]int, workers *WorkersKinds) (map[int][]int, map[int][]int) {
+func ParseReduceErrString(reduceRpcErrs []error, data *MASTER_STATE_DATA, moreWorkerFails map[int]bool) (map[int][]int, map[int][]int) {
 	//parse reduce rpc error string, find failed worker setting map/reduce JOB to reset
-	var workerFailed *Worker
+
 	mapsToRedo := make(map[int][]int)
 	reduceToRedo := make(map[int][]int)
-
+	failedWorkers := make([]int, 0, len(reduceRpcErrs))
 	for _, err := range reduceRpcErrs {
 		tmpErrString := strings.Split(err.Error(), ERROR_SEPARATOR) //key value in 2 string FAIL_TYPE-->ID OF FAILED
 		failedId, _ := strconv.Atoi(tmpErrString[1])
+		workerFailedID := 0
 		if tmpErrString[0] == REDUCERS_ADDR_COMUNICATION { //worker fail during bindings comunication
-			workerFailed = GetWorker(failedId, workers)
+			workerFailedID = failedId
 		} else {
-			workerFailed = GetWorker(reducerCollocation[failedId], workers) //get worker hosting reducer logic
+			workerFailedID = data.ReducerSmartBindingsToWorkersID[failedId]
 		}
-		workerFailed.State.Failed = true
-		mapsToRedo[workerFailed.Id] = workerFailed.State.MapIntermediateTokenIDs
-		reduceToRedo[workerFailed.Id] = workerFailed.State.ReducersHostedIDs
+		failedWorkers = append(failedWorkers, workerFailedID)
+	}
+	for _, workerFailedID := range failedWorkers {
+		lostMapJobs, doesExist := data.AssignedChunkWorkersFairShare[workerFailedID]
+		if doesExist {
+			mapsToRedo[workerFailedID] = lostMapJobs
+		}
+		for reducerID, hostWorker := range data.ReducerSmartBindingsToWorkersID {
+			if workerFailedID == hostWorker {
+				reduceToRedo[workerFailedID] = append(reduceToRedo[workerFailedID], reducerID)
+			}
+		}
+	}
+	for workerFailedID, _ := range moreWorkerFails {
+		//skip if already treated this worker
+		_, alreadyKnowFailM := mapsToRedo[workerFailedID]
+		_, alreadyKnowFailR := reduceToRedo[workerFailedID]
+		if alreadyKnowFailM || alreadyKnowFailR {
+			continue
+		}
+		mapsToRedo[workerFailedID] = data.AssignedChunkWorkersFairShare[workerFailedID]
+		for reducerID, hostWorker := range data.ReducerSmartBindingsToWorkersID {
+			if workerFailedID == hostWorker {
+				reduceToRedo[workerFailedID] = append(reduceToRedo[workerFailedID], reducerID)
+			}
+		}
 	}
 	return mapsToRedo, reduceToRedo
 }
@@ -334,7 +359,7 @@ func PingHeartBitRcv(port int, stopPing chan bool) (net.Conn, error) {
 			//ping read&reply loop until stop has been set on bufferd channel in stopPing
 			//TODO STOP SERVICE DURING READ BLOCK => ERROR PRINT
 			//error check fatal setted to false on stop service propagated to ping routie
-			receivedLen, remoteAddr, err := conn.ReadFromUDP(message) //PING
+			_, remoteAddr, err := conn.ReadFromUDP(message) //PING
 			if CheckErr(err, false, "udp read err") {
 				break
 			}
@@ -342,8 +367,8 @@ func PingHeartBitRcv(port int, stopPing chan bool) (net.Conn, error) {
 			if CheckErr(err, false, "udp write err") {
 				break
 			}
-			data := strings.TrimSpace(string(message[:receivedLen]))
-			fmt.Printf("received: %s from %s\n", data, remoteAddr)
+			//data := strings.TrimSpace(string(message[:receivedLen]))
+			//fmt.Printf("received: %s from %s\n", data, remoteAddr)
 		}
 		_ = conn.Close()
 	}()
@@ -409,7 +434,7 @@ func PingHeartBitSnd(addr string) (error, uint32) {
 
 func PingProbeAlivenessFilter(control *MASTER_CONTROL) map[int]bool {
 	workers := &(control.Workers)
-	failedWorkersUnMarked := make(map[int]bool, len(control.WorkersAll))
+	failedWorkers := make(map[int]bool, len(control.WorkersAll))
 	//probe each worker for aliveness, filter away dead workers
 	workersKindsNums := map[string]int{
 		WORKERS_MAP_REDUCE: len(workers.WorkersMapReduce), WORKERS_ONLY_REDUCE: len(workers.WorkersOnlyReduce), WORKERS_BACKUP_W: len(workers.WorkersBackup),
@@ -431,10 +456,11 @@ func PingProbeAlivenessFilter(control *MASTER_CONTROL) map[int]bool {
 
 			if worker.State.Failed { //avoid useless ping probe
 				err = errors.New("failed worker")
+				failedWorkers[worker.Id] = true
 			} else {
 				err, _ = PingHeartBitSnd(worker.Address + ":" + strconv.Itoa(worker.PingServicePort))
 				if err != nil {
-					failedWorkersUnMarked[worker.Id] = true
+					failedWorkers[worker.Id] = true
 				}
 			}
 			if err == nil {
@@ -445,7 +471,7 @@ func PingProbeAlivenessFilter(control *MASTER_CONTROL) map[int]bool {
 	}
 	(*control).WorkersAll = append((*workers).WorkersMapReduce, (*workers).WorkersOnlyReduce...)
 	(*control).WorkersAll = append((*control).WorkersAll, (*workers).WorkersBackup...)
-	return failedWorkersUnMarked
+	return failedWorkers
 }
 
 ////	INSTANCES FUNCs
@@ -610,13 +636,22 @@ func ReflectionFieldsGet(strct interface{}) {
 	fmt.Println(values)
 
 }
-func GenericPrint(slice interface{}, prefixMsg string) bool {
-	print(prefixMsg)
-	sv := reflect.ValueOf(slice)
-	for i := 0; i < sv.Len(); i++ {
-		fmt.Printf("	\t%d\t", sv.Index(i).Interface())
+
+//func GenericPrint(slice interface{}, prefixMsg string) bool {
+//	println(prefixMsg)
+//	sv := reflect.ValueOf(slice)
+//	for i := 0; i < sv.Len(); i++ {
+//		fmt.Printf("	\t%d\t", sv.Index(i).Interface())
+//	}
+//	fmt.Printf("\n\n")
+//	return false
+//}
+func GenericPrint(slice []int, prefixMsg string) bool {
+
+	for _, value := range slice {
+		prefixMsg += "\t" + strconv.Itoa(value)
 	}
-	fmt.Printf("\n\n")
+	println(prefixMsg)
 	return false
 }
 

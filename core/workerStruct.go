@@ -28,11 +28,12 @@ type WorkersKinds struct { //refs to up&running workers
 	WorkersBackup     []Worker //idle workers for backup
 }
 type CLIENT rpc.Client
+type CHUNKS []CHUNK
 
 func (*CLIENT) GobDecode([]byte) error     { return nil }
 func (*CLIENT) GobEncode() ([]byte, error) { return nil, nil }
-func (*CHUNK) GobDecode([]byte) error      { return nil }
-func (*CHUNK) GobEncode() ([]byte, error)  { return nil, nil }
+func (CHUNKS) GobDecode([]byte) error      { return nil }
+func (CHUNKS) GobEncode() ([]byte, error)  { return nil, nil }
 
 type Worker struct { //worker istance master side
 	Address         string
@@ -108,6 +109,7 @@ const (
 type AggregatedIntermediateTokens struct {
 	ChunksSouces                 []int
 	PerReducerIntermediateTokens []map[string]int
+	FlushedIntermediateTokens    []bool //reducerLogicID-->at least once sent interm.tokens
 	MasterOutputCache            Map2ReduceRouteCost
 }
 
@@ -120,9 +122,10 @@ type Worker_node_internal struct {
 	//global worker istance worker node side
 	WorkerChunksStore          WorkerChunks //chunks stored in the worker node
 	IntermediateDataAggregated AggregatedIntermediateTokens
+	MapperInstances            map[int]MapperIstanceStateInternal
 	Instances                  map[int]WorkerInstanceInternal //server for each worker istance Id
 	ControlRpcInstance         WorkerInstanceInternal         //worker node main control instace ->chunks&&respawn
-	ReducersClients            map[int]*rpc.Client
+	ReducersClients            []*rpc.Client
 	Id                         int
 	PingConnection             net.Conn
 	PingPort                   int
@@ -210,6 +213,7 @@ func (workerNodeInt *Worker_node_internal) initLogicWorkerIstance(initData *Gene
 		_, present := workerNodeInt.Instances[*id]
 		if present {
 			_, _ = fmt.Fprint(os.Stderr, "re instantiation of logic instance on worker")
+
 		}
 		newId = *id
 	}
@@ -241,4 +245,43 @@ func (workerNodeInt *Worker_node_internal) initLogicWorkerIstance(initData *Gene
 		workerNodeInt.Instances[newId] = workerIstanceData
 	}
 	return &workerIstanceData
+}
+
+func (workerNode *Worker_node_internal) aggregateIntermediateTokens(mapJobs []int) {
+
+	workerNode.IntermediateDataAggregated = AggregatedIntermediateTokens{
+		ChunksSouces:                 mapJobs,
+		PerReducerIntermediateTokens: make([]map[string]int, Config.ISTANCES_NUM_REDUCE),
+		FlushedIntermediateTokens:    make([]bool, Config.ISTANCES_NUM_REDUCE),
+	}
+
+	for i := 0; i < Config.ISTANCES_NUM_REDUCE; i++ {
+		//init aggregation var
+		workerNode.IntermediateDataAggregated.FlushedIntermediateTokens[i] = false
+		workerNode.IntermediateDataAggregated.PerReducerIntermediateTokens[i] = make(map[string]int)
+	}
+	aggreagated := 0
+	for _, jobID := range mapJobs {
+		founded := false
+		for chunkID, instance := range workerNode.MapperInstances {
+			if chunkID == jobID {
+				/// map instace data aggregation requested ...
+				for key, value := range instance.IntermediateTokens {
+					destReducer := HashKeyReducerSum(key, Config.ISTANCES_NUM_REDUCE)
+					workerNode.IntermediateDataAggregated.PerReducerIntermediateTokens[destReducer][key] += value //aggregate token per destination reducer
+				}
+				founded = true
+				aggreagated++
+				break
+			}
+		}
+		if !founded {
+			println("MISSING" + strconv.Itoa(jobID) + "\t" + strconv.Itoa(workerNode.ControlRpcInstance.Port))
+		}
+
+	}
+	if aggreagated != len(mapJobs) {
+		GenericPrint(mapJobs, "PANIC AT \t"+strconv.Itoa(workerNode.ControlRpcInstance.Port))
+		panic(strconv.Itoa(len(mapJobs)) + "vs" + strconv.Itoa(aggreagated) + "vs" + strconv.Itoa(len(workerNode.MapperInstances)))
+	}
 }

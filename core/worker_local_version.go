@@ -94,7 +94,7 @@ func InitWorkers_LocalMock_WorkerSide(workers *[]Worker_node_internal, stopPingC
 					Chunks: make(map[int]CHUNK, WORKER_CHUNKS_INITSIZE_DFLT),
 				},
 				Instances:       make(map[int]WorkerInstanceInternal),
-				ReducersClients: make(map[int]*rpc.Client),
+				ReducersClients: make([]*rpc.Client, Config.ISTANCES_NUM_REDUCE),
 				ExitChan:        make(chan bool),
 				Id:              workerId,
 				MasterAddr:      "localhost",
@@ -115,7 +115,7 @@ func InitWorkers_LocalMock_WorkerSide(workers *[]Worker_node_internal, stopPingC
 					ChunksSouces:                 make([]int, 0),
 					PerReducerIntermediateTokens: make([]map[string]int, Config.ISTANCES_NUM_REDUCE),
 				}
-				workerNode.ReducersClients = make(map[int]*rpc.Client, Config.WORKER_NUM_ONLY_REDUCE)
+				workerNode.ReducersClients = make([]*rpc.Client, Config.ISTANCES_NUM_REDUCE)
 			} //else if .....
 			println("started worker: ", workerId)
 			(*workers)[workerId] = workerNode

@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"sort"
 )
 
@@ -39,19 +40,21 @@ func ReducersBindingsLocallityAwareEuristic(reducersIdsTrafficIN ReducersDataRou
 			will be "contracted" first ISTANCES_NUM_REDUCE edges more expensive finding a partition of G )
 	*/
 	reducersTrafficsCostListSorted := extractCostsListSorted(reducersIdsTrafficIN)
-	reducersBindings := make(map[int]int) //final binding of reducerID -> actual worker id for placement
-
+	reducersBindings := make(map[int]int)                                          //final binding of reducerID -> actual worker id for placement
+	workerHostingReducers := make(map[int]int)                                     //for each worker used in contraction--> number of contraction on it (hosted reducers)
 	maxContractions := Config.ISTANCES_NUM_REDUCE - len(workers.WorkersOnlyReduce) //max Num of reducers contractions
 	contractedR := 0
 	for i := 0; i < len(reducersTrafficsCostListSorted) && contractedR < maxContractions; i++ {
 		record := reducersTrafficsCostListSorted[i]
 		_, contractedReducer := reducersBindings[record.ReducerID]
 		if !contractedReducer { //NOT ALREADY CONTRACTED THE REDUCER
-			workerNode := GetWorker(record.WorkerID, workers)
-			//if NumHealthyReducerOnWorker(&workerNode) <= Config.MAX_REDUCERS_PER_WORKER { //NOT TOO MUCH CONTRACTION ON SAME WORKER
-			//} //TODO SIMLPF&&=>LOAD DISTRIB
-			reducersBindings[record.ReducerID] = workerNode.Id //CONTRACT  edge
-			contractedR++
+			workerNode := GetWorker(record.WorkerID, workers, true)
+			if workerHostingReducers[record.WorkerID] <= Config.MAX_REDUCERS_PER_WORKER { //NOT TOO MUCH CONTRACTION ON SAME WORKER
+				reducersBindings[record.ReducerID] = workerNode.Id //CONTRACT  edge
+				fmt.Printf("contracted ", record.ReducerID, "-->", workerNode.Id)
+				contractedR++
+				workerHostingReducers[record.WorkerID]++
+			}
 		}
 	}
 	onlyReducerIndx := 0 //index of worker (type only reduce) in last reducer placement
