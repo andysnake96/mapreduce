@@ -4,19 +4,13 @@
     <list default="true" id="959bba11-67b5-49b9-be5e-31338d05472f" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/configurations/config.json" beforeDir="false" afterPath="$PROJECT_DIR$/configurations/config.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/initDistribuitedVersion.go" beforeDir="false" afterPath="$PROJECT_DIR$/core/initDistribuitedVersion.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/core/map_reduce.go" beforeDir="false" afterPath="$PROJECT_DIR$/core/map_reduce.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/masterReducersBindings.go" beforeDir="false" afterPath="$PROJECT_DIR$/core/masterReducersBindings.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/core/utils.go" beforeDir="false" afterPath="$PROJECT_DIR$/core/utils.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/core/workerStruct.go" beforeDir="false" afterPath="$PROJECT_DIR$/core/workerStruct.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/core/worker_local_version.go" beforeDir="false" afterPath="$PROJECT_DIR$/core/worker_local_version.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/workersUtils.go" beforeDir="false" afterPath="$PROJECT_DIR$/core/workersUtils.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/master/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/master/main.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/master/recovery.go" beforeDir="false" afterPath="$PROJECT_DIR$/master/recovery.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/out/master" beforeDir="false" afterPath="$PROJECT_DIR$/out/master" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/out/worker" beforeDir="false" afterPath="$PROJECT_DIR$/out/worker" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/outTokens" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/startWorkersLocally.sh" beforeDir="false" afterPath="$PROJECT_DIR$/startWorkersLocally.sh" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/worker/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/worker/main.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/worker/worker" beforeDir="false" afterPath="$PROJECT_DIR$/worker/worker" afterDir="false" />
     </list>
@@ -45,91 +39,11 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file pinned="false" current-in-tab="false">
+      <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/master/main.go">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="129">
-              <caret line="224" column="36" selection-start-line="224" selection-start-column="36" selection-end-line="224" selection-end-column="36" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/core/initDistribuitedVersion.go">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="350">
-              <caret line="66" column="30" selection-start-line="66" selection-start-column="30" selection-end-line="66" selection-end-column="30" />
-              <folding>
-                <element signature="n#!!block;n#GetMasterAddr#0" />
-                <element signature="n#!!block;n#MasterAddressFetch#0" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/startWorkersLocally.sh">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="102">
-              <caret line="6" column="31" selection-start-line="6" selection-start-column="31" selection-end-line="6" selection-end-column="31" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="true">
-        <entry file="file://$PROJECT_DIR$/core/utils.go">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="493">
-              <caret line="466" column="61" selection-start-line="466" selection-start-column="61" selection-end-line="466" selection-end-column="61" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/core/map_reduce.go">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="175">
-              <caret line="276" column="9" selection-start-line="276" selection-start-column="9" selection-end-line="276" selection-end-column="9" />
-              <folding>
-                <element signature="n#!!block;n#Get_chunk_ids#0" />
-                <element signature="n#!!block;n#downloadChunk#0" />
-                <element signature="n#!!block;n#ExitWorker#0" />
-                <element signature="e#14276#14517#0" />
-                <element signature="n#!!block;n#Map_quick_route_reducers#0" />
-                <element signature="n#!!block;n#GobDecode#0" />
-                <element signature="n#!!block;n#GobEncode#0" />
-                <element signature="n#!!block;n#ReturnReduce#0" />
-                <element signature="n#!!block;n#Map_parse_builtin#0" />
-                <element signature="n#!!block;n#Map_string_builtin#0" />
-                <element signature="n#!!block;n#Map_raw_parse#0" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/core/workersUtils.go">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="-7">
-              <caret column="12" lean-forward="true" selection-start-column="12" selection-end-column="12" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/master/recovery.go">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="231">
-              <caret line="219" column="35" selection-start-line="219" selection-start-column="35" selection-end-line="219" selection-end-column="35" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/core/workerStruct.go">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="154">
-              <caret line="26" column="12" selection-start-line="26" selection-start-column="12" selection-end-line="26" selection-end-column="12" />
+            <state relative-caret-position="275">
+              <caret line="216" column="16" selection-start-line="216" selection-start-column="16" selection-end-line="216" selection-end-column="16" />
             </state>
           </provider>
         </entry>
@@ -144,10 +58,28 @@
         </entry>
       </file>
       <file pinned="false" current-in-tab="false">
-        <entry file="file:///usr/lib/go-1.11/src/runtime/panic.go">
+        <entry file="file://$PROJECT_DIR$/worker/main.go">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="44">
-              <caret line="680" selection-start-line="680" selection-end-line="680" />
+            <state relative-caret-position="119">
+              <caret line="29" column="51" selection-start-line="29" selection-start-column="51" selection-end-line="29" selection-end-column="51" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/master/recovery.go">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="139">
+              <caret line="188" selection-start-line="188" selection-end-line="188" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file:///usr/lib/go-1.11/src/runtime/proc.go">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="175">
+              <caret line="302" selection-start-line="302" selection-end-line="302" />
             </state>
           </provider>
         </entry>
@@ -164,13 +96,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>conne</find>
-      <find>CONTROL</find>
-      <find>WORKERS INIT ERROR</find>
-      <find>os.exi</find>
-      <find>re instantiation of logic instance on worker</find>
-      <find>REDUCER_ADD</find>
-      <find>REDUCERS_ADD</find>
       <find>activated new</find>
       <find>ALL ENDED AT</find>
       <find>mie</find>
@@ -188,12 +113,19 @@
       <find>e-&gt;</find>
       <find>ActivateNewReducer</find>
       <find>pid</find>
-      <find>error on map RE assign</find>
       <find>::</find>
       <find>GenericPrin</find>
       <find>some reducers activation</find>
       <find>checkmap</find>
       <find>15</find>
+      <find>pongBuf read error</find>
+      <find>Little Endian</find>
+      <find>CHUNKS TO REASSIGN</find>
+      <find>error on map RE assign</find>
+      <find>*</find>
+      <find>RETRY...</find>
+      <find>\</find>
+      <find>sleep</find>
     </findStrings>
     <replaceStrings>
       <replace>core.Config</replace>
@@ -203,6 +135,7 @@
       <replace>masterControl.Workers</replace>
       <replace>masterControl.WorkersAll</replace>
       <replace>fmt.Printf</replace>
+      <replace />
     </replaceStrings>
   </component>
   <component name="GOROOT" path="/usr/lib/go-1.11" />
@@ -231,19 +164,19 @@
         <option value="$PROJECT_DIR$/start.sh" />
         <option value="$PROJECT_DIR$/test/genSequentiallyTokens.go" />
         <option value="$PROJECT_DIR$/aws_SDK_wrap/s3Wrap.go" />
-        <option value="$PROJECT_DIR$/core/worker_local_version.go" />
         <option value="$PROJECT_DIR$/core/masterReducersBindings.go" />
         <option value="$PROJECT_DIR$/outTokens" />
         <option value="$PROJECT_DIR$/core/workersUtils.go" />
         <option value="$PROJECT_DIR$/core/initDistribuitedVersion.go" />
-        <option value="$PROJECT_DIR$/configurations/config.json" />
-        <option value="$PROJECT_DIR$/worker/main.go" />
-        <option value="$PROJECT_DIR$/core/workerStruct.go" />
-        <option value="$PROJECT_DIR$/core/map_reduce.go" />
         <option value="$PROJECT_DIR$/startWorkersLocally.sh" />
+        <option value="$PROJECT_DIR$/core/worker_local_version.go" />
+        <option value="$PROJECT_DIR$/configurations/config.json" />
+        <option value="$PROJECT_DIR$/core/workerStruct.go" />
+        <option value="$PROJECT_DIR$/core/utils.go" />
+        <option value="$PROJECT_DIR$/core/map_reduce.go" />
+        <option value="$PROJECT_DIR$/worker/main.go" />
         <option value="$PROJECT_DIR$/master/recovery.go" />
         <option value="$PROJECT_DIR$/master/main.go" />
-        <option value="$PROJECT_DIR$/core/utils.go" />
       </list>
     </option>
   </component>
@@ -262,6 +195,7 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
+      <pane id="Scope" />
       <pane id="ProjectPane">
         <subPane>
           <expand>
@@ -312,7 +246,6 @@
           <select />
         </subPane>
       </pane>
-      <pane id="Scope" />
     </panes>
   </component>
   <component name="PropertiesComponent">
@@ -487,13 +420,13 @@
     <frame x="-3" y="31" width="1926" height="1003" extended-state="6" />
     <editor active="true" />
     <layout>
-      <window_info content_ui="combo" id="Project" order="0" sideWeight="0.4971537" visible="true" weight="0.24600638" />
+      <window_info content_ui="combo" id="Project" order="0" sideWeight="0.4971537" weight="0.25612354" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
       <window_info id="Favorites" order="2" sideWeight="0.5028463" side_tool="true" weight="0.20394036" />
       <window_info anchor="bottom" id="Message" order="0" />
       <window_info anchor="bottom" id="Find" order="1" weight="0.3295325" />
       <window_info anchor="bottom" id="Run" order="2" sideWeight="0.49893504" weight="0.3295325" />
-      <window_info active="true" anchor="bottom" id="Debug" order="3" sideWeight="0.49733758" visible="true" weight="0.4412771" />
+      <window_info active="true" anchor="bottom" id="Debug" order="3" sideWeight="0.49733758" visible="true" weight="0.46750286" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
       <window_info anchor="bottom" id="TODO" order="6" weight="0.3295325" />
@@ -592,32 +525,26 @@
     <MESSAGE value="DISTRIBUITED VERSION NON MASTER FAULT TOLLERANT ENDED AND LOCALLY TESTED (PORT FORWARDING)" />
     <MESSAGE value="added test, little bug fixed for running distribuited version locally" />
     <MESSAGE value="worker random fail ok, sometime map on worker panic because of loading of chunk of size &lt;5 ... WTF???" />
-    <option name="LAST_COMMIT_MESSAGE" value="worker random fail ok, sometime map on worker panic because of loading of chunk of size &lt;5 ... WTF???" />
+    <MESSAGE value="backupCommit" />
+    <option name="LAST_COMMIT_MESSAGE" value="backupCommit" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
       <breakpoints>
         <line-breakpoint enabled="true" type="DlvLineBreakpoint">
-          <url>file://$PROJECT_DIR$/master/main.go</url>
-          <line>245</line>
-          <option name="timeStamp" value="232" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="DlvLineBreakpoint">
-          <url>file://$PROJECT_DIR$/master/main.go</url>
-          <line>563</line>
-          <option name="timeStamp" value="237" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="DlvLineBreakpoint">
-          <url>file://$PROJECT_DIR$/master/main.go</url>
-          <line>229</line>
-          <properties />
-          <option name="timeStamp" value="243" />
+          <url>file://$PROJECT_DIR$/master/recovery.go</url>
+          <line>208</line>
+          <option name="timeStamp" value="248" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="DlvLineBreakpoint">
           <url>file://$PROJECT_DIR$/master/recovery.go</url>
-          <line>141</line>
-          <properties />
-          <option name="timeStamp" value="244" />
+          <line>188</line>
+          <option name="timeStamp" value="249" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="DlvLineBreakpoint">
+          <url>file://$PROJECT_DIR$/master/recovery.go</url>
+          <line>215</line>
+          <option name="timeStamp" value="251" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>
@@ -684,6 +611,26 @@
     </expressions>
     <expressions id="evaluateExpression">
       <expression>
+        <expression-string>workers[1:1]</expression-string>
+        <language-id>go</language-id>
+        <evaluation-mode>EXPRESSION</evaluation-mode>
+      </expression>
+      <expression>
+        <expression-string>unrecoverableChunks[1:3]</expression-string>
+        <language-id>go</language-id>
+        <evaluation-mode>EXPRESSION</evaluation-mode>
+      </expression>
+      <expression>
+        <expression-string>unrecoverableChunks[1:2]</expression-string>
+        <language-id>go</language-id>
+        <evaluation-mode>EXPRESSION</evaluation-mode>
+      </expression>
+      <expression>
+        <expression-string>unrecoverableChunks</expression-string>
+        <language-id>go</language-id>
+        <evaluation-mode>EXPRESSION</evaluation-mode>
+      </expression>
+      <expression>
         <expression-string>checkMapRes(control)</expression-string>
         <language-id>go</language-id>
         <evaluation-mode>EXPRESSION</evaluation-mode>
@@ -705,26 +652,6 @@
       </expression>
       <expression>
         <expression-string>*(*&quot;[]_/home/andysnake/DATA/mapReduce/mapreduceextended/core.Worker&quot;)(824636219416)[:3]</expression-string>
-        <language-id>go</language-id>
-        <evaluation-mode>EXPRESSION</evaluation-mode>
-      </expression>
-      <expression>
-        <expression-string>*(*&quot;[]_/home/andysnake/DATA/mapReduce/mapreduceextended/core.Worker&quot;)(824636219416)</expression-string>
-        <language-id>go</language-id>
-        <evaluation-mode>EXPRESSION</evaluation-mode>
-      </expression>
-      <expression>
-        <expression-string>len(*assignedPorts)</expression-string>
-        <language-id>go</language-id>
-        <evaluation-mode>EXPRESSION</evaluation-mode>
-      </expression>
-      <expression>
-        <expression-string>([]rune(&quot;a&quot;))[0].</expression-string>
-        <language-id>go</language-id>
-        <evaluation-mode>EXPRESSION</evaluation-mode>
-      </expression>
-      <expression>
-        <expression-string>[]rune(&quot;a&quot;)</expression-string>
         <language-id>go</language-id>
         <evaluation-mode>EXPRESSION</evaluation-mode>
       </expression>
@@ -901,13 +828,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file:///usr/lib/go-1.11/src/builtin/builtin.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="167">
-          <caret line="154" column="5" selection-start-line="154" selection-start-column="5" selection-end-line="154" selection-end-column="5" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file:///usr/lib/go-1.11/src/sync/mutex.go">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="179">
@@ -953,9 +873,7 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/outTokens">
-      <provider selected="true" editor-type-id="text-editor" />
-    </entry>
+    <entry file="file://$PROJECT_DIR$/outTokens" />
     <entry file="file:///usr/lib/go-1.11/src/runtime/lock_futex.go">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="278">
@@ -977,69 +895,10 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/core/worker_local_version.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="183">
-          <caret line="95" column="22" selection-start-line="95" selection-start-column="22" selection-end-line="95" selection-end-column="22" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/outTokensSingleAggreagation.list">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="6783">
           <caret line="399" column="10" selection-start-line="399" selection-start-column="10" selection-end-line="399" selection-end-column="10" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/configurations/config.json">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="51">
-          <caret line="3" column="34" selection-start-line="3" selection-start-column="34" selection-end-line="3" selection-end-column="34" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/worker/main.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="340">
-          <caret line="30" column="50" selection-start-line="30" selection-start-column="50" selection-end-line="30" selection-end-column="50" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file:///usr/lib/go-1.11/src/runtime/proc.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="175">
-          <caret line="302" selection-start-line="302" selection-end-line="302" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/core/map_reduce.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="175">
-          <caret line="276" column="9" selection-start-line="276" selection-start-column="9" selection-end-line="276" selection-end-column="9" />
-          <folding>
-            <element signature="n#!!block;n#Get_chunk_ids#0" />
-            <element signature="n#!!block;n#downloadChunk#0" />
-            <element signature="n#!!block;n#ExitWorker#0" />
-            <element signature="e#14276#14517#0" />
-            <element signature="n#!!block;n#Map_quick_route_reducers#0" />
-            <element signature="n#!!block;n#GobDecode#0" />
-            <element signature="n#!!block;n#GobEncode#0" />
-            <element signature="n#!!block;n#ReturnReduce#0" />
-            <element signature="n#!!block;n#Map_parse_builtin#0" />
-            <element signature="n#!!block;n#Map_string_builtin#0" />
-            <element signature="n#!!block;n#Map_raw_parse#0" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/core/initDistribuitedVersion.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="350">
-          <caret line="66" column="30" selection-start-line="66" selection-start-column="30" selection-end-line="66" selection-end-column="30" />
-          <folding>
-            <element signature="n#!!block;n#GetMasterAddr#0" />
-            <element signature="n#!!block;n#MasterAddressFetch#0" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -1050,6 +909,189 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/core/workersUtils.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state>
+          <caret column="12" selection-start-column="12" selection-end-column="12" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file:///usr/lib/go-1.11/src/runtime/panic.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="322">
+          <caret line="680" selection-start-line="680" selection-end-line="680" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/core/initDistribuitedVersion.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="187">
+          <caret line="36" column="14" selection-start-line="36" selection-start-column="14" selection-end-line="36" selection-end-column="14" />
+          <folding>
+            <element signature="n#!!block;n#GetMasterAddr#0" />
+            <element signature="n#!!block;n#MasterAddressFetch#0" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/core/worker_local_version.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="136">
+          <caret line="195" column="46" selection-start-line="195" selection-start-column="46" selection-end-line="195" selection-end-column="46" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/configurations/config.json">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="68">
+          <caret line="4" column="19" selection-start-line="4" selection-start-column="19" selection-end-line="4" selection-end-column="19" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file:///usr/lib/go-1.11/src/builtin/builtin.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="283">
+          <caret line="182" column="5" selection-start-line="182" selection-start-column="5" selection-end-line="182" selection-end-column="5" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/core/utils.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1360">
+          <caret line="103" column="16" selection-start-line="103" selection-start-column="16" selection-end-line="103" selection-end-column="16" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/core/workerStruct.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="4097">
+          <caret line="249" column="52" selection-start-line="249" selection-start-column="52" selection-end-line="249" selection-end-column="52" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/core/map_reduce.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="179">
+          <caret line="326" column="43" selection-start-line="326" selection-start-column="43" selection-end-line="326" selection-end-column="43" />
+          <folding>
+            <element signature="e#194#224#0" />
+            <element signature="n#!!block;n#Get_chunk_ids#0" />
+            <element signature="e#448#760#0" />
+            <element signature="e#998#1431#0" />
+            <element signature="e#1000#1042#0" />
+            <element signature="e#1167#1246#0" />
+            <element signature="e#1252#1428#0" />
+            <element signature="e#1500#1534#0" />
+            <element signature="e#1627#1667#0" />
+            <element signature="e#1645#1664#0" />
+            <element signature="e#1711#1832#0" />
+            <element signature="e#1733#1767#0" />
+            <element signature="n#!!block;n#downloadChunk#0" />
+            <element signature="e#1995#2239#0" />
+            <element signature="e#2265#2501#0" />
+            <element signature="e#2328#2434#0" />
+            <element signature="e#2507#2848#0" />
+            <element signature="e#2742#2810#0" />
+            <element signature="e#2942#3690#0" />
+            <element signature="e#3733#3773#0" />
+            <element signature="n#!!block;n#ActivateNewReducer#0" />
+            <element signature="e#3939#4039#0" />
+            <element signature="e#4246#4384#0" />
+            <element signature="e#4331#4381#0" />
+            <element signature="e#4901#4918#0" />
+            <element signature="e#5056#5090#0" />
+            <element signature="e#5167#5412#0" />
+            <element signature="n#!!block;n#ExitWorker#0" />
+            <element signature="e#5870#6080#0" />
+            <element signature="e#6105#6229#0" />
+            <element signature="e#6249#6320#0" />
+            <element signature="e#6322#9180#0" />
+            <element signature="n#!!block;n#AssignMaps#0" />
+            <element signature="e#9300#9651#0" />
+            <element signature="e#9654#9680#0" />
+            <element signature="e#10210#10317#0" />
+            <element signature="e#10295#10314#0" />
+            <element signature="e#10323#11033#0" />
+            <element signature="e#10327#10371#0" />
+            <element signature="e#10601#11030#0" />
+            <element signature="e#10776#10970#0" />
+            <element signature="e#10920#10965#0" />
+            <element signature="e#10976#11026#0" />
+            <element signature="e#11268#11655#0" />
+            <element signature="e#11311#11449#0" />
+            <element signature="e#11697#11823#0" />
+            <element signature="e#11911#12008#0" />
+            <element signature="e#12010#12105#0" />
+            <element signature="e#12182#12208#0" />
+            <element signature="e#12285#12388#0" />
+            <element signature="e#12477#12582#0" />
+            <element signature="e#13482#13664#0" />
+            <element signature="e#13518#13661#0" />
+            <element signature="e#13557#13657#0" />
+            <element signature="n#!!block;n#ReducersCollocations#0" />
+            <element signature="e#13788#14226#0" />
+            <element signature="e#14228#14254#0" />
+            <element signature="e#14828#15090#0" />
+            <element signature="e#14969#15087#0" />
+            <element signature="e#15103#15150#0" />
+            <element signature="e#15182#15311#0" />
+            <element signature="e#15238#15295#0" />
+            <element signature="e#15730#16201#0" />
+            <element signature="e#15879#15896#0" />
+            <element signature="e#15944#16040#0" />
+            <element signature="e#16125#16160#0" />
+            <element signature="e#16306#16462#0" />
+            <element signature="e#16343#16459#0" />
+            <element signature="e#16464#16490#0" />
+            <element signature="e#16664#16718#0" />
+            <element signature="n#!!block;n#Map_parse_builtin_quick_route#0" />
+            <element signature="e#16900#17400#0" />
+            <element signature="e#17523#17607#0" />
+            <element signature="e#17727#17853#0" />
+            <element signature="e#17896#17930#0" />
+            <element signature="e#17981#18009#0" />
+            <element signature="e#18104#18139#0" />
+            <element signature="e#18174#18238#0" />
+            <element signature="e#18368#18581#0" />
+            <element signature="e#18519#18525#0" />
+            <element signature="n#!!block;n#Map_quick_route_reducers#0" />
+            <element signature="e#18798#19071#0" />
+            <element signature="e#19100#19112#0" />
+            <element signature="e#19568#19627#0" />
+            <element signature="e#19709#19945#0" />
+            <element signature="e#19869#19875#0" />
+            <element signature="e#19947#19962#0" />
+            <element signature="e#20202#20375#0" />
+            <element signature="e#20467#20788#0" />
+            <element signature="e#21044#21212#0" />
+            <element signature="e#21246#21390#0" />
+            <element signature="e#21396#21494#0" />
+            <element signature="n#!!block;n#GobDecode#0" />
+            <element signature="n#!!block;n#GobEncode#0" />
+            <element signature="e#22551#22637#0" />
+            <element signature="n#!!block;n#ReturnReduce#0" />
+            <element signature="e#22825#22892#0" />
+            <element signature="e#22882#22888#0" />
+            <element signature="e#22983#23051#0" />
+            <element signature="n#!!block;n#Map_parse_builtin#0" />
+            <element signature="e#23218#23252#0" />
+            <element signature="e#23296#23324#0" />
+            <element signature="e#23419#23443#0" />
+            <element signature="n#!!block;n#Map_string_builtin#0" />
+            <element signature="e#23564#23581#0" />
+            <element signature="e#23984#24081#0" />
+            <element signature="e#24107#24183#0" />
+            <element signature="n#!!block;n#Map_raw_parse#0" />
+            <element signature="e#24299#24316#0" />
+            <element signature="e#24473#24596#0" />
+            <element signature="e#24831#24859#0" />
+            <element signature="e#25039#25476#0" />
+            <element signature="e#25161#25298#0" />
+            <element signature="e#25391#25473#0" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/outTokens.list">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="425">
@@ -1057,45 +1099,31 @@
         </state>
       </provider>
     </entry>
-    <entry file="file:///usr/lib/go-1.11/src/runtime/panic.go">
+    <entry file="file://$PROJECT_DIR$/worker/main.go">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="44">
-          <caret line="680" selection-start-line="680" selection-end-line="680" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/master/main.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="129">
-          <caret line="224" column="36" selection-start-line="224" selection-start-column="36" selection-end-line="224" selection-end-column="36" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/core/workerStruct.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="154">
-          <caret line="26" column="12" selection-start-line="26" selection-start-column="12" selection-end-line="26" selection-end-column="12" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/core/workersUtils.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-7">
-          <caret column="12" lean-forward="true" selection-start-column="12" selection-end-column="12" />
+        <state relative-caret-position="119">
+          <caret line="29" column="51" selection-start-line="29" selection-start-column="51" selection-end-line="29" selection-end-column="51" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/master/recovery.go">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="231">
-          <caret line="219" column="35" selection-start-line="219" selection-start-column="35" selection-end-line="219" selection-end-column="35" />
+        <state relative-caret-position="139">
+          <caret line="188" selection-start-line="188" selection-end-line="188" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/core/utils.go">
+    <entry file="file:///usr/lib/go-1.11/src/runtime/proc.go">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="493">
-          <caret line="466" column="61" selection-start-line="466" selection-start-column="61" selection-end-line="466" selection-end-column="61" />
+        <state relative-caret-position="175">
+          <caret line="302" selection-start-line="302" selection-end-line="302" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/master/main.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="275">
+          <caret line="216" column="16" selection-start-line="216" selection-start-column="16" selection-end-line="216" selection-end-column="16" />
         </state>
       </provider>
     </entry>

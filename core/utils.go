@@ -58,6 +58,7 @@ type Configuration struct {
 	LoadChunksToS3 bool
 	S3_REGION      string
 	S3_BUCKET      string
+	FAIL_RETRY     int
 }
 
 func (config *Configuration) printFields() {
@@ -113,7 +114,7 @@ func ParseReduceErrString(reduceRpcErrs []error, data *MASTER_STATE_DATA, moreWo
 		if tmpErrString[0] == REDUCERS_ADDR_COMUNICATION { //worker fail during bindings comunication
 			workerFailedID = failedId
 		} else {
-			workerFailedID = data.ReducerSmartBindingsToWorkersID[failedId]
+			workerFailedID = data.ReducerSmartBindingsToWorkersID[failedId] //worker hosting failed reduce
 		}
 		failedWorkers = append(failedWorkers, workerFailedID)
 	}
@@ -128,6 +129,7 @@ func ParseReduceErrString(reduceRpcErrs []error, data *MASTER_STATE_DATA, moreWo
 			}
 		}
 	}
+	//use ping aliveness filter to get know of others failed workers, witch error has not been propagated e.g. failed reducer over failed mapper
 	for workerFailedID, _ := range moreWorkerFails {
 		//skip if already treated this worker
 		_, alreadyKnowFailM := mapsToRedo[workerFailedID]
@@ -135,7 +137,10 @@ func ParseReduceErrString(reduceRpcErrs []error, data *MASTER_STATE_DATA, moreWo
 		if alreadyKnowFailM || alreadyKnowFailR {
 			continue
 		}
-		mapsToRedo[workerFailedID] = data.AssignedChunkWorkersFairShare[workerFailedID]
+		lostMaps, doesExist := data.AssignedChunkWorkersFairShare[workerFailedID]
+		if doesExist {
+			mapsToRedo[workerFailedID] = lostMaps
+		}
 		for reducerID, hostWorker := range data.ReducerSmartBindingsToWorkersID {
 			if workerFailedID == hostWorker {
 				reduceToRedo[workerFailedID] = append(reduceToRedo[workerFailedID], reducerID)
@@ -281,7 +286,7 @@ func GetEndianess() unicode.Endianness {
 		fmt.Println("Big Endian")
 		return unicode.BigEndian
 	} else {
-		fmt.Println("Little Endian")
+		fmt.Println("")
 		return unicode.LittleEndian
 	}
 
@@ -414,7 +419,7 @@ func PingHeartBitSnd(addr string) (error, uint32) {
 		CheckErr(err, true, "udp write ping error")
 		//// read pongBuf converting from netw byte order to host byte order
 		_, err = udpConn.Read(pongBuf) //PONG rcv
-		if CheckErr(err, false, "pongBuf read error") {
+		if CheckErr(err, false, "") {
 			socketFail = true //no error exit ping try loop
 			continue
 		}

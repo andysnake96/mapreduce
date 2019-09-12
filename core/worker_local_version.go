@@ -189,14 +189,14 @@ func InitWorkers_LocalMock_MasterSide() (WorkersKinds, []Worker) {
 	return workersOut, workersAllsRef
 }
 
-func GetChunksNotAlreadyAssignedRR(chunksIds *[]int, numChunkToFind int, chunksIdsAssignedAlready []int) ([]int, error) {
+func GetChunksNotAlreadyAssignedRR(chunksIds []int, numChunkToFind int, chunksIdsAssignedAlready []int) ([]int, error) {
 	/*
 		find  numChunkToFind not already present in list chunkAssignedAlready (not already assigned to worker
 	*/
-	chunksToAssignable := make([]int, 0, len(*chunksIds)-len(chunksIdsAssignedAlready))
+	chunksToAssignable := make([]int, 0, len(chunksIds)-len(chunksIdsAssignedAlready))
 	chunksToAssign := make([]int, numChunkToFind)
-	for i := 0; i < len(*chunksIds); i++ {
-		chunkId := (*chunksIds)[i]
+	for i := 0; i < len(chunksIds); i++ {
+		chunkId := (chunksIds)[i]
 		alreadyAssignedChunk := false
 		for _, chunkIdsAssignedAlready := range chunksIdsAssignedAlready {
 			if chunkId == chunkIdsAssignedAlready {

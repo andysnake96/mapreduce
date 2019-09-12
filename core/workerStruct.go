@@ -247,18 +247,13 @@ func (workerNodeInt *Worker_node_internal) initLogicWorkerIstance(initData *Gene
 	return &workerIstanceData
 }
 
-func (workerNode *Worker_node_internal) aggregateIntermediateTokens(mapJobs []int) {
+func (workerNode *Worker_node_internal) aggregateIntermediateTokens(mapJobs []int, storeFlag bool) []map[string]int {
 
-	workerNode.IntermediateDataAggregated = AggregatedIntermediateTokens{
-		ChunksSouces:                 mapJobs,
-		PerReducerIntermediateTokens: make([]map[string]int, Config.ISTANCES_NUM_REDUCE),
-		FlushedIntermediateTokens:    make([]bool, Config.ISTANCES_NUM_REDUCE),
-	}
+	perReducerIntermediateTokens := make([]map[string]int, Config.ISTANCES_NUM_REDUCE)
 
 	for i := 0; i < Config.ISTANCES_NUM_REDUCE; i++ {
 		//init aggregation var
-		workerNode.IntermediateDataAggregated.FlushedIntermediateTokens[i] = false
-		workerNode.IntermediateDataAggregated.PerReducerIntermediateTokens[i] = make(map[string]int)
+		perReducerIntermediateTokens[i] = make(map[string]int)
 	}
 	aggreagated := 0
 	for _, jobID := range mapJobs {
@@ -268,7 +263,7 @@ func (workerNode *Worker_node_internal) aggregateIntermediateTokens(mapJobs []in
 				/// map instace data aggregation requested ...
 				for key, value := range instance.IntermediateTokens {
 					destReducer := HashKeyReducerSum(key, Config.ISTANCES_NUM_REDUCE)
-					workerNode.IntermediateDataAggregated.PerReducerIntermediateTokens[destReducer][key] += value //aggregate token per destination reducer
+					perReducerIntermediateTokens[destReducer][key] += value //aggregate token per destination reducer
 				}
 				founded = true
 				aggreagated++
@@ -284,4 +279,12 @@ func (workerNode *Worker_node_internal) aggregateIntermediateTokens(mapJobs []in
 		GenericPrint(mapJobs, "PANIC AT \t"+strconv.Itoa(workerNode.ControlRpcInstance.Port))
 		panic(strconv.Itoa(len(mapJobs)) + "vs" + strconv.Itoa(aggreagated) + "vs" + strconv.Itoa(len(workerNode.MapperInstances)))
 	}
+	GenericPrint(mapJobs, "aggreagated chunks:")
+	if storeFlag {
+		workerNode.IntermediateDataAggregated = AggregatedIntermediateTokens{
+			ChunksSouces:                 mapJobs,
+			PerReducerIntermediateTokens: perReducerIntermediateTokens,
+		}
+	}
+	return perReducerIntermediateTokens
 }

@@ -3,7 +3,6 @@ package core
 import (
 	"../aws_SDK_wrap"
 	"errors"
-	"fmt"
 	"math/rand"
 	"net/rpc"
 	"runtime"
@@ -106,7 +105,7 @@ type ReduceActiveArg struct {
 	LogicID   int
 }
 
-const MAX_RND_SLEEP time.Duration = time.Millisecond / 2
+const MAX_RND_SLEEP time.Duration = time.Millisecond * 2
 
 func (workerNode *Worker_node_internal) ActivateNewReducer(arg ReduceActiveArg, ChosenPort *int) error {
 	//create a new reducer instance on top of workerNode, returning the chosen port for the new instance
@@ -156,7 +155,6 @@ type Map2ReduceRouteCost struct {
 	RouteCosts map[int]int //for each reducerID (logic) --> cumulative data routing cost
 	RouteNum   map[int]int //for each reducerID (logic) --> expected num calls reduce() //TODO HASH PERF DEBUG ONLY.
 }
-
 type MapWorkerArgsWrap struct {
 	WorkerId   int
 	Reply      Map2ReduceRouteCost
@@ -254,13 +252,13 @@ func (workerNode *Worker_node_internal) AssignMaps(arg MapWorkerArgs, Destinatio
 			return err
 		}
 	} else {
-		//TODO SLOW DOWN FOR DEBUG --> RANDOM KILL
-		SLOW_DOWN_MAX_MAP := 800 * time.Millisecond
-		sleepFor := rand.Int63n(int64(SLOW_DOWN_MAX_MAP))
-		sleepFor += 100
-		if sleepFor > 1 {
-			time.Sleep(time.Duration(sleepFor))
-		}
+		////TODO SLOW DOWN FOR DEBUG --> RANDOM KILL
+		//SLOW_DOWN_MAX_MAP := 80 * time.Millisecond
+		//sleepFor := rand.Int63n(int64(SLOW_DOWN_MAX_MAP))
+		//sleepFor += 100
+		//if sleepFor > 1 {
+		//	time.Sleep(time.Duration(sleepFor))
+		//}
 		for i, chunkID := range arg.ChunkIds {
 			//workerMapJobs.Chunks[i]=data.Chunks[chunkId]	TODO PREVIUSLY SETTED
 			_, isAlreadyOwnedChunk := workerNode.WorkerChunksStore.Chunks[chunkID]
@@ -270,6 +268,8 @@ func (workerNode *Worker_node_internal) AssignMaps(arg MapWorkerArgs, Destinatio
 				if len(arg.Chunks[i]) < 5 {
 					panic("invalid chunk received ")
 				}
+			} else {
+				println("already have chunk :", chunkID)
 			}
 		}
 	}
@@ -306,8 +306,39 @@ func (workerNode *Worker_node_internal) AssignMaps(arg MapWorkerArgs, Destinatio
 }
 
 type ReduceTriggerArg struct {
-	ReducersAddresses map[int]string
-	ChunksToAggregate []int
+	ReducersAddresses     map[int]string
+	IndividualChunkShare  []int
+	FailPostPartialReduce bool
+}
+
+func (workerNode *Worker_node_internal) postFailReduce(arg ReduceTriggerArg) []error {
+	//on fault of some of mapper/reducers with some reduce triggered not aggreagated reduce call will be done
+	//avoiding reducer panic for partial collision of aggregated data with already owned data
+
+	//for each chunk get interm data to route to reducer separately
+	intermDataChunkLevAggreag := make([][]map[string]int, len(arg.IndividualChunkShare))
+	for i, chunk := range arg.IndividualChunkShare {
+		intermDataChunkLevAggreag[i] = workerNode.aggregateIntermediateTokens([]int{chunk}, false)
+	}
+	ends := make(map[int][]*rpc.Call, len(intermDataChunkLevAggreag)) //aggreagate rpc calls at reduce level for error setting
+	errs := make([]error, 0, len(intermDataChunkLevAggreag))
+	for j, intermDataPerReducer := range intermDataChunkLevAggreag {
+		chunkID := arg.IndividualChunkShare[j]
+		for reducerID, intermData := range intermDataPerReducer {
+
+			ends[reducerID] = append(ends[reducerID], workerNode.ReducersClients[reducerID].Go("REDUCE.Reduce", ReduceArgs{intermData, []int{chunkID}}, nil, nil))
+		}
+	}
+
+	for reducerLogicId, reducerEnds := range ends {
+		for _, end := range reducerEnds {
+			<-end.Done
+			if end.Error != nil {
+				errs = append(errs, errors.New(REDUCE_CALL+ERROR_SEPARATOR+strconv.Itoa(reducerLogicId)))
+			}
+		}
+	}
+	return errs
 }
 
 func (workerNode *Worker_node_internal) ReducersCollocations(arg ReduceTriggerArg, Errs *[]error) error {
@@ -329,7 +360,8 @@ func (workerNode *Worker_node_internal) ReducersCollocations(arg ReduceTriggerAr
 	//		return nil
 	//	}
 	//}
-	*Errs = make([]error, 0)
+	time.Sleep(800 * time.Millisecond)
+	errs := make([]error, 0)
 	hasErrd := false
 	var err error
 	///	setup reducer connections
@@ -337,31 +369,39 @@ func (workerNode *Worker_node_internal) ReducersCollocations(arg ReduceTriggerAr
 		workerNode.ReducersClients[reducerId], err = rpc.Dial(Config.RPC_TYPE, reducerFinalAddress)
 		if CheckErr(err, false, "dialing reducer") {
 			hasErrd = true
-			*Errs = append(*Errs, errors.New(REDUCE_CONNECTION+ERROR_SEPARATOR+strconv.Itoa(reducerId)))
+			errs = append(*Errs, errors.New(REDUCE_CONNECTION+ERROR_SEPARATOR+strconv.Itoa(reducerId)))
 		}
 	}
 	if hasErrd {
 		return errors.New("setUp Clients error")
 	}
-	workerNode.aggregateIntermediateTokens(arg.ChunksToAggregate)
-	fmt.Println("aggreagated chunks")
+
+	if arg.FailPostPartialReduce {
+		errs = workerNode.postFailReduce(arg)
+		if len(errs) > 0 {
+			*Errs = errs
+			return errors.New("reduce failed")
+		}
+		return nil
+	}
+
 	///	reduce calls over aggregated intermediate Tokens on newly created reduccers in ReducersAddresses
+	workerNode.aggregateIntermediateTokens(arg.IndividualChunkShare, true)
 	ends := make([]*rpc.Call, 0, len(arg.ReducersAddresses))
 	sourcesChunks := workerNode.IntermediateDataAggregated.ChunksSouces
 	for reducerLogicId, intermediateTokens := range workerNode.IntermediateDataAggregated.PerReducerIntermediateTokens {
 		//avoid useless retrasmission of interm. data to reducers
-		/*_,isReductionOrdered:=arg.ReducersAddresses[reducerLogicId]
-		alreadyFlushedIntermData:=workerNode.IntermediateDataAggregated.FlushedIntermediateTokens[reducerLogicId]
-		if !isReductionOrdered && alreadyFlushedIntermData{
+		_, isReductionOrdered := arg.ReducersAddresses[reducerLogicId]
+		if !isReductionOrdered {
 			continue
-		}*/
+		}
 
 		//TODO DEBUG PRINT
 		if reducerLogicId == 0 {
 			GenericPrint(sourcesChunks, "chunks sending to reducer: "+strconv.Itoa(reducerLogicId))
 		}
+
 		end := workerNode.ReducersClients[reducerLogicId].Go("REDUCE.Reduce", ReduceArgs{intermediateTokens, sourcesChunks}, nil, nil)
-		workerNode.IntermediateDataAggregated.FlushedIntermediateTokens[reducerLogicId] = true //mark interm.data as flushed
 		ends = append(ends, end)
 	}
 	//GenericPrint(sourcesChunks, "SOURCE CHUNKS SENT TO REDUCERS")
@@ -369,7 +409,7 @@ func (workerNode *Worker_node_internal) ReducersCollocations(arg ReduceTriggerAr
 		<-end.Done
 		if end.Error != nil {
 			hasErrd = true
-			*Errs = append(*Errs, errors.New(REDUCE_CALL+ERROR_SEPARATOR+strconv.Itoa(reducerLogicId)))
+			errs = append(errs, errors.New(REDUCE_CALL+ERROR_SEPARATOR+strconv.Itoa(reducerLogicId)))
 		}
 	}
 	//if Config.BACKUP_MASTER{
@@ -380,6 +420,7 @@ func (workerNode *Worker_node_internal) ReducersCollocations(arg ReduceTriggerAr
 	//	workerNode.cacheLock.Unlock()
 	//}
 	if hasErrd {
+		*Errs = errs
 		return errors.New("reduce failed")
 	}
 	return nil

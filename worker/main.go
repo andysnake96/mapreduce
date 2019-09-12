@@ -27,8 +27,8 @@ instances running on a worker will have an progressive ID starting to first inst
 
 var WorkersNodeInternal_localVersion []core.Worker_node_internal //for each local simulated worker indexed by his own id -> intenal state
 var WorkersNodeInternal core.Worker_node_internal                //worker nod ref distribuited version
-var SIMULATE_WORKER_CRUSH_BEFORE time.Duration = 19 * time.Millisecond
-var SIMULATE_WORKER_CRUSH_AFTER time.Duration = 55 * time.Nanosecond
+var SIMULATE_WORKER_CRUSH_BEFORE time.Duration = 500 * time.Millisecond
+var SIMULATE_WORKER_CRUSH_AFTER time.Duration = 100 * time.Millisecond
 
 func main() {
 	core.Config = new(core.Configuration)
