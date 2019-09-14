@@ -1,7 +1,7 @@
 {
 	"UPDATE_CONFIGURATION_S3 " : "true",
 	"SORT_FINAL": true,
-	"LOCAL_VERSION": true,
+	"LOCAL_VERSION": false,
 	"SIMULATE_WORKERS_CRUSH": true,
 	"SIMULATE_WORKERS_SLOW_DOWN": true,
 	"FAIL_RETRY": 0	,
