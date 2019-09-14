@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"golang.org/x/text/encoding/unicode"
+	"io"
 	"io/ioutil"
 	"log"
 	"math"
@@ -33,6 +34,7 @@ type Configuration struct {
 	SORT_FINAL                 bool //sort final file (extra computation)
 	LOCAL_VERSION              bool //use function for local deply
 	SIMULATE_WORKERS_CRUSH     bool
+	SIMULATE_WORKERS_SLOW_DOWN bool
 	SIMULATE_WORKERS_CRUSH_NUM int
 	ISTANCES_NUM_REDUCE        int    //number of reducer to istantiate
 	WORKER_NUM_ONLY_REDUCE     int    //num of worker node that will exec only 1 reduce istance
@@ -55,10 +57,11 @@ type Configuration struct {
 	CHUNKS_REPLICATION_FACTOR_BACKUP_WORKERS int
 	CHUNK_SIZE                               int64
 	// AWS
-	LoadChunksToS3 bool
-	S3_REGION      string
-	S3_BUCKET      string
-	FAIL_RETRY     int
+	LoadChunksToS3          bool
+	S3_REGION               string
+	S3_BUCKET               string
+	FAIL_RETRY              int
+	UPDATE_CONFIGURATION_S3 bool
 }
 
 func (config *Configuration) printFields() {
@@ -81,9 +84,9 @@ func (addrs *WorkerAddresses) printFields() {
 //shared configuration
 var Config *Configuration
 
-var Addresses *WorkerAddresses //global configuration
 const (
-	CONFIGFILENAME         = "configurations/config.json"
+	CONFIGFILEPATH         = "configurations/config.json"
+	CONFIGFILENAME         = "config.json"
 	ADDRESSES_GEN_FILENAME = "configurations/addresses.json"
 	OUTFILENAME            = "finalTokens.txt"
 )
@@ -622,12 +625,14 @@ func CheckAllTrueInBoolDict(boolDict map[int]bool) bool {
 func ReadConfigFile(configFilePath string, destVar ConfigInterface) {
 	f, err := os.Open(configFilePath)
 	CheckErr(err, true, "config file open")
-	defer f.Close()
-	//configRawStr,err:=ioutil.ReadAll(bufio.NewReader(f))
-	decoder := json.NewDecoder(f)
-	err = decoder.Decode(destVar)
-	CheckErr(err, true, "")
 
+	defer f.Close()
+	DecodeConfigFile(f, destVar)
+}
+func DecodeConfigFile(reader io.Reader, destVar ConfigInterface) {
+	decoder := json.NewDecoder(reader)
+	err := decoder.Decode(destVar)
+	CheckErr(err, true, "")
 }
 
 func ReflectionFieldsGet(strct interface{}) {

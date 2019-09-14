@@ -291,7 +291,7 @@ func RecoveryFailedMasterState(downloader *aws_SDK_wrap.DOWNLOADER) (core.MASTER
 	for i := 0; i < len(buf); i++ {
 		buf[i] = 0
 	}
-	err := aws_SDK_wrap.DownloadDATA(downloader, core.Config.S3_BUCKET, MASTER_STATE_S3_KEY, buf, false)
+	err := aws_SDK_wrap.DownloadDATA(downloader, core.Config.S3_BUCKET, MASTER_STATE_S3_KEY, &buf, false)
 	if core.CheckErr(err, false, "master old state recovery err") {
 		return core.MASTER_CONTROL{}, err
 	}

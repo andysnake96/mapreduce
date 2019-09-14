@@ -187,7 +187,8 @@ func waitWorkersRegister(waitGroup **sync.WaitGroup, control *MASTER_CONTROL, up
 				}
 				continue //some fail in connection estamblish...skip worker
 			}
-			workerAddr := strings.Split(workerConn.LocalAddr().String(), ":")[0]
+			println("connection from worker : ", workerConn.LocalAddr().String(), "<---", workerConn.RemoteAddr().String())
+			workerAddr := strings.Split(workerConn.RemoteAddr().String(), ":")[0]
 			portPing := Config.PING_SERVICE_BASE_PORT
 			portControlRpc := Config.CHUNK_SERVICE_BASE_PORT
 			if !Config.FIXED_PORT {
@@ -341,7 +342,8 @@ func InitWorker(worker *Worker_node_internal, stopPingChan chan bool, downloader
 	return assignedPorts, nil
 }
 
-const masterADDR = "37.116.178.139:6000"
+const masterADDR_PUBLIC = "37.116.178.139:6000"
+const masterADDR_LOCAL = "192.168.1.96:6000"
 
 func RegisterToMaster(downloader *aws_SDK_wrap.DOWNLOADER, portsComunication string) (string, error) {
 	//get master published address from s3
@@ -349,11 +351,17 @@ func RegisterToMaster(downloader *aws_SDK_wrap.DOWNLOADER, portsComunication str
 	//if setted flexible port assignement for worker servieces (control rpc instance and ping service) comunicate to master portsComunication
 
 	////////fetch master address
-	//masterAddressStr,err := GetMasterAddr(downloader,Config.S3_BUCKET,MASTER_ADDRESS_PUBLISH_S3_KEY)
-	//if CheckErr(err, false, "") {
-	//	return "", err
-	//}
-	masterAddressStr := masterADDR //TODO TEMP SAVE S3 GET limit free tier
+	var masterAddressStr string
+	var err error
+	if Config.LOCAL_VERSION {
+		masterAddressStr = masterADDR_LOCAL
+
+	} else {
+		masterAddressStr, err = GetMasterAddr(downloader, Config.S3_BUCKET, MASTER_ADDRESS_PUBLISH_S3_KEY)
+		if CheckErr(err, false, "") {
+			return "", err
+		}
+	}
 	println("fetched master address for my registration: ", masterAddressStr)
 
 	//register to master
@@ -379,7 +387,7 @@ func GetMasterAddr(downloader *aws_SDK_wrap.DOWNLOADER, bucketKey string, master
 	for v := 0; v < len(masterAddress); v++ { //GO memset (xD)
 		masterAddress[v] = 0
 	}
-	err := aws_SDK_wrap.DownloadDATA(downloader, Config.S3_BUCKET, MASTER_ADDRESS_PUBLISH_S3_KEY, masterAddress, false)
+	err := aws_SDK_wrap.DownloadDATA(downloader, Config.S3_BUCKET, MASTER_ADDRESS_PUBLISH_S3_KEY, &masterAddress, false)
 	if CheckErr(err, false, "master addr fetch err") {
 		return "", err
 	}

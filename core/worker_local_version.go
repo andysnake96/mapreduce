@@ -103,11 +103,6 @@ func InitWorkers_LocalMock_WorkerSide(workers *[]Worker_node_internal, stopPingC
 			avaiblePort = NextUnassignedPort(Config.CHUNK_SERVICE_BASE_PORT, &AssignedPortsAll, true, true, "tcp") //TODO HP AVAIBILITY FOR BASE PORT ASSIGNMENTS
 			e, _ := InitRPCWorkerIstance(nil, avaiblePort, CONTROL, &workerNode)
 			CheckErr(e, true, "instantiating base instanc error...")
-			/////////// ping service start
-			avaiblePort = NextUnassignedPort(Config.PING_SERVICE_BASE_PORT, &AssignedPortsAll, true, true, "tcp") //TODO HP AVAIBILITY FOR BASE PORT ASSIGNMENTS
-			conn, err := PingHeartBitRcv(avaiblePort, stopPingChan)
-			CheckErr(err, true, "heart bit init error")
-			workerNode.PingConnection = conn
 
 			// evaluating special fields basing on worker type
 			if workerKind == WORKERS_MAP_REDUCE {
@@ -132,41 +127,37 @@ func InitWorkers_LocalMock_MasterSide() (WorkersKinds, []Worker) {
 
 	var worker Worker
 	var port int
-	totalWorkersNum := Config.WORKER_NUM_MAP + Config.WORKER_NUM_ONLY_REDUCE + Config.WORKER_NUM_BACKUP_WORKER
+
 	workersKindsNums := map[string]int{
 		WORKERS_MAP_REDUCE: Config.WORKER_NUM_MAP, WORKERS_ONLY_REDUCE: Config.WORKER_NUM_ONLY_REDUCE, WORKERS_BACKUP_W: Config.WORKER_NUM_BACKUP_WORKER,
 	}
 	//generic destination variable for init
-	var addressesWorkers []string
 	var destWorkersContainer *[]Worker //dest variable for workers to init
 	//init out variables
-	workersAllsRef := make([]Worker, 0, totalWorkersNum) //refs to all created workers (for deallocation master side)
-	workersOut := *new(WorkersKinds)                     //actual workers to return
-	workersOut.WorkersMapReduce = make([]Worker, len(Addresses.WorkersMapReduce))
-	workersOut.WorkersOnlyReduce = make([]Worker, len(Addresses.WorkersOnlyReduce))
-	workersOut.WorkersBackup = make([]Worker, len(Addresses.WorkersBackup))
+	workersOut := *new(WorkersKinds) //actual workers to return
+	workersOut.WorkersMapReduce = make([]Worker, Config.WORKER_NUM_MAP)
+	workersOut.WorkersOnlyReduce = make([]Worker, Config.WORKER_NUM_ONLY_REDUCE)
+	workersOut.WorkersBackup = make([]Worker, Config.WORKER_NUM_BACKUP_WORKER)
 	idWorker := 0
 	for workerKind, numToInit := range workersKindsNums {
 		println("initiating: ", numToInit, "of workers kind: ", workerKind)
 		//taking worker kind addresses list
 		if workerKind == WORKERS_MAP_REDUCE {
-			addressesWorkers = Addresses.WorkersMapReduce
 			destWorkersContainer = &workersOut.WorkersMapReduce
 		} else if workerKind == WORKERS_ONLY_REDUCE {
-			addressesWorkers = Addresses.WorkersOnlyReduce
 			destWorkersContainer = &workersOut.WorkersOnlyReduce
 		} else if workerKind == WORKERS_BACKUP_W {
-			addressesWorkers = Addresses.WorkersBackup
 			destWorkersContainer = &workersOut.WorkersBackup
 		}
-		for i, address := range addressesWorkers {
+		for i := 0; i < len(*destWorkersContainer); i++ {
+
 			port = NextUnassignedPort(Config.CHUNK_SERVICE_BASE_PORT, &AssignedPortsAll, true, false, "tcp")
 			pingPort := NextUnassignedPort(Config.PING_SERVICE_BASE_PORT, &AssignedPortsAll, true, false, "tcp")
 			client, err := rpc.Dial(Config.RPC_TYPE, worker.Address+":"+strconv.Itoa(port))
 			CheckErr(err, true, "init worker client")
 			//init control rpc instance
 			worker = Worker{
-				Address:         address,
+				Address:         "localhost",
 				PingServicePort: pingPort,
 				Id:              idWorker,
 				State: WorkerStateMasterControl{
@@ -184,7 +175,7 @@ func InitWorkers_LocalMock_MasterSide() (WorkersKinds, []Worker) {
 			println("initiated worker: ", worker.Id)
 		}
 	}
-	workersAllsRef = append(workersOut.WorkersBackup, workersOut.WorkersMapReduce...)
+	workersAllsRef := append(workersOut.WorkersBackup, workersOut.WorkersMapReduce...)
 	workersAllsRef = append(workersAllsRef, workersOut.WorkersOnlyReduce...)
 	return workersOut, workersAllsRef
 }

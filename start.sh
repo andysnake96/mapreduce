@@ -1,26 +1,18 @@
 #!/usr/bin/env bash
-#EC2 SETUP  ENV FOR MAP REUDCE EXE
-#USAGE <> FOR WORKER  <MASTER> FOR MASTER
+#EC2 SETUP  ENV FOR MAP REUDCE EXECUTION
+#needed package downloaded; internal project dependencies handled by makefile
 
-#Download needed packages for code get and build
-sudo yum install -y golang git
+sudo yum install -y golang git htop
 #get code
 git clone https://andysnake96@bitbucket.org/andysnake96/mapreduceextended.git
 cd mapreduceextended
-#TODO MOVE TO BRANCH TEST
-git checkout origin/faultTollerant_localVersion
-#get aws go packages
-go get -u github.com/aws/aws-sdk-go/aws
-go get -u github.com/aws/aws-sdk-go/service/s3
-#Build master / worker with right env
-cd worker
-go build
-cd ../master
-go build
-cd ..
-#MASTER START WITH SETTED ANY 1 ARGUMENT, else started worker
-if [ -z "$1" ]; then
+
+if [[ $1 == "master" ]]; then
+    echo "starting master...."
+    make master
     ./master/master
 else
+    echo "starting worker...."
+    make worker
     ./worker/worker
 fi

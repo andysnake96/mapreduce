@@ -37,65 +37,70 @@ import (
 */
 
 const INIT_FINAL_TOKEN_SIZE = 500
+
 const TIMEOUT_PER_RPC time.Duration = time.Second * 2
 
 var MasterControl core.MASTER_CONTROL
 
 func main() {
+	//// read config file, if S3 config file flag is given overwrite local configuration with the one on S3
 	core.Config = new(core.Configuration)
-	core.Addresses = new(core.WorkerAddresses)
-	core.ReadConfigFile(core.CONFIGFILENAME, core.Config)
-	core.ReadConfigFile(core.ADDRESSES_GEN_FILENAME, core.Addresses)
+	core.ReadConfigFile(core.CONFIGFILEPATH, core.Config)
+	if core.Config.UPDATE_CONFIGURATION_S3 { //read config file from S3 on argv flag setted
+		//download config file from S3
+		downloader := aws_SDK_wrap.GetS3Downloader(core.Config.S3_REGION)
+		const INITIAL_CONFIG_FILE_SIZE = 1024
+		buf := make([]byte, INITIAL_CONFIG_FILE_SIZE)
+		err := aws_SDK_wrap.DownloadDATA(downloader, core.Config.S3_BUCKET, core.CONFIGFILENAME, &buf, false)
+		core.CheckErr(err, true, "config file read from S3 error")
+		core.DecodeConfigFile(strings.NewReader(string(buf)), core.Config) //decode downloaded config file
+
+	}
+
 	MasterControl = core.MASTER_CONTROL{}
 	var masterAddress string
 	var err error
 	var uploader *aws_SDK_wrap.UPLOADER = nil
-	if core.Config.LOCAL_VERSION {
+	/*if core.Config.LOCAL_VERSION {	//TODO REMOVE
 		masterAddress = "localhost"
 		init_local_version(&MasterControl)
-	} else {
+		masterData := masterRpcInit()
+		MasterControl.MasterRpc = masterData
+		masterLogic(core.CHUNK_ASSIGN, &MasterControl, uploader)
 
-		////// master working config
-		println("usage: isMasterCopy,publicIP master, data upload to S3, source file1,...source fileN")
+	}*/ //TODO REMOVE
 
-		//// master address
-		//masterAddress = "37.116.178.139" //dig +short myip.opendns.com @resolver1.opendns.com
-		masterAddress = ""     //dig +short myip.opendns.com @resolver1.opendns.com
-		if len(os.Args) >= 3 { //TODO SWTICH TO ARGV TEMPLATE
-			masterAddress = os.Args[2]
-		}
-		//// master replica
-		isMasterReplicaStr := "false"
-		if len(os.Args) >= 2 { //TODO SWTICH TO ARGV TEMPLATE
-			isMasterReplicaStr = os.Args[1]
-		}
-		if strings.Contains(strings.ToUpper(isMasterReplicaStr), "TRUE") {
-			MasterReplicaStart(masterAddress)
-		}
-		//// load chunks flag
-		loadChunksToS3 := false
-		loadChunksToS3Str := "false"
-		if len(os.Args) >= 4 {
-			loadChunksToS3Str = os.Args[3]
-		}
-		if strings.Contains(strings.ToUpper(loadChunksToS3Str), "TRUE") {
-			loadChunksToS3 = true
-		}
+	////// master working config
+	println("usage: isMasterCopy,publicIP master,configFile on S3 source file1,...source fileN")
 
-		//// filenames
-		filenames := core.FILENAMES_LOCL
-		if len(os.Args) >= 5 { //TODO SWTICH TO ARGV TEMPLATE
-			filenames = os.Args[4:]
-		}
-		MasterControl.MasterAddress = masterAddress
-		startInitTime := time.Now()
-		uploader, _, err = core.Init_distribuited_version(&MasterControl, filenames, loadChunksToS3)
-		println("elapsed for initialization: ", time.Now().Sub(startInitTime).String())
-		if core.CheckErr(err, false, "") {
-			killAll(&MasterControl.Workers)
-			os.Exit(96)
-		}
+	//// master address
+	//masterAddress = "37.116.178.139" //dig +short myip.opendns.com @resolver1.opendns.com
+	masterAddress = ""     //dig +short myip.opendns.com @resolver1.opendns.com
+	if len(os.Args) >= 3 { //TODO SWTICH TO ARGV TEMPLATE
+		masterAddress = os.Args[2]
 	}
+	//// master replica
+	isMasterReplicaStr := "false"
+	if len(os.Args) >= 2 { //TODO SWTICH TO ARGV TEMPLATE
+		isMasterReplicaStr = os.Args[1]
+	}
+	if strings.Contains(strings.ToUpper(isMasterReplicaStr), "TRUE") {
+		MasterReplicaStart(masterAddress)
+	}
+	//// filenames
+	filenames := core.FILENAMES_LOCL
+	if len(os.Args) >= 4 { //TODO SWTICH TO ARGV TEMPLATE
+		filenames = os.Args[4:]
+	}
+	MasterControl.MasterAddress = masterAddress
+	startInitTime := time.Now()
+	uploader, _, err = core.Init_distribuited_version(&MasterControl, filenames, core.Config.LoadChunksToS3)
+	println("elapsed for initialization: ", time.Now().Sub(startInitTime).String())
+	if core.CheckErr(err, false, "") {
+		killAll(&MasterControl.Workers)
+		os.Exit(96)
+	}
+
 	masterData := masterRpcInit()
 	MasterControl.MasterRpc = masterData
 	masterLogic(core.CHUNK_ASSIGN, &MasterControl, uploader)
@@ -118,7 +123,7 @@ func masterLogic(startPoint uint32, masterControl *core.MASTER_CONTROL, uploader
 
 	/////CHUNK ASSIGNEMENT
 chunk_assign:
-	if core.Config.BACKUP_MASTER {
+	if core.Config.BACKUP_MASTER && !core.Config.LOCAL_VERSION {
 		masterControl.State = core.CHUNK_ASSIGN
 		masterControl.StateChan <- core.CHUNK_ASSIGN
 		err := backUpMasterState(masterControl, uploader)

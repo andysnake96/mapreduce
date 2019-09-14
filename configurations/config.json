@@ -1,8 +1,10 @@
 {
+	"UPDATE_CONFIGURATION_S3 " : "true",
 	"SORT_FINAL": true,
-	"LOCAL_VERSION": false,
-	"SIMULATE_WORKERS_CRUSH": true	,
-	"FAIL_RETRY": 4	,
+	"LOCAL_VERSION": true,
+	"SIMULATE_WORKERS_CRUSH": true,
+	"SIMULATE_WORKERS_SLOW_DOWN": true,
+	"FAIL_RETRY": 0	,
 	"SIMULATE_WORKERS_CRUSH_NUM": 3,
 	"CHUNK_SIZE": 32768,
 	"WORKER_NUM_MAP": 5,
@@ -24,7 +26,7 @@
 	"_comment":"replication",
 	"CHUNKS_REPLICATION_FACTOR": 1,
 	"CHUNKS_REPLICATION_FACTOR_BACKUP_WORKERS": 5,
-	"LoadChunksToS3": false,
+	"LoadChunksToS3": false	,
 	"S3_REGION" : "eu-central-1",
 	"S3_BUCKET" : "mapreducechunks"
 }

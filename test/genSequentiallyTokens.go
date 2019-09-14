@@ -33,7 +33,7 @@ const (
 
 func main() {
 	core.Config = new(core.Configuration)
-	core.ReadConfigFile(core.CONFIGFILENAME, core.Config)
+	core.ReadConfigFile(core.CONFIGFILEPATH, core.Config)
 	startTime := time.Now()
 	//finalTokens:=concurrentMap()
 	finalTokens := singleBlockMap()

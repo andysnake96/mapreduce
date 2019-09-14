@@ -38,6 +38,26 @@ func InitS3Links(region string) (*DOWNLOADER, *UPLOADER) {
 	uploader := s3manager.NewUploader(sessionS3)
 	return (*DOWNLOADER)(downloader), (*UPLOADER)(uploader)
 }
+func GetS3Downloader(region string) *DOWNLOADER {
+	sessionS3, err := session.NewSession(&aws.Config{Region: aws.String(region)})
+	if err != nil {
+		log.Fatal(err)
+	}
+	//// create downloader and uploader on a newly created s3 session
+	downloader := s3manager.NewDownloader(sessionS3)
+	// Create a single AWS session
+	return (*DOWNLOADER)(downloader)
+}
+func GetS3Uploader(region string) *UPLOADER {
+	// Create a single AWS session
+	sessionS3, err := session.NewSession(&aws.Config{Region: aws.String(region)})
+	if err != nil {
+		log.Fatal(err)
+	}
+	// Create an uploader with the session and default options
+	uploader := s3manager.NewUploader(sessionS3)
+	return (*UPLOADER)(uploader)
+}
 
 /*func main(){
 	downloader,uploader:=initS3Links(S3_REGION)
@@ -68,9 +88,10 @@ func UploadDATA(uploader *UPLOADER, dataStr string, strKey string, bucket string
 	return nil
 }
 
-func DownloadDATA(downloader *DOWNLOADER, bucket, key string, bufOut []byte, sizeCheck bool) error {
+func DownloadDATA(downloader *DOWNLOADER, bucket, key string, bufOut *[]byte, sizeCheck bool) error {
 	//download data from s3 and put it i bufOut, byte buffer pre allocated with expected size, propagated eventual errors
-	writer := aws.NewWriteAtBuffer(bufOut)
+
+	writer := aws.NewWriteAtBuffer(*bufOut)
 	s3InputOption := &s3.GetObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
@@ -80,9 +101,10 @@ func DownloadDATA(downloader *DOWNLOADER, bucket, key string, bufOut []byte, siz
 		_, _ = fmt.Fprint(os.Stderr, err)
 	}
 
-	if sizeCheck && (int64(len(bufOut)) != downloadedSize) {
+	if sizeCheck && (int64(len(*bufOut)) != downloadedSize) {
 		return errors.New("download size mismatch with expected!\n")
 	}
+	*bufOut = (*bufOut)[:downloadedSize]
 	println("downloaded ", key, " of size ", downloadedSize)
 	return nil
 }

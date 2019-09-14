@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 killall worker
-cd worker
-go build
-cd ..
+if [[ -n "$2" ]]; then
+    make worker
+fi
 WORKERS_NUM=5
 SLEEP_LOCAL_PORTS_SYNC_SECS=0.2
 if [[ -n "$1" ]]; then

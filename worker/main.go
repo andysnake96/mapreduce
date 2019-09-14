@@ -32,46 +32,54 @@ var SIMULATE_WORKER_CRUSH_AFTER time.Duration = 100 * time.Millisecond
 
 func main() {
 	core.Config = new(core.Configuration)
-	core.Addresses = new(core.WorkerAddresses)
-	core.ReadConfigFile(core.CONFIGFILENAME, core.Config)
-	core.ReadConfigFile(core.ADDRESSES_GEN_FILENAME, core.Addresses)
+	core.ReadConfigFile(core.CONFIGFILEPATH, core.Config)
 	stopPingService := make(chan bool, 1)
 
-	if core.Config.LOCAL_VERSION {
+	/*if core.Config.LOCAL_VERSION {
 		ChunkIDS := core.LoadChunksStorageService_localMock(core.FILENAMES_LOCL)
 		println(ChunkIDS, "<--- chunkIDS ")
 		core.InitWorkers_LocalMock_WorkerSide(&WorkersNodeInternal_localVersion, stopPingService)
-	} else { //////distribuited  version
-		///s3 links
-		downloader, _ := aws_SDK_wrap.InitS3Links(core.Config.S3_REGION)
-		assignedPorts, err := core.InitWorker(&WorkersNodeInternal, stopPingService, downloader)
-		core.GenericPrint(assignedPorts, "")
-		core.CheckErr(err, true, "worker init error")
-		portToComunicate := ""
-		if !core.Config.FIXED_PORT {
-			portToComunicate = strconv.Itoa(WorkersNodeInternal.ControlRpcInstance.Port) + core.PORT_SEPARATOR + strconv.Itoa(WorkersNodeInternal.PingPort) + core.PORT_TERMINATOR
-		}
-		masterAddr, err := core.RegisterToMaster(downloader, portToComunicate)
-		core.CheckErr(err, true, "master register err")
-		WorkersNodeInternal.MasterAddr = masterAddr
-
-		//fault simulation
-		isUnluckyWorker := false //worker to crush
-		if len(os.Args) < 2 {
-			//no crush flag given, gen with random probability in respect with workers to crush
-			totalNumWorkers := core.Config.WORKER_NUM_ONLY_REDUCE + core.Config.WORKER_NUM_BACKUP_WORKER + core.Config.WORKER_NUM_MAP
-			crushProbability := float64(core.Config.SIMULATE_WORKERS_CRUSH_NUM) / float64(totalNumWorkers)
-			isUnluckyWorker = core.RandomBool(crushProbability, 4)
-		} else {
-			crushArg := strings.ToUpper(os.Args[1])
-			isUnluckyWorker = strings.Contains(crushArg, "TRUE")
-		}
-
-		if core.Config.SIMULATE_WORKERS_CRUSH && isUnluckyWorker {
-			simulateWorkerCrush()
-		}
-		waitWorkerEnd(stopPingService)
+		syscall.Pause()
+	}*/ //TODO REMOVE
+	//////distribuited  version
+	///s3 links
+	println("usage for non default setting: configFileFromS3, Schedule Random Crush")
+	downloader, _ := aws_SDK_wrap.InitS3Links(core.Config.S3_REGION)
+	if core.Config.UPDATE_CONFIGURATION_S3 { //read config file from S3 on argv flag setted
+		//download config file from S3
+		const INITIAL_CONFIG_FILE_SIZE = 4096
+		buf := make([]byte, INITIAL_CONFIG_FILE_SIZE)
+		err := aws_SDK_wrap.DownloadDATA(downloader, core.Config.S3_BUCKET, core.CONFIGFILENAME, &buf, false)
+		core.CheckErr(err, true, "config file read from S3 error")
+		core.DecodeConfigFile(strings.NewReader(string(buf)), core.Config) //decode downloaded config file
 	}
+	assignedPorts, err := core.InitWorker(&WorkersNodeInternal, stopPingService, downloader)
+	core.GenericPrint(assignedPorts, "")
+	core.CheckErr(err, true, "worker init error")
+	portToComunicate := ""
+	if !core.Config.FIXED_PORT {
+		portToComunicate = strconv.Itoa(WorkersNodeInternal.ControlRpcInstance.Port) + core.PORT_SEPARATOR + strconv.Itoa(WorkersNodeInternal.PingPort) + core.PORT_TERMINATOR
+	}
+	masterAddr, err := core.RegisterToMaster(downloader, portToComunicate)
+	core.CheckErr(err, true, "master register err")
+	WorkersNodeInternal.MasterAddr = masterAddr
+
+	//fault simulation
+	isUnluckyWorker := false //worker to crush
+	if len(os.Args) < 3 {
+		//no crush flag given, gen with random probability in respect with workers to crush
+		totalNumWorkers := core.Config.WORKER_NUM_ONLY_REDUCE + core.Config.WORKER_NUM_BACKUP_WORKER + core.Config.WORKER_NUM_MAP
+		crushProbability := float64(core.Config.SIMULATE_WORKERS_CRUSH_NUM) / float64(totalNumWorkers)
+		isUnluckyWorker = core.RandomBool(crushProbability, 4)
+	} else {
+		crushArg := strings.ToUpper(os.Args[2])
+		isUnluckyWorker = strings.Contains(crushArg, "TRUE")
+	}
+
+	if core.Config.SIMULATE_WORKERS_CRUSH && isUnluckyWorker {
+		simulateWorkerCrush()
+	}
+	waitWorkerEnd(stopPingService)
 	os.Exit(0)
 }
 

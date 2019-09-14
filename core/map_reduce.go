@@ -3,7 +3,6 @@ package core
 import (
 	"../aws_SDK_wrap"
 	"errors"
-	"math/rand"
 	"net/rpc"
 	"runtime"
 	"sort"
@@ -63,22 +62,16 @@ func (workerNode *Worker_node_internal) downloadChunk(chunkId int, downloadBarri
 		download chunk from data store, allowing concurrent download with waitgroup to notify downloads progress
 		chunk will be written in given location, thread safe if chunkLocation is isolated and readed only after waitgroup has compleated
 	*/
-	if Config.LOCAL_VERSION {
-		chunk, present := ChunksStorageMock[chunkId]
-		if !present {
-			panic("NOT PRESENT CHUNK IN MOCK\nidchunk: " + strconv.Itoa(chunkId)) //TODO ROBUSTENESS PRE EBUG
-		}
-		*chunkLocation = chunk //write chunk to his isolated position
-	} else {
-		chunkBuf := make([]byte, Config.CHUNK_SIZE)
-		err := aws_SDK_wrap.DownloadDATA(workerNode.Downloader, Config.S3_BUCKET, strconv.Itoa(chunkId), chunkBuf, false)
-		if CheckErr(err, false, "downloading chunk: "+strconv.Itoa(chunkId)) {
-			(*downloadBarrier).Done()
-			*errorLocation = err
-			return
-		}
-		*chunkLocation = CHUNK(chunkBuf)
+
+	chunkBuf := make([]byte, Config.CHUNK_SIZE)
+	err := aws_SDK_wrap.DownloadDATA(workerNode.Downloader, Config.S3_BUCKET, strconv.Itoa(chunkId), &chunkBuf, false)
+	if CheckErr(err, false, "downloading chunk: "+strconv.Itoa(chunkId)) {
+		(*downloadBarrier).Done()
+		*errorLocation = err
+		return
 	}
+	*chunkLocation = CHUNK(chunkBuf)
+
 	(*downloadBarrier).Done() //notify other chunk download compleated
 	*errorLocation = nil
 }
@@ -118,9 +111,12 @@ func (workerNode *Worker_node_internal) ActivateNewReducer(arg ReduceActiveArg, 
 			return nil
 		}
 	}
-	//TODO ON LOCAL RACE CONDITION ON PORT BIND
-	rndSleep := rand.Int63n(int64(MAX_RND_SLEEP))
-	time.Sleep(time.Duration(rndSleep))
+
+	/*if Config.SIMULATE_WORKERS_SLOW_DOWN {
+		rndSleep := rand.Int63n(int64(MAX_RND_SLEEP))
+		time.Sleep(time.Duration(rndSleep))
+	}*/
+
 	*ChosenPort = NextUnassignedPort(Config.REDUCE_SERVICE_BASE_PORT, &AssignedPortsAll, true, true, "tcp")
 	masterRpcAddr := workerNode.MasterAddr + ":" + strconv.Itoa(Config.MASTER_BASE_PORT)
 	masterClient, err := rpc.Dial(Config.RPC_TYPE, masterRpcAddr) //init master client for future final return
@@ -360,7 +356,9 @@ func (workerNode *Worker_node_internal) ReducersCollocations(arg ReduceTriggerAr
 	//		return nil
 	//	}
 	//}
-	time.Sleep(800 * time.Millisecond)
+	if Config.SIMULATE_WORKERS_SLOW_DOWN {
+		time.Sleep(800 * time.Millisecond)
+	}
 	errs := make([]error, 0)
 	hasErrd := false
 	var err error
@@ -529,6 +527,7 @@ func (r *ReducerIstanceStateInternal) Reduce(RedArgs ReduceArgs, voidReply *int)
 			duplicateIntermdiateData = true //already processed that intermdiate token share
 			println("intermdiate data contains a share:", chunkId, "already processed")
 		} else if duplicateIntermdiateData { //intermdiate data id collision--->something already processed something not!
+			GenericPrint(RedArgs.Source, "received chunk IDs")
 			panic("CRITICAL INTERMDIATE DATA COLLISION ... ABORTING")
 		} else {
 			r.CumulativeCalls[chunkId] = true //set that intermediate Tokens share has being received
