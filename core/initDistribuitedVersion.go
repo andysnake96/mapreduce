@@ -124,7 +124,7 @@ func BuildSequentialIDsListUpTo(maxID int) []int {
 	return list
 }
 
-const WORKER_REGISTER_TIMEOUT time.Duration = 11 * time.Second
+const WORKER_REGISTER_TIMEOUT time.Duration = 200 * time.Second
 
 func waitWorkersRegister(waitGroup **sync.WaitGroup, control *MASTER_CONTROL, uploader *aws_SDK_wrap.UPLOADER) error {
 	//setup worker register service tcp port at master

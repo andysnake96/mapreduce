@@ -36,6 +36,7 @@ type Configuration struct {
 	SIMULATE_WORKERS_CRUSH     bool
 	SIMULATE_WORKERS_SLOW_DOWN bool
 	SIMULATE_WORKERS_CRUSH_NUM int
+	PING_TIMEOUT_MILLISECONDS  int
 	ISTANCES_NUM_REDUCE        int    //number of reducer to istantiate
 	WORKER_NUM_ONLY_REDUCE     int    //num of worker node that will exec only 1 reduce istance
 	WORKER_NUM_MAP             int    //num of mapper to istantiate
@@ -62,6 +63,7 @@ type Configuration struct {
 	S3_BUCKET               string
 	FAIL_RETRY              int
 	UPDATE_CONFIGURATION_S3 bool
+	MIN_WORKERS_NUM         int
 }
 
 func (config *Configuration) printFields() {
@@ -308,8 +310,6 @@ const (
 )
 const PING_TRY_NUM = 5
 
-var PING_TIMEOUT time.Duration = time.Millisecond * 960
-
 func PingHeartBitRcvMaster(port int, stateChan chan uint32) (net.Conn, error) {
 	//ping receve and reply service under port implemented with ping/pong of 1 byte readed/written by a routine
 	//stopPing has to be a initiated and 1 buffered channel for non blocking read
@@ -407,13 +407,14 @@ func PingHeartBitSnd(addr string) (error, uint32) {
 	//CheckErr(err,true,"ephemeral conn listen error");
 	//defer ephemeralConn.Close();
 
+	timeout := time.Millisecond * time.Duration(Config.PING_TIMEOUT_MILLISECONDS)
 	pongBuf := make([]byte, PING_LEN)
 	var pong uint32
 	ping := make([]byte, PING_LEN)
 	binary.BigEndian.PutUint32(ping, PING)
 	myEndianess := GetEndianess()
 	socketFail := true
-	err = udpConn.SetReadDeadline(time.Now().Add(PING_TIMEOUT))
+	err = udpConn.SetReadDeadline(time.Now().Add(timeout))
 	CheckErr(err, true, "set deadline to ping socket error")
 	/// fixed num of ping try
 	for i := 0; i < PING_TRY_NUM && socketFail; i++ {
@@ -441,6 +442,7 @@ func PingHeartBitSnd(addr string) (error, uint32) {
 }
 
 func PingProbeAlivenessFilter(control *MASTER_CONTROL) map[int]bool {
+	//filter away failed workers;  return map worker_removed_id-->true for each removed worker
 	workers := &(control.Workers)
 	failedWorkers := make(map[int]bool, len(control.WorkersAll))
 	//probe each worker for aliveness, filter away dead workers

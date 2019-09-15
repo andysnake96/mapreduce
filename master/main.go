@@ -22,7 +22,7 @@ import (
 	Chunks for map will be sent in fair shares to worker with a replication configurable
 	is possible to send only chunk IDs and worker will retrive them on S3
 	at the end of map workers will return only their distribuition of bindings of intermediate data derived from map processing to reducers
-	reflecting distribuition of interm.tokens among workers.
+	reflecting distribution of interm.tokens among workers.
 	on fault of a mapper master will re assigned failed map jobs exploiting data locality of chunks replication among workers
 	so some jobs may be unnecessary to be rescheduled.
 	Master will exploit this to select best worker node to host reducer instances producing reducer bindings to comunicate to mappers
@@ -74,9 +74,8 @@ func main() {
 	println("usage: isMasterCopy,publicIP master,configFile on S3 source file1,...source fileN")
 
 	//// master address
-	//masterAddress = "37.116.178.139" //dig +short myip.opendns.com @resolver1.opendns.com
-	masterAddress = ""     //dig +short myip.opendns.com @resolver1.opendns.com
-	if len(os.Args) >= 3 { //TODO SWTICH TO ARGV TEMPLATE
+	masterAddress = "37.116.178.139" //dig +short myip.opendns.com @resolver1.opendns.com
+	if len(os.Args) >= 3 {           //TODO SWTICH TO ARGV TEMPLATE
 		masterAddress = os.Args[2]
 	}
 	//// master replica
@@ -198,6 +197,10 @@ locality_aware_link_reduce:
 		fmt.Fprint(os.Stderr, "FAIL DURING REDUCE PHASE, reduceTriggered: ", reduceCallTriggered)
 		//set up list for failed instances inside failed workers (mapper & reducer)
 		moreFails := core.PingProbeAlivenessFilter(masterControl) //filter in place failed workers
+		if len(masterControl.WorkersAll) < core.Config.MIN_WORKERS_NUM {
+			_, _ = fmt.Fprint(os.Stderr, "TOO MUCH WORKER FAILS... ABORTING COMPUTATION..")
+			os.Exit(96)
+		}
 		mapToRedo, reduceToRedo := core.ParseReduceErrString(errs, &masterControl.MasterData, moreFails)
 		///MAPS REDO
 		if len(mapToRedo) > 0 {

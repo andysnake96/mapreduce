@@ -120,6 +120,11 @@ func MapPhaseRecovery(masterControl *core.MASTER_CONTROL, failedJobs map[int][]i
 	workerMapJobsToReassign := make(map[int][]int) //workerId--> map job to redo (chunkID previusly assigned)
 	filteredMapResults := make([]core.MapWorkerArgsWrap, 0, len((*masterControl).MasterData.MapResults))
 	moreFails := core.PingProbeAlivenessFilter(masterControl) //filter in place failed workers ( other eventually failed among calls
+	///// evalutate to terminate
+	if len(masterControl.WorkersAll) < core.Config.MIN_WORKERS_NUM {
+		_, _ = fmt.Fprint(os.Stderr, "TOO MUCH WORKER FAILS... ABORTING COMPUTATION..")
+		os.Exit(96)
+	}
 	for _, mapResult := range (*masterControl).MasterData.MapResults {
 		errdMap := core.CheckErr(mapResult.Err, false, "WORKER id:"+strconv.Itoa(mapResult.WorkerId)+" ON MAPS JOB ASSIGN")
 		failedWorker := errdMap || moreFails[mapResult.WorkerId]
