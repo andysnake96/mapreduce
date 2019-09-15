@@ -3,6 +3,7 @@ PK_PATH="/home/andysnake/aws/SSNAKE96.pem"
 SSH_CMD="ssh -o \"StrictHostKeyChecking no \" -i $PK_PATH ec2-user@"
 INIT_WAIT_TIME=300
 INSTANCES_HN_FILENAME="instances.list"
+BOTO3_WRAP_PYTHON_FILENAME="EC2instances.py"
 spawn_terminals_ssh_to_ec2_instances(){
     echo "waiting for initialization of instances"
     sleep $1
@@ -13,12 +14,16 @@ spawn_terminals_ssh_to_ec2_instances(){
 
 }
 
-echo "usage: num instance to start"
+echo -e "usage possibilties:\n\t N -> number of ec2 instances to start from default launch template saving instance public host names in $ INSTANCES_HN_FILENAME"
+echo -e "\tspawn -> spawn ssh terminal connected to ec2 instances configured in file $ INSTANCES_HN_FILENAME "
+echo -e "\tterminate -> kill all running ec2 instances"
+
 
 if [[ $1 == "spawn" ]]; then
     spawn_terminals_ssh_to_ec2_instances $2
+elif [[ $1 == "terminate" ]]; then
+    python3 $BOTO3_WRAP_PYTHON_FILENAME "terminate"
 else
-python3 startEc2Instances.py $1 > ${INSTANCES_HN_FILENAME}
-
+	python3 $BOTO3_WRAP_PYTHON_FILENAME $1 > ${INSTANCES_HN_FILENAME}
 fi
 

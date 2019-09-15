@@ -1,5 +1,5 @@
 {
-	"UPDATE_CONFIGURATION_S3 " : true,
+	"UPDATE_CONFIGURATION_S3" : true,
 	"SORT_FINAL": true,
 	"LOCAL_VERSION": false,
 	"SIMULATE_WORKERS_CRUSH": true,
@@ -10,8 +10,9 @@
 	"WORKER_NUM_MAP": 5,
 	"WORKER_NUM_ONLY_REDUCE": 2,
 	"WORKER_NUM_BACKUP_WORKER": 2,
-	"BACKUP_MASTER": true,
 	"ISTANCES_NUM_REDUCE": 3,
+	"MIN_WORKERS_NUM": 3,
+	"BACKUP_MASTER": true,
 	"RPC_TYPE":"tcp",
 	"_comment":"services base port",
 	"MASTER_BASE_PORT": 5555,
