@@ -3,6 +3,7 @@ package main
 import (
 	"../aws_SDK_wrap"
 	"../core"
+	"encoding/gob"
 	"errors"
 	"fmt"
 	"log"
@@ -12,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -49,26 +51,16 @@ func main() {
 	if core.Config.UPDATE_CONFIGURATION_S3 { //read config file from S3 on argv flag setted
 		//download config file from S3
 		downloader := aws_SDK_wrap.GetS3Downloader(core.Config.S3_REGION)
-		const INITIAL_CONFIG_FILE_SIZE = 1024
+		const INITIAL_CONFIG_FILE_SIZE = 2048
 		buf := make([]byte, INITIAL_CONFIG_FILE_SIZE)
 		err := aws_SDK_wrap.DownloadDATA(downloader, core.Config.S3_BUCKET, core.CONFIGFILENAME, &buf, false)
 		core.CheckErr(err, true, "config file read from S3 error")
 		core.DecodeConfigFile(strings.NewReader(string(buf)), core.Config) //decode downloaded config file
-
 	}
 
 	MasterControl = core.MASTER_CONTROL{}
 	var masterAddress string
 	var err error
-	var uploader *aws_SDK_wrap.UPLOADER = nil
-	/*if core.Config.LOCAL_VERSION {	//TODO REMOVE
-		masterAddress = "localhost"
-		init_local_version(&MasterControl)
-		masterData := masterRpcInit()
-		MasterControl.MasterRpc = masterData
-		masterLogic(core.CHUNK_ASSIGN, &MasterControl, uploader)
-
-	}*/ //TODO REMOVE
 
 	////// master working config
 	println("usage: isMasterCopy,publicIP master,configFile on S3 source file1,...source fileN")
@@ -79,12 +71,16 @@ func main() {
 		masterAddress = os.Args[2]
 	}
 	//// master replica
-	isMasterReplicaStr := "false"
-	if len(os.Args) >= 2 { //TODO SWTICH TO ARGV TEMPLATE
-		isMasterReplicaStr = os.Args[1]
-	}
-	if strings.Contains(strings.ToUpper(isMasterReplicaStr), "TRUE") {
-		MasterReplicaStart(masterAddress)
+	if core.Config.BACKUP_MASTER {
+		gob.Register(core.MapWorkerArgs{}) //register sub field of  master state
+		gob.Register(core.Map2ReduceRouteCost{})
+		isMasterReplicaStr := "false"
+		if len(os.Args) >= 2 { //TODO SWTICH TO ARGV TEMPLATE
+			isMasterReplicaStr = os.Args[1]
+		}
+		if strings.Contains(strings.ToUpper(isMasterReplicaStr), "TRUE") {
+			MasterReplicaStart(masterAddress)
+		}
 	}
 	//// filenames
 	filenames := core.FILENAMES_LOCL
@@ -93,7 +89,7 @@ func main() {
 	}
 	MasterControl.MasterAddress = masterAddress
 	startInitTime := time.Now()
-	uploader, _, err = core.Init_distribuited_version(&MasterControl, filenames, core.Config.LoadChunksToS3)
+	uploader, _, err := core.Init_distribuited_version(&MasterControl, filenames, core.Config.LoadChunksToS3)
 	println("elapsed for initialization: ", time.Now().Sub(startInitTime).String())
 	if core.CheckErr(err, false, "") {
 		killAll(&MasterControl.Workers)
@@ -102,36 +98,30 @@ func main() {
 
 	masterData := masterRpcInit()
 	MasterControl.MasterRpc = masterData
-	masterLogic(core.CHUNK_ASSIGN, &MasterControl, uploader)
+	masterLogic(core.CHUNK_ASSIGN, &MasterControl, false, uploader)
 }
 
-func masterLogic(startPoint uint32, masterControl *core.MASTER_CONTROL, uploader *aws_SDK_wrap.UPLOADER) {
+func masterLogic(startPoint uint32, masterControl *core.MASTER_CONTROL, isReplica bool, uploader *aws_SDK_wrap.UPLOADER) {
 
 	var startTime time.Time
 	var err bool
+	var errs []error
 	//var errs []error
 	//// from given starting point
 	switch startPoint {
 	case core.CHUNK_ASSIGN:
 		goto chunk_assign
-	//case core.MAP_ASSIGN:
-	//	goto map_assign
 	case core.LOCALITY_AWARE_LINK_REDUCE:
 		goto locality_aware_link_reduce
 	}
 
-	/////CHUNK ASSIGNEMENT
+	///// CHUNK ASSIGNEMENT & MAP
 chunk_assign:
-	if core.Config.BACKUP_MASTER && !core.Config.LOCAL_VERSION {
-		masterControl.State = core.CHUNK_ASSIGN
-		masterControl.StateChan <- core.CHUNK_ASSIGN
-		err := backUpMasterState(masterControl, uploader)
-		if core.CheckErr(err, false, "") {
-			_, _ = fmt.Fprint(os.Stderr, "MASTER STATE BACKUP FAILED, ABORTING")
-			killAll(&masterControl.Workers)
-		}
+	if isReplica {
+		isReplica = false //TODO FIND BETTER WAY TO AVOID STUPID CHECK IN NEXT LABEL
+		masterControl.MasterData.MapResults, err = RecoveryMapResults(masterControl)
+		goto checkMap
 	}
-
 	/*
 		fair distribuition of chunks among worker nodes with replication factor
 			(will be assigned a fair share of chunks to each worker + a replication factor of chunks)
@@ -142,74 +132,84 @@ chunk_assign:
 	masterControl.MasterData.AssignedChunkWorkersFairShare = assignChunksIDs(masterControl.Workers.WorkersMapReduce, (masterControl.MasterData.ChunkIDS), core.Config.CHUNKS_REPLICATION_FACTOR, false, masterControl.MasterData.AssignedChunkWorkers)
 	checkMapRes(masterControl)
 	assignChunksIDs(masterControl.Workers.WorkersBackup, (masterControl.MasterData.ChunkIDS), core.Config.CHUNKS_REPLICATION_FACTOR_BACKUP_WORKERS, true, masterControl.MasterData.AssignedChunkWorkers) //only replication assignement on backup workers
-
+	//// checkpoint master state with assignement
+	if core.Config.BACKUP_MASTER {
+		masterControl.State = core.CHUNK_ASSIGN
+		masterControl.StateChan <- core.CHUNK_ASSIGN
+		backUpMasterState(masterControl, uploader)
+	}
 	/*
 		assign individual map jobs to specific workers,
 		they will retun control information about distribution of their intermediate token to (logic) reducers
 		With these information logic reducers will be instantiated on workers exploiting intermediate data locality to route
 	*/
 
-	masterControl.MasterData.MapResults, err = assignMapJobsWithRedundancy(&masterControl.MasterData, &masterControl.Workers, masterControl.MasterData.AssignedChunkWorkers) //RPC 2,3 IN SEQ DIAGRAM
+	masterControl.MasterData.MapResults, err = assignMapJobsWithRedundancy(&masterControl.MasterData, &masterControl.Workers, masterControl.MasterData.AssignedChunkWorkers, masterControl.MasterData.AssignedChunkWorkersFairShare) //RPC 2,3 IN SEQ DIAGRAM
 	println("elapsed: ", time.Now().Sub(startTime).String())
 
+checkMap:
 	if err {
-	recoveryMAP:
 		_, _ = fmt.Fprintf(os.Stderr, "ASSIGN MAP JOBS ERRD\n RETRY ON FAILED WORKERS EXPLOITING ASSIGNED CHUNKS REPLICATION")
-
-		reassignementResult := MapPhaseRecovery(masterControl, nil)
+		reassignementResult := MapPhaseRecovery(masterControl, nil, uploader)
 		if !reassignementResult {
 			if core.Config.FAIL_RETRY > 0 {
 				core.Config.FAIL_RETRY--
 				println("RETRY...")
-				goto recoveryMAP
+				goto checkMap
 			}
 			killAll(&masterControl.Workers)
 			os.Exit(96)
 		}
 	}
-
+	//filter away replication worker among map results
+	masterControl.MasterData.MapResults = filterFoundamentalMapResult(masterControl.MasterData.MapResults, masterControl.MasterData.AssignedChunkWorkersFairShare)
 	////DATA LOCALITY AWARE REDUCER COMPUTATION && map intermadiate data set
-locality_aware_link_reduce:
-	/*if core.Config.BACKUP_MASTER {
-		masterControl.State = core.LOCALITY_AWARE_LINK_REDUCE
-		<-masterControl.StateChan //TODO MASTER BACKUP OFF TEST
-		masterControl.StateChan <- core.LOCALITY_AWARE_LINK_REDUCE
-		err := backUpMasterState(masterControl, uploader)
-		if core.CheckErr(err, false, "") {
-			_, _ = fmt.Fprint(os.Stderr, "MASTER STATE BACKUP FAILED, ABORTING")
-			killAll(&masterControl.Workers)
-		}
-	}*/
-	startTime = time.Now()
 	masterControl.MasterData.ReducerRoutingInfos = aggregateMappersCosts(masterControl.MasterData.MapResults, &masterControl.Workers)
 	masterControl.MasterData.ReducerSmartBindingsToWorkersID = core.ReducersBindingsLocallityAwareEuristic(masterControl.MasterData.ReducerRoutingInfos.DataRoutingCosts, &masterControl.Workers)
-	////DATA LOCALITY AWARE REDUCER BINDINGS COMMUNICATION
+	//// checkpoint master state
+	if core.Config.BACKUP_MASTER {
+		masterControl.State = core.LOCALITY_AWARE_LINK_REDUCE
+		masterControl.StateChan <- core.LOCALITY_AWARE_LINK_REDUCE
+		backUpMasterState(masterControl, uploader)
+	}
+locality_aware_link_reduce:
+	reduceCallTriggered := false
+	if isReplica {
+		fails := RecoveryReduceResults(masterControl)
+		if !fails {
+			goto finalAggreagate
+		}
+	}
+	startTime = time.Now()
 	/*
 		instantiate logic reducer on actual worker and communicate  these bindings to workers with map instances
 		they will aggregate reduce calls to individual reducers propagating  eventual errors
 	*/
-
-	reduceCallTriggered, errs := comunicateReducersBindings(masterControl, masterControl.MasterData.ReducerSmartBindingsToWorkersID, false) //RPC 4,5 IN SEQ DIAGRAM;
+	////DATA LOCALITY AWARE REDUCER BINDINGS COMMUNICATION
+	reduceCallTriggered, errs = comunicateReducersBindings(masterControl, masterControl.MasterData.ReducerSmartBindingsToWorkersID, false) //RPC 4,5 IN SEQ DIAGRAM;
 	println("elapsed: ", time.Now().Sub(startTime).String())
-
+	if !isReplica {
+		os.Exit(69)
+	}
+checkReduce:
 	if len(errs) > 0 {
-	recoveryReduce:
-		fmt.Fprint(os.Stderr, "FAIL DURING REDUCE PHASE, reduceTriggered: ", reduceCallTriggered)
+		_, _ = fmt.Fprint(os.Stderr, "FAIL DURING REDUCE PHASE, reduceTriggered: ", reduceCallTriggered)
 		//set up list for failed instances inside failed workers (mapper & reducer)
-		moreFails := core.PingProbeAlivenessFilter(masterControl) //filter in place failed workers
+		moreFails := core.PingProbeAlivenessFilter(masterControl, false) //filter in place failed workers
 		if len(masterControl.WorkersAll) < core.Config.MIN_WORKERS_NUM {
 			_, _ = fmt.Fprint(os.Stderr, "TOO MUCH WORKER FAILS... ABORTING COMPUTATION..")
+			killAll(&masterControl.Workers)
 			os.Exit(96)
 		}
 		mapToRedo, reduceToRedo := core.ParseReduceErrString(errs, &masterControl.MasterData, moreFails)
 		///MAPS REDO
 		if len(mapToRedo) > 0 {
-			reassignementResult := MapPhaseRecovery(masterControl, mapToRedo)
+			reassignementResult := MapPhaseRecovery(masterControl, mapToRedo, uploader)
 			if !reassignementResult {
 				if core.Config.FAIL_RETRY > 0 {
 					core.Config.FAIL_RETRY--
 					println("RETRY...")
-					goto recoveryReduce
+					goto checkReduce
 				}
 				killAll(&masterControl.Workers)
 				os.Exit(96)
@@ -223,21 +223,28 @@ locality_aware_link_reduce:
 			_ = ReducersReplacementRecovery(reduceToRedo, masterControl.MasterData.ReducerSmartBindingsToWorkersID, &masterControl.Workers)
 			//re notify mappers reducer placement
 		}
+		if core.Config.BACKUP_MASTER {
+
+			backUpMasterState(masterControl, uploader) //checkpoint new reducer bindings
+		}
 		_, errs = comunicateReducersBindings(masterControl, masterControl.MasterData.ReducerSmartBindingsToWorkersID, reduceCallTriggered)
 		if len(errs) > 0 {
 			_, _ = fmt.Fprintf(os.Stderr, "error on map RE reduce comunication")
 			if core.Config.FAIL_RETRY > 0 {
 				core.Config.FAIL_RETRY--
 				println("RETRY...")
-				goto recoveryReduce
+				goto checkReduce
 			}
+			killAll(&masterControl.Workers)
 			panic("")
-			//killAll(&masterControl.Workers)
 			os.Exit(96)
 		}
+	} //checkpoint avoided here because of reduce link comunication return when mappers already called REDUCE
+	err = jobsEnd(masterControl) //wait all reduces END then, kill all workers
+	if err {
+		goto locality_aware_link_reduce
 	}
-	// will be triggered in 6
-	jobsEnd(masterControl) //wait all reduces END then, kill all workers
+finalAggreagate:
 	if core.Config.SORT_FINAL {
 		tk := core.TokenSorter{masterControl.MasterRpc.FinalTokens}
 		sort.Sort(sort.Reverse(tk))
@@ -245,6 +252,19 @@ locality_aware_link_reduce:
 	core.SerializeToFile(masterControl.MasterRpc.FinalTokens, core.FINAL_TOKEN_FILENAME)
 	println(masterControl.MasterRpc.FinalTokens)
 	os.Exit(0)
+}
+
+func filterFoundamentalMapResult(mapResults []core.MapWorkerArgsWrap, filterWorkersResults map[int][]int) []core.MapWorkerArgsWrap {
+	//among all map result filter away replication results for locality aware placement
+	//filterWorkersResults equally to the individual and unique chunk share assigned to workers
+	filteredMapResult := make([]core.MapWorkerArgsWrap, 0, len(mapResults))
+	for _, mapRes := range mapResults {
+		_, isWorkerFoundamental := filterWorkersResults[mapRes.WorkerId]
+		if isWorkerFoundamental {
+			filteredMapResult = append(filteredMapResult, mapRes)
+		}
+	}
+	return filteredMapResult
 }
 
 func checkMapRes(control *core.MASTER_CONTROL) {
@@ -288,7 +308,7 @@ func masterRpcInit() *core.MasterRpc {
 	reducerEndChan := make(chan bool, core.Config.ISTANCES_NUM_REDUCE) //buffer all reducers return flags for later check (avoid block during rpc return )
 	master := core.MasterRpc{
 		FinalTokens:     make([]core.Token, 0, INIT_FINAL_TOKEN_SIZE),
-		Mutex:           core.MUTEX{},
+		Mutex:           sync.Mutex{},
 		ReturnedReducer: &reducerEndChan,
 	}
 	server := rpc.NewServer()
@@ -403,12 +423,14 @@ func comunicateChunksAssignementToWorkers(assignementChunkWorkers map[int][]int,
 	return errs
 }
 
-func assignMapJobsWithRedundancy(data *core.MASTER_STATE_DATA, workers *core.WorkersKinds, chunkShare map[int][]int) ([]core.MapWorkerArgsWrap, bool) {
+func assignMapJobsWithRedundancy(data *core.MASTER_STATE_DATA, workers *core.WorkersKinds, chunkShare map[int][]int, chunkFairShare map[int][]int) ([]core.MapWorkerArgsWrap, bool) {
 	/*
-		assign MAP input data (chunks) to designed workers that will trigger several concurrent MAP execution
-		intermediate tokens data buffered inside workers and routing cost of data to reducers (logic) returned aggregated at worker node level
-		that reflect data locality of interm.data over workers,
-		if newChunks is not nil it will be used to filter appended chunk data to map request to workers (
+		trigger map operation over chunk share per worker
+		chunkShare is a per worker chunks share including a configurable ammount of replication
+		chunkFairShare is individual per worker chunks share with no replication (used only for the return)
+		each worker will execute MAP logic over each chunk and will aggregate routing cost of chunk related to chunkFairShare
+		routing cost of intermediate data to reducers reflect data locality among workers and will be exploited for smart placement of reducers
+		maximizing data locality already present on destination node in next phase
 	*/
 	hasErrd := false
 	mapRpcWrap := make([]core.MapWorkerArgsWrap, 0, len(chunkShare))
@@ -416,7 +438,8 @@ func assignMapJobsWithRedundancy(data *core.MASTER_STATE_DATA, workers *core.Wor
 	for workerId, chunkIDs := range chunkShare {
 		workerMapJobs := core.MapWorkerArgsWrap{
 			MapJobArgs: core.MapWorkerArgs{
-				ChunkIds: chunkIDs,
+				ChunkIds:          chunkIDs,
+				ChunkIdsFairShare: chunkFairShare[workerId],
 			},
 			WorkerId: workerId,
 			Err:      nil,
@@ -437,17 +460,16 @@ func assignMapJobsWithRedundancy(data *core.MASTER_STATE_DATA, workers *core.Wor
 	for i := 0; i < len(mapRpcWrap); i++ {
 		workerPntr := core.GetWorker(mapRpcWrap[i].WorkerId, workers, true)
 		//async start map
-		core.GenericPrint(mapRpcWrap[i].MapJobArgs.ChunkIds, "assigning map jobs to worker"+strconv.Itoa(mapRpcWrap[i].WorkerId)+"\t"+strconv.Itoa(workerPntr.State.ControlRPCInstance.Port))
+		core.GenericPrint(mapRpcWrap[i].MapJobArgs.ChunkIds, "assigning map jobs to worker"+strconv.Itoa(mapRpcWrap[i].WorkerId)+"\t"+workerPntr.Address+" : "+strconv.Itoa(workerPntr.State.ControlRPCInstance.Port))
 		mapRpcWrap[i].End = (*rpc.Client)(workerPntr.State.ControlRPCInstance.Client).Go("CONTROL.AssignMaps", mapRpcWrap[i].MapJobArgs, &(mapRpcWrap[i].Reply), nil)
 	}
 	for i := 0; i < len(mapRpcWrap); i++ {
 		<-mapRpcWrap[i].End.Done
 		err := mapRpcWrap[i].End.Error
-		if core.CheckErr(err, false, "error on workerMap:"+strconv.Itoa(mapRpcWrap[i].WorkerId)) {
+		if core.CheckErr(err, false, "error on worker :"+strconv.Itoa(mapRpcWrap[i].WorkerId)) {
 			mapRpcWrap[i].Err = err
 			hasErrd = true
 			(core.GetWorker(mapRpcWrap[i].WorkerId, workers, true)).State.Failed = true
-
 		}
 	}
 	return mapRpcWrap, hasErrd
@@ -499,7 +521,7 @@ func comunicateReducersBindings(control *core.MASTER_CONTROL, reducersBindings m
 			LogicID:   reducerIdLogic,
 		}
 		err := (*rpc.Client)(worker.State.ControlRPCInstance.Client).Call("CONTROL.ActivateNewReducer", arg, &redNewInstancePort)
-		if core.CheckErr(err, false, "instantiating reducer: "+strconv.Itoa(reducerIdLogic)) {
+		if core.CheckErr(err, false, "instantiating reducer: "+strconv.Itoa(reducerIdLogic)+"\t at; \t"+worker.Address) {
 			worker.State.Failed = true
 			errs = append(errs, errors.New(core.REDUCER_ACTIVATE+core.ERROR_SEPARATOR+strconv.Itoa(reducerIdLogic)))
 			continue //don't appending failed reducer until activation
@@ -559,13 +581,23 @@ func killAll(workersKinds *core.WorkersKinds) {
 		core.CheckErr(err, false, "error in shutdowning worker: "+strconv.Itoa(worker.Id))
 	}
 }
-func jobsEnd(control *core.MASTER_CONTROL) {
+
+var TIMEOUT = time.Second * 5
+
+func jobsEnd(control *core.MASTER_CONTROL) bool {
 	/*
 		block main thread until REDUCERS workers will comunicate that all REDUCE jobs are ended
+		TODO if timeout expire means all workers has failed and reducer failed with result to send
 	*/
+	println("waiting for reducers ends")
 	for r := 0; r < core.Config.ISTANCES_NUM_REDUCE; r++ {
-		<-*(*control).MasterRpc.ReturnedReducer //wait end of all reducers
+		select {
+		case <-*(*control).MasterRpc.ReturnedReducer: //wait end of all reducers
+		case <-time.After(TIMEOUT):
+			return true
+		}
 		println("ENDED REDUCER!!!", r)
 	}
 	killAll(&(control.Workers))
+	return false
 }

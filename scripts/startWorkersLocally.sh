@@ -3,6 +3,7 @@ killall worker
 cd ..
 if [[ -n "$2" ]]; then
     make worker
+    echo "worker rebuilded"
 fi
 WORKERS_NUM=5
 SLEEP_LOCAL_PORTS_SYNC_SECS=0.2
@@ -14,7 +15,7 @@ else
 fi
 
 for i in $( seq 1  $WORKERS_NUM ); do
-    ../worker/worker &
+    ./worker/worker &
     sleep $SLEEP_LOCAL_PORTS_SYNC_SECS
 done
 echo "started all workers"

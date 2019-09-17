@@ -27,13 +27,6 @@ type WorkersKinds struct { //refs to up&running workers
 	WorkersOnlyReduce []Worker //separated worker for reduce
 	WorkersBackup     []Worker //idle workers for backup
 }
-type CLIENT rpc.Client
-type CHUNKS []CHUNK
-
-func (*CLIENT) GobDecode([]byte) error     { return nil }
-func (*CLIENT) GobEncode() ([]byte, error) { return nil, nil }
-func (CHUNKS) GobDecode([]byte) error      { return nil }
-func (CHUNKS) GobEncode() ([]byte, error)  { return nil, nil }
 
 type Worker struct { //worker istance master side
 	Address         string
@@ -58,6 +51,7 @@ type MapperIstanceStateInternal struct {
 	IntermediateTokens map[string]int //produced by map, routed to Reducer
 	WorkerChunks       *WorkerChunks  //readonly ref to chunks stored in worker that contains this Mapper istance
 	ChunkID            int            //assigned ChunkID unique identifier for a MAPPER work result
+	DestinationCosts   Map2ReduceRouteCost
 }
 
 type ReducerIstanceStateInternal struct {
@@ -66,6 +60,11 @@ type ReducerIstanceStateInternal struct {
 	mutex                        sync.Mutex     //protect cumulative vars from concurrent access
 	MasterClient                 *rpc.Client    //to report back to master final token share of reducer
 	LogicID                      int
+	StateChan                    chan uint32 //to propagate at worker level
+	Server                       *rpc.Server //to propagate at worker level
+	Port                         int
+	MasterAddress                string
+	//to propagate at worker level
 }
 
 type GenericInternalState struct { //worker instance generic internal state ( field to use is discriminable from instance kind filed)
@@ -123,19 +122,22 @@ type Worker_node_internal struct {
 	WorkerChunksStore          WorkerChunks //chunks stored in the worker node
 	IntermediateDataAggregated AggregatedIntermediateTokens
 	MapperInstances            map[int]MapperIstanceStateInternal
-	Instances                  map[int]WorkerInstanceInternal //server for each worker istance Id
+	Instances                  map[int]WorkerInstanceInternal //TODO MAKE REDUCE INSTANCES ONLY
 	ControlRpcInstance         WorkerInstanceInternal         //worker node main control instace ->chunks&&respawn
 	ReducersClients            []*rpc.Client
-	Id                         int
-	PingConnection             net.Conn
-	PingPort                   int
-	Downloader                 *aws_SDK_wrap.DOWNLOADER
-	MasterAddr                 string
-	//////////////// master fault tollerant idempotent
+	Id                         int         //TODO OLD
+	StateChan                  chan uint32 //actual worker state for pong
+
+	PingPort   int
+	Downloader *aws_SDK_wrap.DOWNLOADER
+	MasterAddr string
+	//////////////// master fault tollerant recovery outputs
 	cacheLock   sync.Mutex
-	reduceChace ReduceOutputCache
+	reduceCache ReduceOutputCache
+	mapsCache   Map2ReduceRouteCost
 	///////// local version chan for internal correct termination
-	ExitChan chan bool
+	ExitChan         chan bool
+	ReducerInstances []ReducerIstanceStateInternal
 }
 type WorkerChunks struct { //WORKER NODE LEVEL STRUCT
 	//HOLD chunks stored in worker node pretected by a mutex
@@ -176,6 +178,7 @@ func InitRPCWorkerIstance(initData *GenericInternalState, port int, kind int, wo
 			reducer = &(initData.ReduceData)
 		}
 		err = workerIstanceData.ServerRpc.RegisterName("REDUCE", reducer)
+		go workerIstanceData.ServerRpc.Accept(l)
 		workerIstanceData.IntData.ReduceData = ReducerIstanceStateInternal(*reducer)
 		(*workerNodeInt).Instances[maxId] = workerIstanceData
 	} else if kind == CONTROL { //instances for controlRPCs and ChunksService at workerNodeLevel

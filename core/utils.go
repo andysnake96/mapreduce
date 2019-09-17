@@ -16,6 +16,7 @@ import (
 	"math"
 	"math/rand"
 	"net"
+	"net/rpc"
 	"os"
 	"reflect"
 	"runtime"
@@ -49,6 +50,7 @@ type Configuration struct {
 	REDUCE_SERVICE_BASE_PORT          int
 	MASTER_BASE_PORT                  int
 	PING_SERVICE_BASE_PORT            int
+	PING_MILLISECS_TIMEOUT            int
 	FIXED_PORT                        bool
 	WORKER_REGISTER_SERVICE_BASE_PORT int
 	// main loadBalacing vars
@@ -58,12 +60,16 @@ type Configuration struct {
 	CHUNKS_REPLICATION_FACTOR_BACKUP_WORKERS int
 	CHUNK_SIZE                               int64
 	// AWS
-	LoadChunksToS3          bool
-	S3_REGION               string
-	S3_BUCKET               string
-	FAIL_RETRY              int
-	UPDATE_CONFIGURATION_S3 bool
-	MIN_WORKERS_NUM         int
+	LoadChunksToS3                        bool
+	S3_REGION                             string
+	S3_BUCKET                             string
+	FAIL_RETRY                            int
+	UPDATE_CONFIGURATION_S3               bool
+	MIN_WORKERS_NUM                       int
+	SIMULATE_WORKER_CRUSH_BEFORE_MILLISEC int64
+	SIMULATE_WORKER_CRUSH_AFTER_MILLISEC  int64
+	WORKER_IDLE_WAIT_POLL_MILLISEC        int
+	PING_RETRY                            int
 }
 
 func (config *Configuration) printFields() {
@@ -93,7 +99,7 @@ const (
 	OUTFILENAME            = "finalTokens.txt"
 )
 
-var FILENAMES_LOCL = []string{"txtSrc/1012-0.txt"}
+var FILENAMES_LOCL = []string{"txtSrc/1012-0.txt"} //TODO REMOVE
 
 //errors constant for fault revery
 const ( //errors kinds
@@ -308,9 +314,9 @@ const (
 	LOCALITY_AWARE_LINK_REDUCE
 	ENDED
 )
-const PING_TRY_NUM = 5
+const PING_TRY_NUM = 10
 
-func PingHeartBitRcvMaster(port int, stateChan chan uint32) (net.Conn, error) {
+func PingHeartBitRcv(port int, stateChan chan uint32) (net.Conn, error) {
 	//ping receve and reply service under port implemented with ping/pong of 1 byte readed/written by a routine
 	//stopPing has to be a initiated and 1 buffered channel for non blocking read
 	//return the listen udp connection to caller or error
@@ -318,15 +324,14 @@ func PingHeartBitRcvMaster(port int, stateChan chan uint32) (net.Conn, error) {
 		Port: port,
 		IP:   net.ParseIP("0.0.0.0"),
 	})
-	if CheckErr(err, false, "ping rcv error") {
+	if CheckErr(err, false, "ping listening error") {
 		return conn, err
 	}
 	message := make([]byte, PING_LEN)
-	masterDead := false
 	var state uint32
 	/// go ping reaceiver rountine
 	go func() {
-		for masterDead {
+		for {
 			_, remoteAddr, err := conn.ReadFromUDP(message) //PING
 			if CheckErr(err, false, "udp read err") {
 				break
@@ -335,18 +340,23 @@ func PingHeartBitRcvMaster(port int, stateChan chan uint32) (net.Conn, error) {
 			if len(stateChan) > 0 {
 				state = <-stateChan //unblocking chan read
 			}
+			if state == ENDED {
+				_ = conn.Close()
+				runtime.Goexit()
+			}
 			binary.BigEndian.PutUint32(message, state)
+			println("sending state :", state)
 			_, err = conn.WriteToUDP(message, remoteAddr) //PONG
 			if CheckErr(err, false, "udp write err") {
 				break
 			}
 		}
 	}()
-	_ = conn.Close()
+
 	return nil, nil
 }
 
-func PingHeartBitRcv(port int, stopPing chan bool) (net.Conn, error) {
+/*func PingHeartBitRcv(port int, stopPing chan bool) (net.Conn, error) {
 	//ping receve and reply service under port implemented with ping/pong of 1 byte readed/written by a routine
 	//stopPing has to be a initiated and 1 buffered channel for non blocking read
 	//return the listen udp connection to caller or error
@@ -382,7 +392,7 @@ func PingHeartBitRcv(port int, stopPing chan bool) (net.Conn, error) {
 	}()
 	return conn, nil
 }
-
+*/
 func PingHeartBitSnd(addr string) (error, uint32) {
 	//ping host at addr with 1byte ping msg waiting for a pongBuf or a timeout expire
 	//fixed num of trys performed
@@ -414,16 +424,15 @@ func PingHeartBitSnd(addr string) (error, uint32) {
 	binary.BigEndian.PutUint32(ping, PING)
 	myEndianess := GetEndianess()
 	socketFail := true
-	err = udpConn.SetReadDeadline(time.Now().Add(timeout))
-	CheckErr(err, true, "set deadline to ping socket error")
-	/// fixed num of ping try
-	for i := 0; i < PING_TRY_NUM && socketFail; i++ {
+	for i := 0; i < Config.PING_RETRY && socketFail; i++ { /// for a fixed num of ping try send ping probe
+		err = udpConn.SetReadDeadline(time.Now().Add(timeout))
+		CheckErr(err, true, "set deadline to ping socket error")
 		//// write ping
 		_, err = udpConn.Write(ping) //PING
 		CheckErr(err, true, "udp write ping error")
 		//// read pongBuf converting from netw byte order to host byte order
 		_, err = udpConn.Read(pongBuf) //PONG rcv
-		if CheckErr(err, false, "") {
+		if CheckErr(err, false, "pong read err") {
 			socketFail = true //no error exit ping try loop
 			continue
 		}
@@ -441,11 +450,12 @@ func PingHeartBitSnd(addr string) (error, uint32) {
 	return nil, pong
 }
 
-func PingProbeAlivenessFilter(control *MASTER_CONTROL) map[int]bool {
+func PingProbeAlivenessFilter(control *MASTER_CONTROL, waitIdle bool) map[int]bool {
 	//filter away failed workers;  return map worker_removed_id-->true for each removed worker
+	//probe each worker for aliveness, filter away dead workers
+	//return the ref to workers removed from Workers structs
 	workers := &(control.Workers)
 	failedWorkers := make(map[int]bool, len(control.WorkersAll))
-	//probe each worker for aliveness, filter away dead workers
 	workersKindsNums := map[string]int{
 		WORKERS_MAP_REDUCE: len(workers.WorkersMapReduce), WORKERS_ONLY_REDUCE: len(workers.WorkersOnlyReduce), WORKERS_BACKUP_W: len(workers.WorkersBackup),
 	}
@@ -468,9 +478,16 @@ func PingProbeAlivenessFilter(control *MASTER_CONTROL) map[int]bool {
 				err = errors.New("failed worker")
 				failedWorkers[worker.Id] = true
 			} else {
-				err, _ = PingHeartBitSnd(worker.Address + ":" + strconv.Itoa(worker.PingServicePort))
-				if err != nil {
+			ping:
+				var pong uint32 = 0
+				err, pong = PingHeartBitSnd(worker.Address + ":" + strconv.Itoa(worker.PingServicePort))
+				if CheckErr(err, false, "ping probe to worker: "+strconv.Itoa(worker.Id)) {
 					failedWorkers[worker.Id] = true
+					continue
+				}
+				if waitIdle && int(pong) != IDLE {
+					time.Sleep(time.Millisecond * time.Duration(Config.WORKER_IDLE_WAIT_POLL_MILLISEC))
+					goto ping
 				}
 			}
 			if err == nil {
@@ -481,6 +498,13 @@ func PingProbeAlivenessFilter(control *MASTER_CONTROL) map[int]bool {
 	}
 	(*control).WorkersAll = append((*workers).WorkersMapReduce, (*workers).WorkersOnlyReduce...)
 	(*control).WorkersAll = append((*control).WorkersAll, (*workers).WorkersBackup...)
+
+	///// fails print
+	failsID := ""
+	for key, _ := range failedWorkers {
+		failsID += strconv.Itoa(key) + "\t"
+	}
+	println("failed worker ID: ", failsID, " residue: ", len((*control).WorkersAll))
 	return failedWorkers
 }
 
@@ -580,9 +604,7 @@ func SerializeMasterStateBase64(m MASTER_CONTROL) string {
 	b := bytes.Buffer{}
 	e := gob.NewEncoder(&b)
 	err := e.Encode(m)
-	if err != nil {
-		fmt.Println(`failed gob Encode`, err)
-	}
+	CheckErr(err, true, "ENCODE ERR")
 	return base64.StdEncoding.EncodeToString(b.Bytes())
 }
 
@@ -590,16 +612,13 @@ func SerializeMasterStateBase64(m MASTER_CONTROL) string {
 func DeSerializeMasterStateBase64(str string) MASTER_CONTROL {
 	out := MASTER_CONTROL{}
 	by, err := base64.StdEncoding.DecodeString(str)
-	if err != nil {
-		fmt.Println(`failed base64 Decode`, err)
-	}
+	CheckErr(err, true, "DESERIALIZE BASE 64 ERR")
 	b := bytes.Buffer{}
 	b.Write(by)
 	d := gob.NewDecoder(&b)
 	err = d.Decode(&out)
-	if err != nil {
-		fmt.Println(`failed gob Decode`, err)
-	}
+	CheckErr(err, true, "DECODE GOB  ERR")
+
 	return out
 }
 func ListOfDictCumulativeSize(dictList []map[int]int) int {
@@ -735,3 +754,16 @@ func MapsEq(map1 map[int]string, map2 map[int]string) bool {
 	}
 	return true
 }
+
+///////////// GOB ENCODER DISABLER FOR MASTER STATE SERIALIZATION
+
+func (*MasterRpc) GobDecode([]byte) error     { return nil }
+func (*MasterRpc) GobEncode() ([]byte, error) { return nil, nil }
+
+type CLIENT rpc.Client
+type CHUNKS []CHUNK
+
+func (*CLIENT) GobDecode([]byte) error     { return nil }
+func (*CLIENT) GobEncode() ([]byte, error) { return nil, nil }
+func (CHUNKS) GobDecode([]byte) error      { return nil }
+func (CHUNKS) GobEncode() ([]byte, error)  { return nil, nil }

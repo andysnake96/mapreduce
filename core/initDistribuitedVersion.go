@@ -28,8 +28,6 @@ type MASTER_CONTROL struct {
 	StateChan chan uint32
 	State     uint32
 	PingConn  net.Conn
-
-	//UploaderState *aws_SDK_wrap.UPLOADER
 }
 
 type MASTER_STATE_DATA struct {
@@ -68,17 +66,19 @@ func Init_distribuited_version(control *MASTER_CONTROL, filenames []string, load
 		barrier.Add(-1)
 	}
 
-	////// sync worker init routines
-	barrier.Wait()
 	if Config.BACKUP_MASTER {
+
 		pingPort := NextUnassignedPort(Config.PING_SERVICE_BASE_PORT, &assignedPorts, true, true, "udp")
-		control.StateChan = make(chan uint32, 1)
-		conn, e := PingHeartBitRcvMaster(pingPort, control.StateChan)
+		control.StateChan = make(chan uint32, 10) //channel to pass current master state to ping answ routine, buffering is to avoid blocking on channel write
+		conn, e := PingHeartBitRcv(pingPort, control.StateChan)
 		if CheckErr(e, false, "PING SERVICE STARTING ERR") {
 			return uploader, assignedPorts, errors.New(e.Error() + err.Error())
 		}
 		control.PingConn = conn
 	}
+	////// sync worker init routines
+	barrier.Wait()
+
 	println("initialization done")
 	return uploader, assignedPorts, err
 }
@@ -187,7 +187,7 @@ func waitWorkersRegister(waitGroup **sync.WaitGroup, control *MASTER_CONTROL, up
 				}
 				continue //some fail in connection estamblish...skip worker
 			}
-			println("connection from worker : ", workerConn.LocalAddr().String(), "<---", workerConn.RemoteAddr().String())
+			//println("connection from worker : ", workerConn.LocalAddr().String(), "<---", workerConn.RemoteAddr().String())
 			workerAddr := strings.Split(workerConn.RemoteAddr().String(), ":")[0]
 			portPing := Config.PING_SERVICE_BASE_PORT
 			portControlRpc := Config.CHUNK_SERVICE_BASE_PORT
@@ -209,7 +209,7 @@ func waitWorkersRegister(waitGroup **sync.WaitGroup, control *MASTER_CONTROL, up
 				portPing, _ = strconv.Atoi(ports[1])
 			}
 			//// init workers connections
-			println("initiating worker with controPort", portControlRpc, "ping port ", portPing)
+			println("initiating worker: ", id, "at: ", workerAddr, " controPort", portControlRpc, "ping port ", portPing)
 			client, err := rpc.Dial(Config.RPC_TYPE, workerAddr+":"+strconv.Itoa(portControlRpc))
 			if CheckErr(err, false, "dialing connected worker errd") {
 				_ = workerConn.Close()
@@ -311,10 +311,7 @@ func InitWorker(worker *Worker_node_internal, stopPingChan chan bool, downloader
 	controlRpcPort := NextUnassignedPort(Config.CHUNK_SERVICE_BASE_PORT, &assignedPorts, true, true, "tcp") //TODO HP AVAIBILITY FOR BASE PORT ASSIGNMENTS
 
 	_, _ = fmt.Fprint(os.Stderr, controlRpcPort, pingPort)
-	pingConn, err := PingHeartBitRcv(pingPort, stopPingChan)
-	if CheckErr(err, false, "worker init distribuited version error") {
-		return assignedPorts, err
-	}
+
 	*worker = Worker_node_internal{
 		WorkerChunksStore: WorkerChunks{
 			Mutex:  sync.Mutex{},
@@ -324,13 +321,18 @@ func InitWorker(worker *Worker_node_internal, stopPingChan chan bool, downloader
 			ChunksSouces:                 make([]int, 0, 5),
 			PerReducerIntermediateTokens: make([]map[string]int, Config.ISTANCES_NUM_REDUCE),
 		},
-		Instances:       make(map[int]WorkerInstanceInternal),
-		MapperInstances: make(map[int]MapperIstanceStateInternal),
-		ReducersClients: make([]*rpc.Client, Config.ISTANCES_NUM_REDUCE),
-		ExitChan:        make(chan bool),
-		PingConnection:  pingConn,
-		PingPort:        pingPort,
-		Downloader:      downloader,
+		Instances:        make(map[int]WorkerInstanceInternal),
+		MapperInstances:  make(map[int]MapperIstanceStateInternal),
+		ReducersClients:  make([]*rpc.Client, Config.ISTANCES_NUM_REDUCE),
+		ReducerInstances: make([]ReducerIstanceStateInternal, 0, Config.ISTANCES_NUM_REDUCE),
+		ExitChan:         make(chan bool),
+		StateChan:        make(chan uint32, 5),
+		PingPort:         pingPort,
+		Downloader:       downloader,
+	}
+	_, err := PingHeartBitRcv(pingPort, worker.StateChan) //heart bit monitoring service, receive end
+	if CheckErr(err, false, "worker init ping service") {
+		return assignedPorts, err
 	}
 	if Config.BACKUP_MASTER {
 		(*worker).cacheLock = sync.Mutex{}

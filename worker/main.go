@@ -27,22 +27,12 @@ instances running on a worker will have an progressive ID starting to first inst
 
 var WorkersNodeInternal_localVersion []core.Worker_node_internal //for each local simulated worker indexed by his own id -> intenal state
 var WorkersNodeInternal core.Worker_node_internal                //worker nod ref distribuited version
-var SIMULATE_WORKER_CRUSH_BEFORE time.Duration = 500 * time.Millisecond
-var SIMULATE_WORKER_CRUSH_AFTER time.Duration = 100 * time.Millisecond
 
 func main() {
 	core.Config = new(core.Configuration)
 	core.ReadConfigFile(core.CONFIGFILEPATH, core.Config)
 	stopPingService := make(chan bool, 1)
 
-	/*if core.Config.LOCAL_VERSION {
-		ChunkIDS := core.LoadChunksStorageService_localMock(core.FILENAMES_LOCL)
-		println(ChunkIDS, "<--- chunkIDS ")
-		core.InitWorkers_LocalMock_WorkerSide(&WorkersNodeInternal_localVersion, stopPingService)
-		syscall.Pause()
-	}*/ //TODO REMOVE
-	//////distribuited  version
-	///s3 links
 	println("usage for non default setting: configFileFromS3, Schedule Random Crush")
 	downloader, _ := aws_SDK_wrap.InitS3Links(core.Config.S3_REGION)
 	if core.Config.UPDATE_CONFIGURATION_S3 { //read config file from S3 on argv flag setted
@@ -87,8 +77,9 @@ const EXIT_FORCED = 556
 
 func simulateWorkerCrush() {
 	///select a random time before simulate worker death
-	killAfterAbout := rand.Int63n(int64(SIMULATE_WORKER_CRUSH_BEFORE))
-	killAfterAbout += int64(SIMULATE_WORKER_CRUSH_AFTER)
+	killAfterAbout := rand.Int63n(int64(time.Millisecond) * core.Config.SIMULATE_WORKER_CRUSH_BEFORE_MILLISEC)
+	killAfterAbout += int64(time.Millisecond) * core.Config.SIMULATE_WORKER_CRUSH_AFTER_MILLISEC
+
 	if killAfterAbout > 1 {
 		time.Sleep(time.Duration(killAfterAbout))
 	}
@@ -167,7 +158,7 @@ func simulateWorkerCrushRandomly(workers []core.Worker_node_internal) {
 		workerUnlucky:=workers[workerUnluckyIndx]
 		go func(workerChosen core.Worker_node_internal){ //async schedule workers kill on new routine
 			///select a random time before simulate worker death
-			killAfterAbout:=rand.Intn(int(SIMULATE_WORKER_CRUSH_BEFORE))
+			killAfterAbout:=rand.Intn(int(SIMULATE_WORKER_CRUSH_BEFORE_MILLISEC))
 			time.Sleep(time.Duration(killAfterAbout))
 			/// on routine resume kill all instances on unlucky worker
 			_ = workerChosen.ControlRpcInstance.ListenerRpc.Close()

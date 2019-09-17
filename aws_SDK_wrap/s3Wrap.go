@@ -15,8 +15,9 @@ import (
 type UPLOADER s3manager.Uploader
 type DOWNLOADER s3manager.Downloader
 
-func (*UPLOADER) GobDecode([]byte) error       { return nil }
-func (*UPLOADER) GobEncode() ([]byte, error)   { return nil, nil }
+func (*UPLOADER) GobDecode([]byte) error     { return nil }
+func (*UPLOADER) GobEncode() ([]byte, error) { return nil, nil }
+
 func (*DOWNLOADER) GobDecode([]byte) error     { return nil }
 func (*DOWNLOADER) GobEncode() ([]byte, error) { return nil, nil }
 
