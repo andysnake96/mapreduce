@@ -276,7 +276,6 @@ func (workerNode *Worker_node_internal) aggregateIntermediateTokens(mapJobs []in
 		if !founded {
 			println("MISSING" + strconv.Itoa(jobID) + "\t" + strconv.Itoa(workerNode.ControlRpcInstance.Port))
 		}
-
 	}
 	if aggreagated != len(mapJobs) {
 		GenericPrint(mapJobs, "PANIC AT \t"+strconv.Itoa(workerNode.ControlRpcInstance.Port))

@@ -359,7 +359,12 @@ func (workerNode *Worker_node_internal) postFailReduce(arg ReduceTriggerArg) []e
 
 	for reducerLogicId, reducerEnds := range ends {
 		for _, end := range reducerEnds {
-			<-end.Done
+			select {
+			case <-end.Done:
+			case <-time.After(TIMEOUT_PER_RPC):
+				end.Error = errors.New("RPC TIMEOUT")
+			}
+
 			if end.Error != nil {
 				errs = append(errs, errors.New(REDUCE_CALL+ERROR_SEPARATOR+strconv.Itoa(reducerLogicId)))
 			}
@@ -399,13 +404,15 @@ func (workerNode *Worker_node_internal) ReducersCollocations(arg ReduceTriggerAr
 		if CheckErr(err, false, "dialing reducer") {
 			hasErrd = true
 			errs = append(*Errs, errors.New(REDUCE_CONNECTION+ERROR_SEPARATOR+strconv.Itoa(reducerId)))
+		} else {
+			println("Set Up Connection to reducer at ", reducerFinalAddress) //clean ext log
 		}
 	}
 	if hasErrd {
 		return errors.New("setUp Clients error")
 	}
 
-	if arg.FailPostPartialReduce {
+	if arg.FailPostPartialReduce { //to avoid eventual I.D. collision use only base data aggregation level
 		errs = workerNode.postFailReduce(arg)
 		if len(errs) > 0 {
 			*Errs = errs
@@ -414,7 +421,7 @@ func (workerNode *Worker_node_internal) ReducersCollocations(arg ReduceTriggerAr
 		return nil
 	}
 
-	///	reduce calls over aggregated intermediate Tokens on newly created reduccers in ReducersAddresses
+	///	reduce calls over aggregated intermediate Tokens on newly created reducers in ReducersAddresses
 	workerNode.aggregateIntermediateTokens(arg.IndividualChunkShare, true)
 	ends := make([]*rpc.Call, 0, len(arg.ReducersAddresses))
 	sourcesChunks := workerNode.IntermediateDataAggregated.ChunksSouces
@@ -434,7 +441,12 @@ func (workerNode *Worker_node_internal) ReducersCollocations(arg ReduceTriggerAr
 	}
 	//GenericPrint(sourcesChunks, "SOURCE CHUNKS SENT TO REDUCERS")
 	for reducerLogicId, end := range ends {
-		<-end.Done
+		select {
+		case <-end.Done:
+		case <-time.After(TIMEOUT_PER_RPC):
+			end.Error = errors.New("RPC TIMEOUT")
+		}
+
 		if end.Error != nil {
 			hasErrd = true
 			errs = append(errs, errors.New(REDUCE_CALL+ERROR_SEPARATOR+strconv.Itoa(reducerLogicId)))
@@ -557,6 +569,7 @@ func (master *MasterRpc) ReturnReduce(FinalTokensPartial map[string]int, VoidRep
 		master.FinalTokens = append(master.FinalTokens, Token{k, v})
 	}
 	*master.ReturnedReducer <- true //notify returned reducer
+	println("Reduce returned, Collected new ", len(FinalTokensPartial), " aggregated tokens")
 	master.Mutex.Unlock()
 	return nil
 }

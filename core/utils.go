@@ -18,6 +18,7 @@ import (
 	"net"
 	"net/rpc"
 	"os"
+	"os/exec"
 	"reflect"
 	"runtime"
 	"strconv"
@@ -34,6 +35,7 @@ type ConfigInterface interface {
 type Configuration struct {
 	SORT_FINAL                 bool //sort final file (extra computation)
 	LOCAL_VERSION              bool //use function for local deply
+	REMOTE_SERVER_PORT_FORWARD bool // worker connection serialized through a remote relay server that will expose ports for master and relay  connection to it
 	SIMULATE_WORKERS_CRUSH     bool
 	SIMULATE_WORKERS_SLOW_DOWN bool
 	SIMULATE_WORKERS_CRUSH_NUM int
@@ -98,8 +100,18 @@ const (
 	ADDRESSES_GEN_FILENAME = "configurations/addresses.json"
 	OUTFILENAME            = "finalTokens.txt"
 )
+const TIMEOUT_PER_RPC time.Duration = time.Second * 11
 
 var FILENAMES_LOCL = []string{"txtSrc/1012-0.txt"} //TODO REMOVE
+func ShellCmdWrapGetIp() string {
+	//get public IP of current node
+	cmd := exec.Command("dig", "+short", "myip.opendns.com", "@resolver1.opendns.com")
+	stdout, err := cmd.Output()
+
+	CheckErr(err, true, "GETTING IP FAILED")
+	return string(stdout[:len(stdout)-1])
+	//return "127.0.0.1"
+}
 
 //errors constant for fault revery
 const ( //errors kinds
@@ -181,7 +193,6 @@ func InitChunks(filenames []string) []CHUNK { //fast concurrent file read for ch
 		eventually the size of the reminder of division for assignment will be assigned to last chunk
 	*/
 	openedFiles := make([]*os.File, len(filenames))
-	fmt.Println("---start chunkization---")
 	filesData := make([]string, len(filenames))
 	barrierRead := new(sync.WaitGroup)
 	barrierRead.Add(len(filenames))
@@ -499,12 +510,15 @@ func PingProbeAlivenessFilter(control *MASTER_CONTROL, waitIdle bool) map[int]bo
 	(*control).WorkersAll = append((*workers).WorkersMapReduce, (*workers).WorkersOnlyReduce...)
 	(*control).WorkersAll = append((*control).WorkersAll, (*workers).WorkersBackup...)
 
+	/*TODO
+	UPDATE IN PLACE WORKERS_FAIR_SHARE HERE
+	*/
 	///// fails print
 	failsID := ""
 	for key, _ := range failedWorkers {
 		failsID += strconv.Itoa(key) + "\t"
 	}
-	println("failed worker ID: ", failsID, " residue: ", len((*control).WorkersAll))
+	log.Println("failed worker ID: ", failsID, " residue: ", len((*control).WorkersAll))
 	return failedWorkers
 }
 

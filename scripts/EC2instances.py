@@ -11,6 +11,18 @@ import sys
 ec2Client=boto3.client("ec2")
 INSTANCE_CHECK_POLLING_TIME=10
 EC2_RUNNING_CODE=16
+def startInstancePortRelay():
+    #start port forward relay
+    launchTemplate= LaunchTemplate={
+        'LaunchTemplateName': 'port_forward_relay_server',
+        'Version': '6'
+    }
+    response=ec2Client.run_instances(MaxCount=1,MinCount=1,LaunchTemplate=launchTemplate)
+    instancesIds=list()
+    for instance in response["Instances"]:
+        instancesIds.append(instance["InstanceId"])
+    return instancesIds
+
 def startInstances(num):
     #start num ec2 instances
     launchTemplate= LaunchTemplate={
@@ -48,11 +60,13 @@ def waitForReadyInstances(instancesId):
         time.sleep(INSTANCE_CHECK_POLLING_TIME)
     return readyInstancesHostNames
 
-def _killRunningInstances():
-    resp=    ec2Client.describe_instances(InstanceIds=instancesId)
-    instances=    resp["Reservations"][0]["Instances"]
-    #for instance in instances:
-    #    if  instance["State"]["Code"]==EC2_RUNNING_CODE:
+def killInstances(hostnames):
+    ec2 = boto3.resource('ec2')
+    instances=list(ec2.instances.filter(Filters=[{'Name': 'instance-state-name', 'Values': ['running']}]).all())
+    for i in instances:
+        for hn in hostnames:
+            if i.public_dns_name==hn :
+                i.terminate()
 
 def killRunningInstances():
     ec2 = boto3.resource('ec2')
@@ -63,10 +77,17 @@ def killRunningInstances():
 
 if __name__=="__main__":
     instanceNum=1
-
     if len(sys.argv)>1:
+        if sys.argv[1]=="terminate_instances":
+            killInstances(sys.argv[2:])
+            exit()
         if sys.argv[1]=="terminate":
             killRunningInstances()
+            exit()
+        if sys.argv[1]=="relay":
+            instances=startInstancePortRelay()
+            hostNames=waitForReadyInstances(instances)
+            print(hostNames[0])
             exit()
         instanceNum=int(sys.argv[1])
     instances=startInstances(instanceNum)

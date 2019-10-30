@@ -1,7 +1,6 @@
 package core
 
 import (
-	"fmt"
 	"sort"
 	"strconv"
 )
@@ -52,7 +51,7 @@ func ReducersBindingsLocallityAwareEuristic(reducersIdsTrafficIN ReducersDataRou
 			workerNode := GetWorker(record.WorkerID, workers, true)
 			if workerHostingReducers[record.WorkerID] <= Config.MAX_REDUCERS_PER_WORKER { //NOT TOO MUCH CONTRACTION ON SAME WORKER
 				reducersBindings[record.ReducerID] = workerNode.Id //CONTRACT  edge
-				fmt.Printf("contracted ", record.ReducerID, "-->", workerNode.Id)
+				println("contracted ", record.ReducerID, "-->", workerNode.Id)
 				contractedR++
 				workerHostingReducers[record.WorkerID]++
 			}

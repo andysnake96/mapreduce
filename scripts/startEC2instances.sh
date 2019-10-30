@@ -22,11 +22,33 @@ echo -e "\tterminate -> kill all running ec2 instances"
 
 if [[ $1 == "spawn" ]]; then
     spawn_terminals_ssh_to_ec2_instances $2
+elif [[ $1 == "relay" ]]; then
+    relayHostName="$(python3 $BOTO3_WRAP_PYTHON_FILENAME relay)"
+    echo "RELAY_ACTIVATION_SSH_CMD_COMPLD"
+    echo "ssh -fNTR 6000:localhost:6000 ec2-user@$relayHostName -i $PK_PATH"
+    echo "ssh -fNTR 6666:localhost:6666 ec2-user@$relayHostName -i $PK_PATH"
+    echo "ssh -fNTR 5555:localhost:5555 ec2-user@$relayHostName -i $PK_PATH"
+    sleep 5
+    ssh -o "StrictHostKeyChecking no " -fNTR 6000:localhost:6000 ec2-user@$relayHostName -i $PK_PATH
+    ssh -o "StrictHostKeyChecking no " -fNTR 6666:localhost:6666 ec2-user@$relayHostName -i $PK_PATH
+    ssh -o "StrictHostKeyChecking no " -fNTR 5555:localhost:5555 ec2-user@$relayHostName -i $PK_PATH
+
+elif [[ $1 == "terminate_instances" ]]; then
+    python3 $BOTO3_WRAP_PYTHON_FILENAME "terminate_instances" $(cat ${INSTANCES_HN_FILENAME} | xargs -d "\n")
+    rm ${INSTANCES_HN_FILENAME}
 elif [[ $1 == "terminate" ]]; then
     python3 $BOTO3_WRAP_PYTHON_FILENAME "terminate"
+    rm ${INSTANCES_HN_FILENAME}
+elif [[ $1 == "get_hostnames" ]]; then
+    aws ec2 describe-instances | grep -Eo "ec2.*com" | uniq > ${INSTANCES_HN_FILENAME}
+elif [[ $1 == "terminate_shells" ]]; then
+    sudo killall xfce4-terminal
 elif [[ $1 == "restart" ]]; then
+     aws s3 rm s3://mapreducechunks/ --recursive --exclude "*" --include "log*"
      for hostname in $(cat ${INSTANCES_HN_FILENAME} );do
-        nc ${hostname} ${RESTART_PORT} -q 0 < $INSTANCES_HN_FILENAME
+        #nc ${hostname} ${RESTART_PORT} -q 0 < $INSTANCES_HN_FILENAME
+        nc ${hostname} ${RESTART_PORT} -q 0  < /dev/null
+	echo $?
     done
 elif [[ $1 == "clean-logs" ]]; then
     aws s3 rm s3://mapreducechunks/ --recursive --exclude "*" --include "log*"

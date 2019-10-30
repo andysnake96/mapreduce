@@ -2,6 +2,7 @@ package core
 
 import (
 	"../aws_SDK_wrap"
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
@@ -67,7 +68,6 @@ func Init_distribuited_version(control *MASTER_CONTROL, filenames []string, load
 	}
 
 	if Config.BACKUP_MASTER {
-
 		pingPort := NextUnassignedPort(Config.PING_SERVICE_BASE_PORT, &assignedPorts, true, true, "udp")
 		control.StateChan = make(chan uint32, 10) //channel to pass current master state to ping answ routine, buffering is to avoid blocking on channel write
 		conn, e := PingHeartBitRcv(pingPort, control.StateChan)
@@ -79,7 +79,7 @@ func Init_distribuited_version(control *MASTER_CONTROL, filenames []string, load
 	////// sync worker init routines
 	barrier.Wait()
 
-	println("initialization done")
+	println("initialization done\n\n")
 	return uploader, assignedPorts, err
 }
 
@@ -124,7 +124,8 @@ func BuildSequentialIDsListUpTo(maxID int) []int {
 	return list
 }
 
-const WORKER_REGISTER_TIMEOUT time.Duration = 200 * time.Second
+const WORKERS_REGISTER_TIMEOUT time.Duration = 200 * time.Second
+const WORKER_DIAL_TIMEOUT time.Duration = 5 * time.Second
 
 func waitWorkersRegister(waitGroup **sync.WaitGroup, control *MASTER_CONTROL, uploader *aws_SDK_wrap.UPLOADER) error {
 	//setup worker register service tcp port at master
@@ -140,30 +141,38 @@ func waitWorkersRegister(waitGroup **sync.WaitGroup, control *MASTER_CONTROL, up
 		return err
 	}
 	///////publish master address to workers
-	println("uploading master registration addresse: ", conn.Addr().String())
-	if (*control).MasterAddress != "" {
+	if (*control).MasterAddress != "" && (*control).MasterAddress != "0" {
 		masterRegServiceAddr := (*control).MasterAddress + ":" + strconv.Itoa(port)
 		err = aws_SDK_wrap.UploadDATA(uploader, masterRegServiceAddr, MASTER_ADDRESS_PUBLISH_S3_KEY, Config.S3_BUCKET)
 		if CheckErr(err, false, "") {
 			return err
 		}
+		println("uploaded master registration addresse: ", masterRegServiceAddr)
 	}
 
 	workers := WorkersKinds{
 		WorkersMapReduce:  make([]Worker, 0, Config.WORKER_NUM_MAP),
 		WorkersOnlyReduce: make([]Worker, 0, Config.WORKER_NUM_ONLY_REDUCE),
 		WorkersBackup:     make([]Worker, 0, Config.WORKER_NUM_BACKUP_WORKER),
+		//// aggreagate worker registration
 	}
-	//// aggreagate worker registration with 2! for
+
+	var workerConn *net.TCPConn = nil
+	var connBuffered *bufio.Reader = nil //used only in relay server version
+
 	workersKindsNums := map[string]int{
 		WORKERS_MAP_REDUCE: Config.WORKER_NUM_MAP, WORKERS_ONLY_REDUCE: Config.WORKER_NUM_ONLY_REDUCE, WORKERS_BACKUP_W: Config.WORKER_NUM_BACKUP_WORKER,
+		//taking worker kind addresses list
+		//WAIT WORKERS TO REGISTER TO COMUNICATED MASTER ADDRESS EXTRACTING ADDRESS FROM PROBE SYNs
+		//println("connection from worker : ", workerConn.LocalAddr().String(), "<---", workerConn.RemoteAddr().String())
 	}
 	var destWorkersContainer *[]Worker //dest variable for workers to init
 	id := 0                            //worker id
+	var workerAddr string
 
 	for workerKind, numToInit := range workersKindsNums {
+
 		println("initiating: ", numToInit, "of workers kind: ", workerKind)
-		//taking worker kind addresses list
 		if workerKind == WORKERS_MAP_REDUCE {
 			destWorkersContainer = &(workers.WorkersMapReduce)
 		} else if workerKind == WORKERS_ONLY_REDUCE {
@@ -172,49 +181,84 @@ func waitWorkersRegister(waitGroup **sync.WaitGroup, control *MASTER_CONTROL, up
 			destWorkersContainer = &(workers.WorkersBackup)
 		}
 		for i := 0; i < numToInit; i++ {
-			//WAIT WORKERS TO REGISTER TO COMUNICATED MASTER ADDRESS EXTRACTING ADDRESS FROM PROBE SYNs
-			workerConn, err := conn.AcceptTCP()
-			if id == 0 {
-				//set timeout to conn only 1 time after first succesfully connection (assuming at least 1 worker will register)
-				err = conn.SetDeadline(time.Now().Add(WORKER_REGISTER_TIMEOUT))
+			portBuf := make([]byte, len("6666;7777"))
+			if Config.REMOTE_SERVER_PORT_FORWARD { //get worker addresses to estamblish rpc connection over a relay connection to unnatted server
+				if workerConn == nil || true { //init relay connection only first time, done here to avoid another if above
+					workerConn, err = conn.AcceptTCP()
+					if CheckErr(err, false, "invalid connection from local proxy of relay server") {
+						goto exit
+					}
+					connBuffered = bufio.NewReaderSize(workerConn, len("100.100.100.100:6666;7777- "))
+				}
+				line, isPrefix, err := connBuffered.ReadLine()
+				if isPrefix || CheckErr(err, false, "reading line from relay connection") {
+					return err
+				}
+				ip_port_raw := strings.Split(string(line), ADDR_SEPARATOR)
+				workerAddr = ip_port_raw[0]
+				if !Config.FIXED_PORT && len(ip_port_raw) == 2 {
+					portBuf = []byte(ip_port_raw[1])
+				}
+			} else {
+				workerConn, err = conn.AcceptTCP() //else init new connection for each worker (unnatted master)
+				if CheckErr(err, false, "worker connection error") {
+					if err, ok := err.(*net.OpError); ok && err.Timeout() {
+						println("time out")
+						goto exit //timeout=> no more worker to accept
+					}
+					continue //some fail in connection estamblish...skip worker
+				}
+				workerAddr = strings.Split(workerConn.RemoteAddr().String(), ":")[0]
+			}
+			if id == 0 { //set timeout to conn only 1 time after first succesfully connection (assuming at least 1 worker will register)
+				err = conn.SetDeadline(time.Now().Add(WORKERS_REGISTER_TIMEOUT))
 				CheckErr(err, true, "connection timeout err")
 			}
 
-			if CheckErr(err, false, "worker connection error") {
-				if err, ok := err.(*net.OpError); ok && err.Timeout() {
-					println("time out")
-					goto exit //timeout=> no more worker to accept
-				}
-				continue //some fail in connection estamblish...skip worker
-			}
-			//println("connection from worker : ", workerConn.LocalAddr().String(), "<---", workerConn.RemoteAddr().String())
-			workerAddr := strings.Split(workerConn.RemoteAddr().String(), ":")[0]
 			portPing := Config.PING_SERVICE_BASE_PORT
 			portControlRpc := Config.CHUNK_SERVICE_BASE_PORT
 			if !Config.FIXED_PORT {
-				portBuf := make([]byte, len("6666;7777"))
-				readed := 0
-				rd := 0
-				lastReaded := ""
-				for readed < len(portBuf) && err != io.EOF && lastReaded != PORT_TERMINATOR {
-					rd, err = workerConn.Read(portBuf[readed:])
-					if err != io.EOF && CheckErr(err, false, "WORKER INIT ERROR") {
-						return err
+				if !Config.REMOTE_SERVER_PORT_FORWARD {
+					//TODO SAME CODE CAN BE APPLIED IF WORKER ALWAYS SEND REGISTRATION WITH NEWLINES
+					readed := 0
+					rd := 0
+					lastReaded := ""
+					for readed < len(portBuf) && err != io.EOF && lastReaded != PORT_TERMINATOR {
+						rd, err = workerConn.Read(portBuf[readed:])
+						if err != io.EOF && CheckErr(err, false, "WORKER INIT ERROR") {
+							return err
+						}
+						readed += rd
+						lastReaded = string(portBuf[readed-1])
 					}
-					readed += rd
-					lastReaded = string(portBuf[readed-1])
+				} else {
+					portBuf = portBuf[:len(portBuf)-1] //remove explicitly terminator in remote rely server case
 				}
 				ports := strings.Split(string(portBuf), PORT_SEPARATOR)
 				portControlRpc, _ = strconv.Atoi(ports[0])
 				portPing, _ = strconv.Atoi(ports[1])
 			}
-			//// init workers connections
-			println("initiating worker: ", id, "at: ", workerAddr, " controPort", portControlRpc, "ping port ", portPing)
-			client, err := rpc.Dial(Config.RPC_TYPE, workerAddr+":"+strconv.Itoa(portControlRpc))
+			//// init workers tcp rpc connections with timeout
+			rpcClientChan := make(chan *rpc.Client, 1)
+			go func() {
+				cli, err := rpc.Dial(Config.RPC_TYPE, workerAddr+":"+strconv.Itoa(portControlRpc))
+				if !CheckErr(err, false, "Dial worker at "+workerAddr) {
+					rpcClientChan <- cli
+				}
+			}()
+			var client *rpc.Client
+			select {
+			case client = <-rpcClientChan:
+			case <-time.After(WORKER_DIAL_TIMEOUT):
+				err = errors.New("DIAL TIMEDOUT FOR WORKER AT " + workerAddr)
+			}
 			if CheckErr(err, false, "dialing connected worker errd") {
-				_ = workerConn.Close()
+				if !Config.REMOTE_SERVER_PORT_FORWARD || true {
+					_ = workerConn.Close()
+				}
 				continue
 			}
+			println("Connected to Worker:", id, "at: ", workerAddr, "controPort", portControlRpc, "ping port", portPing)
 			newWorker := Worker{
 				Address:         workerAddr,
 				PingServicePort: portPing,
@@ -230,7 +274,9 @@ func waitWorkersRegister(waitGroup **sync.WaitGroup, control *MASTER_CONTROL, up
 				},
 			}
 			*destWorkersContainer = append(*destWorkersContainer, newWorker)
-			_ = workerConn.Close()
+			if !Config.REMOTE_SERVER_PORT_FORWARD {
+				_ = workerConn.Close()
+			}
 			id++
 		}
 	}
@@ -300,6 +346,7 @@ func CheckAndSolveInitErr(workersKinds *WorkersKinds) bool {
 }
 
 ////////// WORKER SIDE
+const ADDR_SEPARATOR = ":"  // for flexible port assignement worker will comunicate during registration CONTROL_RPC_PORT;PING_SERVICE_PORT
 const PORT_SEPARATOR = ";"  // for flexible port assignement worker will comunicate during registration CONTROL_RPC_PORT;PING_SERVICE_PORT
 const PORT_TERMINATOR = "-" // for flexible port assignement worker will comunicate during registration CONTROL_RPC_PORT;PING_SERVICE_PORT
 
@@ -345,7 +392,7 @@ func InitWorker(worker *Worker_node_internal, stopPingChan chan bool, downloader
 }
 
 const masterADDR_PUBLIC = "37.116.178.139:6000"
-const masterADDR_LOCAL = "192.168.1.96:6000"
+const masterADDR_LOCAL = "127.0.0.1:6000"
 
 func RegisterToMaster(downloader *aws_SDK_wrap.DOWNLOADER, portsComunication string) (string, error) {
 	//get master published address from s3

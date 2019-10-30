@@ -4,6 +4,7 @@ import (
 	"../aws_SDK_wrap"
 	"../core"
 	"fmt"
+	"log"
 	"math/rand"
 	"os"
 	"reflect"
@@ -29,10 +30,12 @@ var WorkersNodeInternal_localVersion []core.Worker_node_internal //for each loca
 var WorkersNodeInternal core.Worker_node_internal                //worker nod ref distribuited version
 
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	core.Config = new(core.Configuration)
 	core.ReadConfigFile(core.CONFIGFILEPATH, core.Config)
 	stopPingService := make(chan bool, 1)
-
+	myIp := core.ShellCmdWrapGetIp()
+	println(myIp, "\t", core.Config.REMOTE_SERVER_PORT_FORWARD)
 	println("usage for non default setting: configFileFromS3, Schedule Random Crush")
 	downloader, _ := aws_SDK_wrap.InitS3Links(core.Config.S3_REGION)
 	if core.Config.UPDATE_CONFIGURATION_S3 { //read config file from S3 on argv flag setted
@@ -46,11 +49,14 @@ func main() {
 	assignedPorts, err := core.InitWorker(&WorkersNodeInternal, stopPingService, downloader)
 	core.GenericPrint(assignedPorts, "")
 	core.CheckErr(err, true, "worker init error")
-	portToComunicate := ""
+	addressesToComunicate := ""
 	if !core.Config.FIXED_PORT {
-		portToComunicate = strconv.Itoa(WorkersNodeInternal.ControlRpcInstance.Port) + core.PORT_SEPARATOR + strconv.Itoa(WorkersNodeInternal.PingPort) + core.PORT_TERMINATOR
+		addressesToComunicate = strconv.Itoa(WorkersNodeInternal.ControlRpcInstance.Port) + core.PORT_SEPARATOR + strconv.Itoa(WorkersNodeInternal.PingPort) + core.PORT_TERMINATOR
+		if core.Config.REMOTE_SERVER_PORT_FORWARD {
+			addressesToComunicate = myIp + core.ADDR_SEPARATOR + strconv.Itoa(WorkersNodeInternal.ControlRpcInstance.Port) + core.PORT_SEPARATOR + strconv.Itoa(WorkersNodeInternal.PingPort) + core.PORT_TERMINATOR + "\n"
+		}
 	}
-	masterAddr, err := core.RegisterToMaster(downloader, portToComunicate)
+	masterAddr, err := core.RegisterToMaster(downloader, addressesToComunicate)
 	core.CheckErr(err, true, "master register err")
 	WorkersNodeInternal.MasterAddr = masterAddr
 
@@ -69,7 +75,7 @@ func main() {
 	if core.Config.SIMULATE_WORKERS_CRUSH && isUnluckyWorker {
 		simulateWorkerCrush()
 	}
-	waitWorkerEnd(stopPingService)
+	waitEndMR(stopPingService)
 	os.Exit(0)
 }
 
@@ -92,7 +98,7 @@ func simulateWorkerCrush() {
 	os.Exit(EXIT_FORCED)
 }
 
-func waitWorkerEnd(stopPing chan bool) { //// distribuited version
+func waitEndMR(stopPing chan bool) { //// wait end of Map Reduce
 	<-WorkersNodeInternal.ExitChan ///wait worker end setted by the master
 	_ = WorkersNodeInternal.ControlRpcInstance.ListenerRpc.Close()
 	//for _, instance := range WorkersNodeInternal.Instances {
