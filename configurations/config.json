@@ -7,7 +7,7 @@
 	"SIMULATE_WORKERS_SLOW_DOWN": 					true,
 	"BACKUP_MASTER": 						false,
 	"SIMULATE_WORKERS_CRUSH_NUM": 					3,
-	"FAIL_RETRY": 							1,
+	"FAIL_RETRY": 							3,
 	"FIXED_PORT": 							false,
 	"LoadChunksToS3": 						false,
 	"CHUNK_SIZE": 							32768,

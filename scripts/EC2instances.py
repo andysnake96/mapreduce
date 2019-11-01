@@ -27,7 +27,8 @@ def startInstances(num):
     #start num ec2 instances
     launchTemplate= LaunchTemplate={
         'LaunchTemplateName': 'EC2-INIT-S3DOWN-SCRIPT',
-        'Version': '1'
+        #'Version': '1'
+        'Version': '3'
     }
     response=ec2Client.run_instances(MaxCount=num,MinCount=num,LaunchTemplate=launchTemplate)
     instancesIds=list()

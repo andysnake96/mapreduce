@@ -6,6 +6,11 @@ if [[ $1 == "upload" ]];then
 fi
 sudo yum install -y golang  htop
 GET_CODE_WITH_S3=1
+RESTART_PORT=4444 #message on this port on worker node cause restarting of worker
+#not sync restart simulation
+RAND_SLEEP_ON_RESTART=1
+MAXSLEEPTIME=5
+MAXSLEEPTIMESUBSEC=9696069
 if [[ $GET_CODE_WITH_S3 == 1 ]];then
     aws s3 cp  s3://mapreducechunks/tmpDump.zip tmpDump.zip
     unzip tmpDump.zip -d go
@@ -17,15 +22,21 @@ else #get code by git repo
 fi
 myIp="$(dig +short myip.opendns.com @resolver1.opendns.com)"
 
-RESTART_PORT=4444
 workerEndlessRetryDgb(){
+    trap "" HUP				    #may allow restart on some fail crushing whole script?
     for (( ; ; ))                           #handle restart request
     do
-        #PUSH GENERATED LOG TO S3
         echo "RESTARTING WORKER...." | nc -l ${RESTART_PORT} -w 0
+	if [[ $RAND_SLEEP_ON_RESTART == 1 ]];then
+    		#RANDOM SLEEP TO AVOID PARTIALLY SYNC START
+		sleepSec="$(shuf -i 0-$MAXSLEEPTIME -n 1)"
+		sleepSec="$(shuf -i 0-$MAXSLEEPTIMESUBSEC -n 1)"
+		sleep $MAXSLEEPTIME.$MAXSLEEPTIMESUBSEC
+	fi
 	sudo killall worker
+        #PUSH GENERATED LOG TO S3
         aws s3 cp log_$myIp.log  s3://mapreducechunks
-        ./worker/worker > log_$myIp.log 2>&1
+        ./worker/worker > log_$myIp.log 2>&1 &
     done
 }
 mkdir ../tmp

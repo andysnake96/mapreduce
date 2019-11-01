@@ -117,37 +117,66 @@ func ReducersReplacementRecovery(failedWorkersReducers map[int][]int, oldReducer
 
 }
 */
-func MapPhaseRecovery(masterControl *core.MASTER_CONTROL, failedJobs map[int][]int, uploader *aws_SDK_wrap.UPLOADER) bool {
+func MapPhaseRecovery(masterControl *core.MASTER_CONTROL, failedJobs map[int][]int, moreFails map[int]bool, uploader *aws_SDK_wrap.UPLOADER) bool {
 	println("MAP RECOVERY")
 	//// filter failed workers in map results
 	workerMapJobsToReassign := make(map[int][]int) //workerId--> map job to redo (chunkID previusly assigned)
+	lostRedundantMapJobs := make(map[int][]int)
+
 	filteredMapResults := make([]core.MapWorkerArgsWrap, 0, len((*masterControl).MasterData.MapResults))
-	moreFails := core.PingProbeAlivenessFilter(masterControl, false) //filter in place failed workers ( other eventually failed among calls
+	//todo moreFails := core.PingProbeAlivenessFilter(masterControl, false) //filter in place failed workers ( other eventually failed among calls
 	///// evalutate to terminate
 	if len(masterControl.WorkersAll) < core.Config.MIN_WORKERS_NUM {
 		_, _ = fmt.Fprint(os.Stderr, "TOO MUCH WORKER FAILS... ABORTING COMPUTATION..")
 		killAll(&masterControl.Workers)
 		os.Exit(96)
 	}
-	for _, mapResult := range (*masterControl).MasterData.MapResults {
+	//get list of lost map jobs because of worker fails
+	for workerID, _ := range masterControl.MasterData.AssignedChunkWorkers {
+		_, failedWorker := moreFails[workerID]
+		//search failed worker among mapresult carried -> todo after reduce redundancy has been deletted <--- cmq overneeded?
+		/*for _, mapResult := range (*masterControl).MasterData.MapResults {
+			if mapResult.WorkerId == workerID {
+				failedWorker = failedWorker || core.CheckErr(mapResult.Err, false, "WORKER id:"+strconv.Itoa(mapResult.WorkerId)+" ON MAPS JOB ASSIGN")
+			}
+		}*/
+		if !failedWorker {
+			continue
+		}
+		_, workerInChunkfairShare := (*masterControl).MasterData.AssignedChunkWorkersFairShare[workerID]
+		if workerInChunkfairShare {
+			workerMapJobsToReassign[workerID] = masterControl.MasterData.AssignedChunkWorkersFairShare[workerID]
+		} else {
+			lostRedundantMapJobs[workerID] = masterControl.MasterData.AssignedChunkWorkers[workerID]
+		}
+	}
+	/*for _, mapResult := range (*masterControl).MasterData.MapResults {
 		errdMap := core.CheckErr(mapResult.Err, false, "WORKER id:"+strconv.Itoa(mapResult.WorkerId)+" ON MAPS JOB ASSIGN")
 		failedWorker := errdMap || moreFails[mapResult.WorkerId]
 		if failedWorker {
-			workerMapJobsToReassign[mapResult.WorkerId] = mapResult.MapJobArgs.ChunkIds //schedule to reassign only not redundant share of chunks on worker
+			//todo wtf??? workerMapJobsToReassign[mapResult.WorkerId] = mapResult.MapJobArgs.ChunkIds //schedule to reassign only not redundant share of chunks on worker
+			workerMapJobsToReassign[mapResult.WorkerId] = mapResult.MapJobArgs.ChunkIdsFairShare //schedule to reassign only not redundant share of chunks on worker
 		} else {
-
 			filteredMapResults = append(filteredMapResults, mapResult)
 		}
-	}
+	}*/
 	if failedJobs != nil { //eventually insert passed failed jobs
 		for workerID, jobs := range failedJobs {
-			workerMapJobsToReassign[workerID] = jobs
+			_, alreadyKnowWorkerFailed := workerMapJobsToReassign[workerID]
+			if !alreadyKnowWorkerFailed {
+				workerMapJobsToReassign[workerID] = jobs
+			} else { //TODO DEBUG CHECK!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+				if len(workerMapJobsToReassign[workerID]) != len(failedJobs[workerID]) {
+					panic("CAZZO!")
+				}
+			}
 		}
 	}
+	//workerMapJobsToReassign ,_=core.GetLostJobsGeneric(&masterControl.MasterData,moreFails)
 	((*masterControl).MasterData.MapResults) = filteredMapResults
 	checkMapRes(masterControl)
 	//re assign failed map job exploiting chunk replication among workers
-	newChunks := AssignChunksIDsRecovery(&masterControl.Workers, workerMapJobsToReassign, (masterControl.MasterData.AssignedChunkWorkers), (masterControl.MasterData.AssignedChunkWorkersFairShare))
+	newChunks := AssignChunksIDsRecovery(&masterControl.Workers, workerMapJobsToReassign, lostRedundantMapJobs, (masterControl.MasterData.AssignedChunkWorkers), (masterControl.MasterData.AssignedChunkWorkersFairShare))
 	checkMapRes(masterControl)
 	//// checkpoint master state updating  chunk fair share assignments
 	if core.Config.BACKUP_MASTER {
@@ -157,14 +186,13 @@ func MapPhaseRecovery(masterControl *core.MASTER_CONTROL, failedJobs map[int][]i
 	mapResultsNew, err := assignMapJobsWithRedundancy(&masterControl.MasterData, &masterControl.Workers, newChunks, masterControl.MasterData.AssignedChunkWorkersFairShare) //RPC 2,3 IN SEQ DIAGRAM
 	masterControl.MasterData.MapResults = append(masterControl.MasterData.MapResults, mapResultsNew...)
 	if err {
-		_, _ = fmt.Fprintf(os.Stderr, "error on map RE assign\n aborting all")
+		_, _ = fmt.Fprintf(os.Stderr, "error on map RE assign")
 		print(&mapResultsNew)
 		return false
 	}
 	return true
 }
-func AssignChunksIDsRecovery(workerKinds *core.WorkersKinds, workerChunksFailed map[int][]int,
-	oldAssignementsGlbl, oldAssignementsFairShare map[int][]int) map[int][]int {
+func AssignChunksIDsRecovery(workerKinds *core.WorkersKinds, workerChunksFailed, lostRedundantChunk map[int][]int, oldAssignementsGlbl, oldAssignementsFairShare map[int][]int) map[int][]int {
 	checkMapRes(&MasterControl)
 	//reassign chunks evaluating existent replication old assignmenets and reducing assignement only at fundamental chunk to reassign
 	//old assignements map will be modified in place
@@ -177,7 +205,9 @@ func AssignChunksIDsRecovery(workerKinds *core.WorkersKinds, workerChunksFailed 
 		delete(oldAssignementsGlbl, workerId)      //DELETE FAILED WORKER KEY FROM ASSIGNEMENT DICT
 		delete(oldAssignementsFairShare, workerId) //DELETE FAILED WORKER KEY FROM ASSIGNEMENT DICT
 	}
-
+	for workerID, _ := range lostRedundantChunk {
+		delete(oldAssignementsGlbl, workerID)
+	}
 	reverseGlblChunkMap := make(map[int]int)
 	for workerID, chunks := range oldAssignementsGlbl {
 		for _, chunkID := range chunks {
@@ -197,7 +227,7 @@ func AssignChunksIDsRecovery(workerKinds *core.WorkersKinds, workerChunksFailed 
 	for _, chunks := range workerChunksFailed {
 		for _, chunkId := range chunks {
 			workerInPossess, isAlreadyAssigned := reverseGlblChunkMap[chunkId]
-			_, presentInFairShare := reverseChunkMapFairShare[chunkId]
+			_, presentInFairShare := reverseChunkMapFairShare[chunkId] //todo redundant
 			if !isAlreadyAssigned && !presentInFairShare {
 				failedChunk[chunkId] = true
 			} else if !presentInFairShare { //update fair share with prev. redundant chunk now useful
@@ -412,7 +442,7 @@ func RecoveryMapResults(control *core.MASTER_CONTROL) ([]core.MapWorkerArgsWrap,
 func RecoveryReduceResults(control *core.MASTER_CONTROL) bool {
 	//try to recover reducers results, if some fails has happened reset them and later retry saving map computations
 	fails := false
-	reducersResults := make([]map[string]int, core.Config.ISTANCES_NUM_REDUCE)
+	reducersResults := make([]core.ReduceRet, core.Config.ISTANCES_NUM_REDUCE)
 	r := 0
 	for redLogicID, workerID := range control.MasterData.ReducerSmartBindingsToWorkersID {
 		workerPntr := core.GetWorker(workerID, &control.Workers, false)

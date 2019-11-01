@@ -13,7 +13,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -41,7 +40,7 @@ import (
 const INIT_FINAL_TOKEN_SIZE = 500
 
 var MasterControl core.MASTER_CONTROL
-
+var syncRpcTimeoutChan = make(chan bool, 1) //used for each rpc.Call to implement a timeout with standard go rpc lib
 func main() {
 	//// read config file, if S3 config file flag is given overwrite local configuration with the one on S3
 	core.Config = new(core.Configuration)
@@ -107,6 +106,7 @@ func masterLogic(startPoint uint32, masterControl *core.MASTER_CONTROL, isReplic
 
 	var startTime time.Time
 	var err bool
+	var e error
 	var errs []error
 	//var errs []error
 	//// from given starting point
@@ -152,14 +152,16 @@ chunk_assign:
 checkMap:
 	if err {
 		_, _ = fmt.Fprintf(os.Stderr, "ASSIGN MAP JOBS ERRD\n RETRY ON FAILED WORKERS EXPLOITING ASSIGNED CHUNKS REPLICATION")
-		reassignementResult := MapPhaseRecovery(masterControl, nil, uploader) //TODO ADD morefails
+		moreFails := core.PingProbeAlivenessFilter(masterControl, false)
+		reassignementResult := MapPhaseRecovery(masterControl, nil, moreFails, uploader) //TODO ADD morefails
 		if !reassignementResult {
 			if core.Config.FAIL_RETRY > 0 {
 				core.Config.FAIL_RETRY--
-				println("RETRY...")
+				println("RETRIES LEFT ...", core.Config.FAIL_RETRY)
 				goto checkMap
 			}
 			killAll(&masterControl.Workers)
+			panic("")
 			os.Exit(96)
 		}
 	}
@@ -194,26 +196,33 @@ locality_aware_link_reduce:
 		os.Exit(69)
 	}*/
 checkReduce:
-	if len(errs) > 0 {
+	if len(errs) > 0 && len(*masterControl.MasterRpc.ReturnedReducer) < core.Config.ISTANCES_NUM_REDUCE {
+		//&& check if reducers doesn't already returned -> may be mapper over worker with also reducer -> fail just after reducer return, before mapper return route rpc
 		_, _ = fmt.Fprint(os.Stderr, "FAIL DURING REDUCE PHASE, reduceTriggered: ", reduceCallTriggered)
 		//set up list for failed instances inside failed workers (mapper & reducer)
 		moreFails := core.PingProbeAlivenessFilter(masterControl, false) //filter in place failed workers TODO ADD TO MAP PHASE RECOVERY morefails
+		if len(*masterControl.MasterRpc.ReturnedReducer) == core.Config.ISTANCES_NUM_REDUCE {
+			print("Spurious reducers return, all aggregated tokens has already been received")
+			goto finalAggreagate
+		}
 		if len(masterControl.WorkersAll) < core.Config.MIN_WORKERS_NUM {
 			_, _ = fmt.Fprint(os.Stderr, "TOO MUCH WORKER FAILS... ABORTING COMPUTATION..")
 			killAll(&masterControl.Workers)
 			os.Exit(96)
 		}
 		mapToRedo, reduceToRedo := core.ParseReduceErrString(errs, &masterControl.MasterData, moreFails)
+		//mapToRedo, reduceToRedo := core.GetLostJobsGeneric(&masterControl.MasterData, moreFails)
 		///MAPS REDO
 		if len(mapToRedo) > 0 {
-			reassignementResult := MapPhaseRecovery(masterControl, mapToRedo, uploader)
+			reassignementResult := MapPhaseRecovery(masterControl, mapToRedo, moreFails, uploader)
 			if !reassignementResult {
 				if core.Config.FAIL_RETRY > 0 {
 					core.Config.FAIL_RETRY--
-					println("RETRY...")
+					println("RETRIES LEFT...", core.Config.FAIL_RETRY)
 					goto checkReduce
 				}
 				killAll(&masterControl.Workers)
+				panic("")
 				os.Exit(96)
 			}
 		}
@@ -234,7 +243,7 @@ checkReduce:
 			_, _ = fmt.Fprintf(os.Stderr, "error on map RE reduce comunication")
 			if core.Config.FAIL_RETRY > 0 {
 				core.Config.FAIL_RETRY--
-				println("  RETRY...")
+				println("RETRIES LEFT...", core.Config.FAIL_RETRY)
 				goto checkReduce
 			}
 			killAll(&masterControl.Workers)
@@ -242,8 +251,8 @@ checkReduce:
 			os.Exit(96)
 		}
 	} //checkpoint avoided here because of reduce link comunication return when mappers already called REDUCE
-	err = jobsEnd(masterControl) //wait all reduces END then, kill all workers
-	if err {
+	e = jobsEnd(masterControl) //wait all reduces END then, kill all workers
+	if e != nil {
 		goto locality_aware_link_reduce
 	}
 finalAggreagate:
@@ -252,7 +261,6 @@ finalAggreagate:
 		sort.Sort(sort.Reverse(tk))
 	}
 	core.SerializeToFile(masterControl.MasterRpc.FinalTokens, core.FINAL_TOKEN_FILENAME)
-	println(masterControl.MasterRpc.FinalTokens)
 	os.Exit(0)
 }
 
@@ -311,9 +319,9 @@ func masterRpcInit() *core.MasterRpc {
 	//register master RPC
 	reducerEndChan := make(chan bool, core.Config.ISTANCES_NUM_REDUCE) //buffer all reducers return flags for later check (avoid block during rpc return )
 	master := core.MasterRpc{
-		FinalTokens:     make([]core.Token, 0, INIT_FINAL_TOKEN_SIZE),
-		Mutex:           sync.Mutex{},
-		ReturnedReducer: &reducerEndChan,
+		FinalTokens:      make([]core.Token, 0, INIT_FINAL_TOKEN_SIZE),
+		ReturnedReducer:  &reducerEndChan,
+		ReducersReturned: make(map[int]bool, core.Config.ISTANCES_NUM_REDUCE),
 	}
 	server := rpc.NewServer()
 	err := server.RegisterName("MASTER", &master)
@@ -474,7 +482,7 @@ func assignMapJobsWithRedundancy(data *core.MASTER_STATE_DATA, workers *core.Wor
 		case <-mapRpcWrap[i].End.Done:
 			err = mapRpcWrap[i].End.Error
 		case <-time.After(core.TIMEOUT_PER_RPC):
-			err = errors.New("RPC TIMEOUT")
+			err = errors.New(core.ERR_TIMEOUT_RPC)
 		}
 		if core.CheckErr(err, false, "error on worker :"+strconv.Itoa(mapRpcWrap[i].WorkerId)) {
 			mapRpcWrap[i].Err = err
@@ -531,7 +539,17 @@ func comunicateReducersBindings(control *core.MASTER_CONTROL, reducersBindings m
 			NumChunks: len(control.MasterData.ChunkIDS),
 			LogicID:   reducerIdLogic,
 		}
-		err := (*rpc.Client)(worker.State.ControlRPCInstance.Client).Call("CONTROL.ActivateNewReducer", arg, &redNewInstancePort)
+		//activate reducer with a sync rpc with nested timeout check via bool chan updated on rpc return called on another routine and select
+		var err error
+		go func() {
+			err = (*rpc.Client)(worker.State.ControlRPCInstance.Client).Call("CONTROL.ActivateNewReducer", arg, &redNewInstancePort)
+			syncRpcTimeoutChan <- true
+		}()
+		select {
+		case <-syncRpcTimeoutChan:
+		case <-time.After(core.TIMEOUT_PER_RPC):
+			err = errors.New(core.ERR_TIMEOUT_RPC)
+		}
 		if core.CheckErr(err, false, "instantiating reducer: "+strconv.Itoa(reducerIdLogic)+"\t at; \t"+worker.Address) {
 			worker.State.Failed = true
 			errs = append(errs, errors.New(core.REDUCER_ACTIVATE+core.ERROR_SEPARATOR+strconv.Itoa(reducerIdLogic)))
@@ -572,7 +590,7 @@ func comunicateReducersBindings(control *core.MASTER_CONTROL, reducersBindings m
 		select { //APP LEVEL TIMEOUT PER RPC
 		case <-end.Done:
 		case <-time.After(core.TIMEOUT_PER_RPC):
-			end.Error = errors.New("RPC TIMEOUT") //explicit override error field on timeout
+			end.Error = errors.New(core.ERR_TIMEOUT_RPC) //explicit override error field on timeout
 		}
 		endWorkerID := mappersTriggerReduce[i]
 		if core.CheckErr(end.Error, false, "error on bindings comunication at "+strconv.Itoa(endWorkerID)) {
@@ -597,9 +615,7 @@ func killAll(workersKinds *core.WorkersKinds) {
 	}
 }
 
-var TIMEOUT = time.Second * 5
-
-func jobsEnd(control *core.MASTER_CONTROL) bool {
+func jobsEnd(control *core.MASTER_CONTROL) error {
 	/*
 		block main thread until REDUCERS workers will comunicate that all REDUCE jobs are ended
 		TODO if timeout expire means all workers has failed and reducer failed with result to send
@@ -608,11 +624,11 @@ func jobsEnd(control *core.MASTER_CONTROL) bool {
 	for r := 0; r < core.Config.ISTANCES_NUM_REDUCE; r++ {
 		select {
 		case <-*(*control).MasterRpc.ReturnedReducer: //wait end of all reducers
-		case <-time.After(TIMEOUT):
-			return true
+		case <-time.After(core.TIMEOUT_PER_RPC):
+			return errors.New(core.ERR_TIMEOUT_RPC)
 		}
 		println("ENDED REDUCER!!!", r)
 	}
 	killAll(&(control.Workers))
-	return false
+	return nil
 }

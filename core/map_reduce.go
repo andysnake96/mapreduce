@@ -137,6 +137,7 @@ startNewReducer:
 	//println("activated new reducer:", arg.LogicID)
 	return err
 }
+
 func (r *ReducerIstanceStateInternal) Reduce(RedArgs ReduceArgs, voidReply *int) error {
 	/*
 		reduce function, aggregate intermediate Tokens in final Tokens with fault tollerant
@@ -182,7 +183,7 @@ func (r *ReducerIstanceStateInternal) Reduce(RedArgs ReduceArgs, voidReply *int)
 	}
 	if allEnded {
 		println("ALL ENDED at reducer :", r.LogicID)
-		err := r.MasterClient.Call("MASTER.ReturnReduce", r.IntermediateTokensCumulative, nil)
+		err := r.MasterClient.Call("MASTER.ReturnReduce", ReduceRet{r.LogicID, r.IntermediateTokensCumulative}, nil)
 		CheckErr(err, false, "master return failed ")
 		r.StateChan <- uint32(IDLE) //reducer ended
 	}
@@ -282,7 +283,6 @@ func (workerNode *Worker_node_internal) AssignMaps(arg MapWorkerArgs, Destinatio
 	for _, chunkID := range arg.ChunkIdsFairShare {
 		mapperDestCosts := workerNode.MapperInstances[chunkID].DestinationCosts
 		routeInfosCombiner(mapperDestCosts, DestinationsCosts)
-
 	}
 	//println("::route infos-->",len(DestinationsCosts.RouteCosts),len(DestinationsCosts.RouteNum))
 	//workerNode.aggregateIntermediateTokens(mapJobsTODO,*DestinationsCosts)
@@ -311,7 +311,7 @@ func (workerNode *Worker_node_internal) RecoveryMapRes(chunkFairShare []int, Des
 	*DestinationsCosts = destCosts
 	return nil
 }
-func (workerNode *Worker_node_internal) RecoveryReduceResult(reducerID int, FinalTokens *map[string]int) error {
+func (workerNode *Worker_node_internal) RecoveryReduceResult(reducerID int, FinalTokens *ReduceRet) error {
 	// return final result to new master if it exist
 	var reducer *ReducerIstanceStateInternal
 	for _, r := range workerNode.ReducerInstances {
@@ -325,7 +325,7 @@ func (workerNode *Worker_node_internal) RecoveryReduceResult(reducerID int, Fina
 		}
 	}
 	if reducer != nil {
-		*FinalTokens = reducer.IntermediateTokensCumulative
+		*FinalTokens = ReduceRet{reducerID, reducer.IntermediateTokensCumulative}
 		return nil
 	}
 	return errors.New("not founded reducer")
@@ -362,7 +362,7 @@ func (workerNode *Worker_node_internal) postFailReduce(arg ReduceTriggerArg) []e
 			select {
 			case <-end.Done:
 			case <-time.After(TIMEOUT_PER_RPC):
-				end.Error = errors.New("RPC TIMEOUT")
+				end.Error = errors.New(ERR_TIMEOUT_RPC)
 			}
 
 			if end.Error != nil {
@@ -444,7 +444,7 @@ func (workerNode *Worker_node_internal) ReducersCollocations(arg ReduceTriggerAr
 		select {
 		case <-end.Done:
 		case <-time.After(TIMEOUT_PER_RPC):
-			end.Error = errors.New("RPC TIMEOUT")
+			end.Error = errors.New(ERR_TIMEOUT_RPC)
 		}
 
 		if end.Error != nil {
@@ -554,22 +554,34 @@ type ReduceArgs struct {
 	IntermediateTokens map[string]int //key-value pre aggregated at worker lev
 	Source             []int          //intermediate Tokens source  ( for failure error )
 }
+type ReduceRet struct {
+	ReducerLogicID   int
+	AggregatedTokens map[string]int
+}
 
 ////////		MASTER		///////////////////////////////
 
 type MasterRpc struct {
-	FinalTokens     []Token
-	Mutex           sync.Mutex
-	ReturnedReducer *chan bool
+	FinalTokens      []Token
+	Mutex            sync.Mutex
+	ReturnedReducer  *chan bool
+	ReducersReturned map[int]bool
 }
 
-func (master *MasterRpc) ReturnReduce(FinalTokensPartial map[string]int, VoidReply *int) error {
+func (master *MasterRpc) ReturnReduce(AggregatedTokensReducer ReduceRet, VoidReply *int) error {
 	master.Mutex.Lock()
-	for k, v := range FinalTokensPartial {
+	_, alreadyReturnedReducer := (*master).ReducersReturned[AggregatedTokensReducer.ReducerLogicID]
+	if alreadyReturnedReducer {
+		master.Mutex.Unlock()
+		println("reducer returned twice, ignoring data of size:", len(AggregatedTokensReducer.AggregatedTokens))
+		return nil
+	}
+	for k, v := range AggregatedTokensReducer.AggregatedTokens {
 		master.FinalTokens = append(master.FinalTokens, Token{k, v})
 	}
+	(*master).ReducersReturned[AggregatedTokensReducer.ReducerLogicID] = true
 	*master.ReturnedReducer <- true //notify returned reducer
-	println("Reduce returned, Collected new ", len(FinalTokensPartial), " aggregated tokens")
+	println("Reduce returned, Collected new ", len(AggregatedTokensReducer.AggregatedTokens), " aggregated tokens")
 	master.Mutex.Unlock()
 	return nil
 }

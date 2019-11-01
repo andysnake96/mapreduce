@@ -101,6 +101,7 @@ const (
 	OUTFILENAME            = "finalTokens.txt"
 )
 const TIMEOUT_PER_RPC time.Duration = time.Second * 11
+const ERR_TIMEOUT_RPC string = "TIMEOUT_RPC"
 
 var FILENAMES_LOCL = []string{"txtSrc/1012-0.txt"} //TODO REMOVE
 func ShellCmdWrapGetIp() string {
@@ -124,7 +125,7 @@ const ( //errors kinds
 
 )
 
-func ParseReduceErrString(reduceRpcErrs []error, data *MASTER_STATE_DATA, moreWorkerFails map[int]bool) (map[int][]int, map[int][]int) {
+func ParseErrorGeneric(reduceRpcErrs []error, data *MASTER_STATE_DATA, moreWorkerFails map[int]bool) (map[int][]int, map[int][]int) {
 	//parse reduce rpc error string, find failed worker setting map/reduce JOB to reset
 
 	mapsToRedo := make(map[int][]int)
@@ -153,6 +154,73 @@ func ParseReduceErrString(reduceRpcErrs []error, data *MASTER_STATE_DATA, moreWo
 		}
 	}
 	//use ping aliveness filter to get know of others failed workers, witch error has not been propagated e.g. failed reducer over failed mapper
+	for workerFailedID, _ := range moreWorkerFails {
+		//skip if already treated this worker
+		_, alreadyKnowFailM := mapsToRedo[workerFailedID]
+		_, alreadyKnowFailR := reduceToRedo[workerFailedID]
+		if alreadyKnowFailM || alreadyKnowFailR {
+			continue
+		}
+		lostMaps, doesExist := data.AssignedChunkWorkersFairShare[workerFailedID]
+		if doesExist {
+			mapsToRedo[workerFailedID] = lostMaps
+		}
+		for reducerID, hostWorker := range data.ReducerSmartBindingsToWorkersID {
+			if workerFailedID == hostWorker {
+				reduceToRedo[workerFailedID] = append(reduceToRedo[workerFailedID], reducerID)
+			}
+		}
+	}
+	return mapsToRedo, reduceToRedo
+}
+
+func GetLostJobsGeneric(data *MASTER_STATE_DATA, failedWorkersID map[int]bool) (map[int][]int, map[int][]int) {
+	mapsToRedo := make(map[int][]int)
+	reduceToRedo := make(map[int][]int)
+	//use ping aliveness filter to get know of others failed workers, witch error has not been propagated e.g. failed mapper over failed reducer
+	for workerFailedID, _ := range failedWorkersID {
+		lostMaps, doesExist := data.AssignedChunkWorkersFairShare[workerFailedID]
+		if doesExist {
+			mapsToRedo[workerFailedID] = lostMaps
+		}
+		for reducerID, hostWorker := range data.ReducerSmartBindingsToWorkersID {
+			if workerFailedID == hostWorker {
+				reduceToRedo[workerFailedID] = append(reduceToRedo[workerFailedID], reducerID)
+			}
+		}
+	}
+	return mapsToRedo, reduceToRedo
+
+}
+func ParseReduceErrString(reduceRpcErrs []error, data *MASTER_STATE_DATA, moreWorkerFails map[int]bool) (map[int][]int, map[int][]int) {
+	//parse reduce rpc error string, find failed worker setting map/reduce JOB to reset
+	mapsToRedo := make(map[int][]int)
+	reduceToRedo := make(map[int][]int)
+	failedWorkers := make([]int, 0, len(reduceRpcErrs))
+	for _, err := range reduceRpcErrs {
+		tmpErrString := strings.Split(err.Error(), ERROR_SEPARATOR) //key value in 2 string FAIL_TYPE-->ID OF FAILED
+		failedId, _ := strconv.Atoi(tmpErrString[1])
+		workerFailedID := 0
+		if tmpErrString[0] == REDUCERS_ADDR_COMUNICATION { //worker fail during bindings comunication or nested reduce call
+			workerFailedID = failedId
+		} else {
+			workerFailedID = data.ReducerSmartBindingsToWorkersID[failedId] //worker hosting failed reduce
+		}
+		failedWorkers = append(failedWorkers, workerFailedID)
+	}
+	//for each known failed worker from RPC errs propagated mark jobs to redo
+	for _, workerFailedID := range failedWorkers {
+		lostMapJobs, doesExist := data.AssignedChunkWorkersFairShare[workerFailedID]
+		if doesExist {
+			mapsToRedo[workerFailedID] = lostMapJobs
+		}
+		for reducerID, hostWorker := range data.ReducerSmartBindingsToWorkersID {
+			if workerFailedID == hostWorker {
+				reduceToRedo[workerFailedID] = append(reduceToRedo[workerFailedID], reducerID)
+			}
+		}
+	}
+	//for each known failed worker from multiple ping probe filter, update jobs to redo
 	for workerFailedID, _ := range moreWorkerFails {
 		//skip if already treated this worker
 		_, alreadyKnowFailM := mapsToRedo[workerFailedID]

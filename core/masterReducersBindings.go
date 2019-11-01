@@ -66,6 +66,7 @@ func ReducersBindingsLocallityAwareEuristic(reducersIdsTrafficIN ReducersDataRou
 		}
 	}
 	if len(reducersBindings) < Config.ISTANCES_NUM_REDUCE { //TODO ASSERTION CHECK
+
 		panic("reducers placement error" + strconv.Itoa(len(reducersBindings)) + strconv.Itoa(Config.ISTANCES_NUM_REDUCE))
 	}
 

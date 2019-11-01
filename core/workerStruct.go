@@ -108,7 +108,7 @@ const (
 type AggregatedIntermediateTokens struct {
 	ChunksSouces                 []int
 	PerReducerIntermediateTokens []map[string]int
-	FlushedIntermediateTokens    []bool //reducerLogicID-->at least once sent interm.tokens
+	FlushedIntermediateTokens    []bool //ReducerLogicID-->at least once sent interm.tokens
 	MasterOutputCache            Map2ReduceRouteCost
 }
 
