@@ -82,8 +82,26 @@ type ReduceActiveArg struct {
 	LogicID   int
 }
 
-func (workerNode *Worker_node_internal) ActivateNewReducer(arg ReduceActiveArg, ChosenPort *int) error {
-	//create a new reducer instance on top of workerNode, returning the chosen port for the new instance
+func (workerNode *Worker_node_internal) initReducer(logicID, numChunksExpected, port int, masterClient *rpc.Client) ReducerIstanceStateInternal {
+	//init expected intermdiate data shares for the new reducer
+	cumulativesCalls := make(map[int]bool)
+	for i := 0; i < numChunksExpected; i++ {
+		cumulativesCalls[i] = false
+	}
+	return ReducerIstanceStateInternal{
+		IntermediateTokensCumulative: make(map[string]int),
+		CumulativeCalls:              cumulativesCalls,
+		mutex:                        sync.Mutex{},
+		MasterClient:                 masterClient,
+		LogicID:                      logicID,
+		StateChan:                    workerNode.StateChan,
+		Server:                       rpc.NewServer(),
+		Port:                         port,
+	}
+}
+func (workerNode *Worker_node_internal) ActivateNewReducer(arg ReduceActiveArg, voidReply *int) error {
+	//create a new reducer instance on top of workerNode,
+	//for the new reducer will be assigned default port as reducerID +reducer port base
 	//Idempontent function, it's safe to Re Activate a Reducer on same worker and same reducer port will be returned
 
 	/*if Config.SIMULATE_WORKERS_SLOW_DOWN {
@@ -94,7 +112,6 @@ func (workerNode *Worker_node_internal) ActivateNewReducer(arg ReduceActiveArg, 
 	//// check if already instantiated reducer if it exist return his port
 	for _, reducer := range workerNode.ReducerInstances {
 		if reducer.LogicID == arg.LogicID {
-			*ChosenPort = reducer.Port
 			return nil
 		}
 	}
@@ -104,37 +121,22 @@ func (workerNode *Worker_node_internal) ActivateNewReducer(arg ReduceActiveArg, 
 	if CheckErr(err, false, "reducer activation master link fail on addr= "+masterRpcAddr) {
 		return err
 	}
-	maxActivationTry := Config.ISTANCES_NUM_REDUCE
-startNewReducer:
-	*ChosenPort = NextUnassignedPort(Config.REDUCE_SERVICE_BASE_PORT, &AssignedPortsAll, true, true, "tcp")
-	//init expected intermdiate data shares for the new reducer
-	cumulativesCalls := make(map[int]bool)
-	for i := 0; i < arg.NumChunks; i++ {
-		cumulativesCalls[i] = false
-	}
 
-	l, e := net.Listen("tcp", ":"+strconv.Itoa(*ChosenPort))
-	if CheckErr(e, false, "reducer port opening err ") && Config.LOCAL_VERSION && maxActivationTry > 0 { //rare race condition on port avaibility check, simply retry
-		maxActivationTry--
-		goto startNewReducer
+	//*ChosenPort = NextUnassignedPort(Config.REDUCE_SERVICE_BASE_PORT, &AssignedPortsAll, true, true, "tcp")
+	ChosenPort := arg.LogicID + Config.REDUCE_SERVICE_BASE_PORT
+	l, e := net.Listen("tcp", ":"+strconv.Itoa(ChosenPort))
+	if CheckErr(e, false, "reducer port opening err ") {
+		return e
 	}
-	newReducer := ReducerIstanceStateInternal{
-		IntermediateTokensCumulative: make(map[string]int),
-		CumulativeCalls:              cumulativesCalls,
-		mutex:                        sync.Mutex{},
-		MasterClient:                 masterClient,
-		LogicID:                      arg.LogicID,
-		StateChan:                    workerNode.StateChan,
-		Server:                       rpc.NewServer(),
-		Port:                         *ChosenPort,
-	}
-
+	newReducer := workerNode.initReducer(arg.LogicID, arg.NumChunks, ChosenPort, masterClient)
+	newReducer.MasterAddress = masterRpcAddr //commodity reference
 	err = newReducer.Server.RegisterName("REDUCE", &newReducer)
 	CheckErr(err, true, "reduce rpc register")
+	newReducer.Port = ChosenPort
 	go newReducer.Server.Accept(l)
 	workerNode.ReducerInstances = append(workerNode.ReducerInstances, newReducer)
 	workerNode.StateChan <- uint32(REDUCE)
-	//println("activated new reducer:", arg.LogicID)
+	println("activated new reducer:", arg.LogicID, " at port ", ChosenPort)
 	return err
 }
 
@@ -186,6 +188,7 @@ func (r *ReducerIstanceStateInternal) Reduce(RedArgs ReduceArgs, voidReply *int)
 		err := r.MasterClient.Call("MASTER.ReturnReduce", ReduceRet{r.LogicID, r.IntermediateTokensCumulative}, nil)
 		CheckErr(err, false, "master return failed ")
 		r.StateChan <- uint32(IDLE) //reducer ended
+		println("sended to master", r.MasterAddress, " aggregated tokens")
 	}
 	r.mutex.Unlock()
 	return nil
@@ -263,7 +266,7 @@ func (workerNode *Worker_node_internal) AssignMaps(arg MapWorkerArgs, Destinatio
 			ChunkID:            chunkId,
 		}
 		workerNode.MapperInstances[chunkId] = newMapper
-		destCostOut[i] = make(chan Map2ReduceRouteCost)
+		destCostOut[i] = make(chan Map2ReduceRouteCost, 1)
 		go newMapper.Map_parse_builtin_quick_route(chunkId, &(destCostOut[i])) //concurrent map computations
 	}
 	*DestinationsCosts = Map2ReduceRouteCost{
@@ -274,12 +277,13 @@ func (workerNode *Worker_node_internal) AssignMaps(arg MapWorkerArgs, Destinatio
 	for i, destCostChan := range destCostOut {
 		mapperDestCosts := <-destCostChan
 		relatedChunkID := mapJobsTODO[i] //out chan has same indezing of mapJobsToDo
-		// update mapper dest cost out for eventual later master recovery //TODO BARRIER AND DIRECT DestinationCosts UPDATE IN PLACE IN MAP() NOT WORK...
+		// update mapper dest cost out for eventual later master recovery
 		mapper := workerNode.MapperInstances[relatedChunkID]
 		mapper.DestinationCosts = mapperDestCosts
-		workerNode.MapperInstances[relatedChunkID] = mapper
+		workerNode.MapperInstances[relatedChunkID] = mapper //todo redundants updates
 	}
 	//aggregate destination cost of individual fair share of chunk for master answer
+	println("Aggregating route infos for reply")
 	for _, chunkID := range arg.ChunkIdsFairShare {
 		mapperDestCosts := workerNode.MapperInstances[chunkID].DestinationCosts
 		routeInfosCombiner(mapperDestCosts, DestinationsCosts)
@@ -293,20 +297,46 @@ func (workerNode *Worker_node_internal) AssignMaps(arg MapWorkerArgs, Destinatio
 	workerNode.StateChan <- uint32(IDLE)
 	return nil
 }
+
 func (workerNode *Worker_node_internal) RecoveryMapRes(chunkFairShare []int, DestinationsCosts *Map2ReduceRouteCost) error {
 	// re aggregate destination cost for requested chunkIDs ( not including replication)
 	destCosts := Map2ReduceRouteCost{
 		RouteCosts: make(map[int]int, Config.ISTANCES_NUM_REDUCE),
 		RouteNum:   make(map[int]int, Config.ISTANCES_NUM_REDUCE),
 	}
-
+	//HANDLE EVENTUAL MISSING CHUNK in worker
+	destCostOut := make([]chan Map2ReduceRouteCost, 0, len(chunkFairShare))
+	i := 0
 	for _, chunkId := range chunkFairShare {
 		_, isAlreadyOwnedChunk := workerNode.WorkerChunksStore.Chunks[chunkId]
 		if !isAlreadyOwnedChunk {
-			panic("invalid chunk ID" + strconv.Itoa(chunkId))
+			//missing chunk -->
+			println("missing chunk ID" + strconv.Itoa(chunkId))
+			if !Config.LoadChunksToS3 {
+				return errors.New("INVALID CONFIG WITH MISSING CHUNK")
+			}
+			err := workerNode.Get_chunk_ids([]int{chunkId}, nil)
+			if CheckErr(err, false, "") {
+				workerNode.StateChan <- uint32(IDLE)
+				return err
+			}
+			newMapper := MapperIstanceStateInternal{
+				IntermediateTokens: make(map[string]int),
+				WorkerChunks:       &(workerNode.WorkerChunksStore),
+				ChunkID:            chunkId,
+			}
+			workerNode.MapperInstances[chunkId] = newMapper
+			destCostOut = append(destCostOut, make(chan Map2ReduceRouteCost, 1))
+			go newMapper.Map_parse_builtin_quick_route(chunkId, &(destCostOut[i])) //concurrent map computations
+			i++
+			continue
 		}
 		println("aggreagating map dest cost of size: ", len(workerNode.MapperInstances[chunkId].DestinationCosts.RouteCosts))
 		routeInfosCombiner(workerNode.MapperInstances[chunkId].DestinationCosts, &destCosts)
+	}
+	for j := 0; j < i; j++ { //AGGREGATE EVENTUAL MISSING CHUNK ON WORKER
+		destCost := <-destCostOut[j] //setted on proper mapper by MAP func
+		routeInfosCombiner(destCost, &destCosts)
 	}
 	*DestinationsCosts = destCosts
 	return nil
@@ -318,7 +348,17 @@ func (workerNode *Worker_node_internal) RecoveryReduceResult(reducerID int, Fina
 		if r.LogicID == reducerID {
 			reducer = &r
 			for _, processed := range r.CumulativeCalls {
-				if !processed {
+				if !processed { //not fully completed reduction (some mapper failed for sure)
+
+					// --> resetting for new reduce iteration
+					//workerNode.ReducerInstances[i]=workerNode.initReducer(r.LogicID,len(r.CumulativeCalls),r.Port,r.MasterClient) //reinit the reducer
+					//reset manually cumulative fields of reducer for new reduce phase
+					//for k,v:=range r.CumulativeCalls{
+					//	if v==true{
+					//		r.CumulativeCalls[k]=false		//reset possible received chunk call marker
+					//	}
+					//}
+					//r.IntermediateTokensCumulative=make(map[string]int)
 					return errors.New("uncompleted reduction")
 				}
 			}
@@ -345,14 +385,13 @@ func (workerNode *Worker_node_internal) postFailReduce(arg ReduceTriggerArg) []e
 	println("post fail re-reduce")
 	intermDataChunkLevAggreag := make([][]map[string]int, len(arg.IndividualChunkShare))
 	for i, chunk := range arg.IndividualChunkShare {
-		intermDataChunkLevAggreag[i] = workerNode.aggregateIntermediateTokens([]int{chunk}, false)
+		intermDataChunkLevAggreag[i] = workerNode.aggregateIntermediateTokens([]int{chunk}, false) //keep chunk "mapped" un aggreagated by same aggregated function with 1 chunk per time
 	}
 	ends := make(map[int][]*rpc.Call, len(intermDataChunkLevAggreag)) //aggreagate rpc calls at reduce level for error setting
 	errs := make([]error, 0, len(intermDataChunkLevAggreag))
 	for j, intermDataPerReducer := range intermDataChunkLevAggreag {
 		chunkID := arg.IndividualChunkShare[j]
 		for reducerID, intermData := range intermDataPerReducer {
-
 			ends[reducerID] = append(ends[reducerID], workerNode.ReducersClients[reducerID].Go("REDUCE.Reduce", ReduceArgs{intermData, []int{chunkID}}, nil, nil))
 		}
 	}
@@ -443,13 +482,15 @@ func (workerNode *Worker_node_internal) ReducersCollocations(arg ReduceTriggerAr
 	for reducerLogicId, end := range ends {
 		select {
 		case <-end.Done:
-		case <-time.After(TIMEOUT_PER_RPC):
+		case <-time.After(2 * TIMEOUT_PER_RPC):
 			end.Error = errors.New(ERR_TIMEOUT_RPC)
 		}
 
 		if end.Error != nil {
 			hasErrd = true
-			errs = append(errs, errors.New(REDUCE_CALL+ERROR_SEPARATOR+strconv.Itoa(reducerLogicId)))
+			e := errors.New(REDUCE_CALL + ERROR_SEPARATOR + strconv.Itoa(reducerLogicId))
+			errs = append(errs, e)
+			CheckErr(e, false, "REDUCE ERRD")
 		}
 	}
 	//if Config.BACKUP_MASTER{
@@ -508,6 +549,7 @@ func (m *MapperIstanceStateInternal) Map_parse_builtin_quick_route(rawChunkId in
 		(destinationsCosts).RouteCosts[destReducerNodeId] += estimateTokenSize(Token{k, v})
 		(destinationsCosts).RouteNum[destReducerNodeId]++
 	}
+	m.DestinationCosts = destinationsCosts
 	*destinationsCostsChan <- destinationsCosts //send route result into chan
 	runtime.Goexit()
 }

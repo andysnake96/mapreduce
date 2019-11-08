@@ -2,16 +2,12 @@ package main
 
 //generate final tokens on same input of distribuited version for matching output results
 import (
-	"../aws_SDK_wrap"
 	"../core"
 	"bufio"
-	"bytes"
-	"encoding/base64"
-	"encoding/gob"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math"
-	"net"
 	"os"
 	"sort"
 	"strconv"
@@ -26,7 +22,7 @@ const (
 	MULTY_ROUTINE_CHUNKS_VERSION
 )
 
-type MASTER_CONTROLA struct {
+/*type MASTER_CONTROLA struct {
 	MasterRpc     *core.MasterRpc
 	MasterAddress string
 	Workers       core.WorkersKinds //connected workers
@@ -39,7 +35,6 @@ type MASTER_CONTROLA struct {
 	PingConn      net.Conn
 	UploaderState *aws_SDK_wrap.UPLOADER
 }
-
 func testEncode2() {
 	m := core.MASTER_CONTROL{
 		MasterRpc: &core.MasterRpc{
@@ -89,24 +84,32 @@ func testEncode2() {
 
 	//core.GenericPrint(deserialized)
 }
-
+*/
 func main() {
 	core.Config = new(core.Configuration)
 	core.ReadConfigFile(core.CONFIGFILEPATH, core.Config)
 
-	testEncode2()
-	os.Exit(0)
+	//testEncode2()
+	//os.Exit(0)
 	startTime := time.Now()
-	//finalTokens:=concurrentMap()
-	finalTokens := singleBlockMap()
+
+	finalTokens := concurrentMap()
+	//finalTokens := singleBlockMap()
+
 	endTime := time.Now()
 	tk := core.TokenSorter{finalTokens}
 	sort.Sort(sort.Reverse(tk))
 	core.SerializeToFile(finalTokens, TEST_TOKENS_OUTPUT_FILE)
 	println("elapsed: ", endTime.Sub(startTime).String())
-	//checkDifferenceInFinaleTokens(core.FINAL_TOKEN_FILENAME, TEST_TOKENS_OUTPUT_FILE)
+	errs := checkDifferenceInFinaleTokens(core.FINAL_TOKEN_FILENAME, TEST_TOKENS_OUTPUT_FILE)
+	println("End Check")
+	if len(errs) > 0 {
+		os.Exit(1)
+	}
+	os.Exit(0)
 }
-func checkDifferenceInFinaleTokens(tokensFile1, tokensFile2 string) {
+func checkDifferenceInFinaleTokens(tokensFile1, tokensFile2 string) []error {
+	eventualError := make([]error, 0)
 	/////// getting raw data from out tokens files
 	file1, err1 := os.Open(tokensFile1)
 	file2, err2 := os.Open(tokensFile2)
@@ -131,25 +134,37 @@ func checkDifferenceInFinaleTokens(tokensFile1, tokensFile2 string) {
 
 	barrier.Wait()
 	if len(tokens1) != len(tokens2) {
-		_, _ = fmt.Fprint(os.Stderr, "different len in dicts \n")
+		err := errors.New("different len in dicts")
+		_, _ = fmt.Fprint(os.Stderr, err.Error(), " \n")
+		eventualError = append(eventualError, err)
 	}
 	for key, value := range tokens1 {
 		_, presentInOtherDict := tokens2[key]
 		if !presentInOtherDict {
-			_, _ = fmt.Fprint(os.Stderr, "absent key:", key, "in  OutTokens2\n")
+			err := errors.New("absent key:" + key + "in  OutTokens2")
+			_, _ = fmt.Fprint(os.Stderr, err.Error(), "\n")
+			eventualError = append(eventualError, err)
 			continue
 		}
 		if value != tokens2[key] {
-			_, _ = fmt.Fprint(os.Stderr, "different values in dicts 1<->2", math.Abs(float64(value-tokens2[key])), "\n")
+			err := errors.New("different values in dicts for key " + key)
+			_, _ = fmt.Fprint(os.Stderr, key, "different values in dicts 1<->2", math.Abs(float64(value-tokens2[key])), "\n")
+			eventualError = append(eventualError, err)
 		}
+		//println(key,value,tokens2[key])
 	}
+	return eventualError
 }
 func parseTokenFileData(data string) map[string]int {
-	tks := strings.Split(data, " -> ")
+	tks := strings.Split(data, "\r\n")
 	outTokenMap := make(map[string]int)
-	for i := 0; i < len(tks)-1; i += 2 {
-		key := tks[i]
-		val, _ := strconv.Atoi(tks[i+1])
+	for _, t := range tks {
+		if t == "" {
+			continue //avoid last blankline
+		}
+		tk := strings.Split(t, "->")
+		key := tk[0]
+		val, _ := strconv.Atoi(tk[1])
 		outTokenMap[key] = val
 	}
 	return outTokenMap
@@ -183,7 +198,6 @@ func singleBlockMap() []core.Token {
 	}
 	return finalTokens
 }
-
 func concurrentMap() []core.Token {
 	//multi routine map over chunk
 	chunks := core.InitChunks(core.FILENAMES_LOCL)

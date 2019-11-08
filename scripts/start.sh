@@ -35,6 +35,8 @@ workerEndlessRetryDgb(){
 	fi
 	sudo killall worker
         #PUSH GENERATED LOG TO S3
+	echo -e "\n\n\n\n" >>log_$myIp.log 
+        netstat -la >> log_$myIp.log 
         aws s3 cp log_$myIp.log  s3://mapreducechunks
         ./worker/worker > log_$myIp.log 2>&1 &
     done

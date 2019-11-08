@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/rpc"
 	"os"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -108,6 +109,8 @@ func masterLogic(startPoint uint32, masterControl *core.MASTER_CONTROL, isReplic
 	var err bool
 	var e error
 	var errs []error
+	var timeouttedMapToRedo map[int][]int = nil
+
 	//var errs []error
 	//// from given starting point
 	switch startPoint {
@@ -153,7 +156,8 @@ checkMap:
 	if err {
 		_, _ = fmt.Fprintf(os.Stderr, "ASSIGN MAP JOBS ERRD\n RETRY ON FAILED WORKERS EXPLOITING ASSIGNED CHUNKS REPLICATION")
 		moreFails := core.PingProbeAlivenessFilter(masterControl, false)
-		reassignementResult := MapPhaseRecovery(masterControl, nil, moreFails, uploader) //TODO ADD morefails
+		timeouttedMapToRedo = nil                                                                        //TODO TIMEOUT ERR CHECK -> VIA SAME MAP RECOVERY RPC-> ON FAULT APPEND TO failedJobs
+		reassignementResult := MapPhaseRecovery(masterControl, timeouttedMapToRedo, moreFails, uploader) //TODO ADD morefails
 		if !reassignementResult {
 			if core.Config.FAIL_RETRY > 0 {
 				core.Config.FAIL_RETRY--
@@ -162,7 +166,7 @@ checkMap:
 			}
 			killAll(&masterControl.Workers)
 			panic("")
-			os.Exit(96)
+			os.Exit(43)
 		}
 	}
 	//filter away replication worker among map results
@@ -182,6 +186,9 @@ locality_aware_link_reduce:
 		fails := RecoveryReduceResults(masterControl)
 		if !fails {
 			goto finalAggreagate
+		} else {
+			errs = make([]error, 0)
+			goto checkReduce
 		}
 	}
 	startTime = time.Now()
@@ -190,17 +197,18 @@ locality_aware_link_reduce:
 		they will aggregate reduce calls to individual reducers propagating  eventual errors
 	*/
 	////DATA LOCALITY AWARE REDUCER BINDINGS COMMUNICATION
-	reduceCallTriggered, errs = comunicateReducersBindings(masterControl, masterControl.MasterData.ReducerSmartBindingsToWorkersID, false) //RPC 4,5 IN SEQ DIAGRAM;
+	reduceCallTriggered, errs = comunicateReducersBindings(masterControl, masterControl.MasterData.ReducerSmartBindingsToWorkersID, false, true) //RPC 4,5 IN SEQ DIAGRAM;
 	println("elapsed: ", time.Now().Sub(startTime).String())
 	/*if !isReplica && core.Config.BACKUP_MASTER {
 		os.Exit(69)
 	}*/
 checkReduce:
-	if len(errs) > 0 && len(*masterControl.MasterRpc.ReturnedReducer) < core.Config.ISTANCES_NUM_REDUCE {
+	if len(*masterControl.MasterRpc.ReturnedReducer) < core.Config.ISTANCES_NUM_REDUCE && (len(errs) > 0 || isReplica) {
 		//&& check if reducers doesn't already returned -> may be mapper over worker with also reducer -> fail just after reducer return, before mapper return route rpc
 		_, _ = fmt.Fprint(os.Stderr, "FAIL DURING REDUCE PHASE, reduceTriggered: ", reduceCallTriggered)
 		//set up list for failed instances inside failed workers (mapper & reducer)
 		moreFails := core.PingProbeAlivenessFilter(masterControl, false) //filter in place failed workers TODO ADD TO MAP PHASE RECOVERY morefails
+
 		if len(*masterControl.MasterRpc.ReturnedReducer) == core.Config.ISTANCES_NUM_REDUCE {
 			print("Spurious reducers return, all aggregated tokens has already been received")
 			goto finalAggreagate
@@ -210,11 +218,27 @@ checkReduce:
 			killAll(&masterControl.Workers)
 			os.Exit(96)
 		}
+
+		//TODO CHECK TIMED OUT MAP --> some param combination on map assign rpc -> on missing chunk mapper will MAP(missingChunk)
+		//	!!!!!!!!!!!!! MI ASPETTO CHE TUTTO SIA GIA PRESENTE --> MA POTREBBE ANDARE IN TIMEOUT ANCHE TIMEOUT CHECK RPC !!!!! <-- FLAG PER ABILITARE QUESTO CONTROLLO EXTRA...
 		mapToRedo, reduceToRedo := core.ParseReduceErrString(errs, &masterControl.MasterData, moreFails)
+		newReducersToActivate := len(reduceToRedo) > 0
+		timeouttedMapToRedo = nil //TODO TIMEOUT ERR CHECK -> VIA SAME MAP RECOVERY RPC-> ON FAULT APPEND TO failedJobs
+		mapsToReassign := len(mapToRedo) > 0 || len(timeouttedMapToRedo) > 0
+		//REDUCE REPLACE
+		//re assign failed reducer on avaible workers following custom order for better assignements in accord with load balance
+		//in place modified prev. bindings
+		if newReducersToActivate {
+			_ = ReducersReplacementRecovery(reduceToRedo, masterControl.MasterData.ReducerSmartBindingsToWorkersID, &masterControl.Workers)
+			//re notify mappers reducer placement
+			if core.Config.BACKUP_MASTER {
+				backUpMasterState(masterControl, uploader) //checkpoint new reducer bindings
+			}
+		}
 		//mapToRedo, reduceToRedo := core.GetLostJobsGeneric(&masterControl.MasterData, moreFails)
 		///MAPS REDO
-		if len(mapToRedo) > 0 {
-			reassignementResult := MapPhaseRecovery(masterControl, mapToRedo, moreFails, uploader)
+		if mapsToReassign {
+			reassignementResult := MapPhaseRecovery(masterControl, timeouttedMapToRedo, moreFails, uploader)
 			if !reassignementResult {
 				if core.Config.FAIL_RETRY > 0 {
 					core.Config.FAIL_RETRY--
@@ -223,22 +247,16 @@ checkReduce:
 				}
 				killAll(&masterControl.Workers)
 				panic("")
-				os.Exit(96)
+				os.Exit(43)
 			}
 		}
 		checkMapRes(masterControl)
-		///REDUCES REDO
-		if len(reduceToRedo) > 0 {
-			//re assign failed reducer on avaible workers following custom order for better assignements in accord with load balance
-			//in place modified prev. bindings
-			_ = ReducersReplacementRecovery(reduceToRedo, masterControl.MasterData.ReducerSmartBindingsToWorkersID, &masterControl.Workers)
-			//re notify mappers reducer placement
-		}
-		if core.Config.BACKUP_MASTER {
+		///REDUCE REDO
 
-			backUpMasterState(masterControl, uploader) //checkpoint new reducer bindings
+		if core.Config.BACKUP_MASTER {
+			backUpMasterState(masterControl, uploader) //checkpoint
 		}
-		_, errs = comunicateReducersBindings(masterControl, masterControl.MasterData.ReducerSmartBindingsToWorkersID, reduceCallTriggered)
+		_, errs = comunicateReducersBindings(masterControl, masterControl.MasterData.ReducerSmartBindingsToWorkersID, reduceCallTriggered, newReducersToActivate)
 		if len(errs) > 0 {
 			_, _ = fmt.Fprintf(os.Stderr, "error on map RE reduce comunication")
 			if core.Config.FAIL_RETRY > 0 {
@@ -248,7 +266,7 @@ checkReduce:
 			}
 			killAll(&masterControl.Workers)
 			panic("")
-			os.Exit(96)
+			os.Exit(43)
 		}
 	} //checkpoint avoided here because of reduce link comunication return when mappers already called REDUCE
 	e = jobsEnd(masterControl) //wait all reduces END then, kill all workers
@@ -521,17 +539,21 @@ func aggregateMappersCosts(workerMapResults []core.MapWorkerArgsWrap, workers *c
 	return routeInfosAggregated
 }
 
-func comunicateReducersBindings(control *core.MASTER_CONTROL, reducersBindings map[int]int, failPostPartialReduce bool) (bool, []error) {
+func comunicateReducersBindings(control *core.MASTER_CONTROL, reducersBindings map[int]int, failPostPartialReduce, ActivateReducers bool) (bool, []error) {
 	//for each reducer ID (logic) activate an actual reducer on a worker following redBindings dict
 	// init each reducer with expected reduce calls from mappers indified by their assigned chunk (that has produced map result -> reduce calls)
-	//RPC 4,5 in SEQ diagram
+
 	println("-----\t", "Comunicating Data Locality Aware Reducers Bindings triggering Reduce calls", "\t-----")
 
 	redNewInstancePort := 0
 	errs := make([]error, 0)
-
-	/// RPC 4 ---> REDUCERS INSTANCES ACTIVATION
-	reducerBindings := make(map[int]string, core.Config.ISTANCES_NUM_REDUCE)
+	reducerAddressesBindings := make(map[int]string, core.Config.ISTANCES_NUM_REDUCE)
+	if !ActivateReducers {
+		reducerAddressesBindings = control.MasterData.ReducersBindingsAddr
+		goto reduceTrigger
+	}
+	//reduceActivate:
+	/// RPC ---> REDUCERS INSTANCES ACTIVATION
 	for reducerIdLogic, placementWorker := range reducersBindings {
 		worker := core.GetWorker(placementWorker, &control.Workers, true) //get dest worker for the new Reduce Instance
 		//instantiate the new reducer instance with expected calls # from mapper for termination and faultTollerant
@@ -542,8 +564,9 @@ func comunicateReducersBindings(control *core.MASTER_CONTROL, reducersBindings m
 		//activate reducer with a sync rpc with nested timeout check via bool chan updated on rpc return called on another routine and select
 		var err error
 		go func() {
-			err = (*rpc.Client)(worker.State.ControlRPCInstance.Client).Call("CONTROL.ActivateNewReducer", arg, &redNewInstancePort)
+			err = (*rpc.Client)(worker.State.ControlRPCInstance.Client).Call("CONTROL.ActivateNewReducer", arg, nil)
 			syncRpcTimeoutChan <- true
+			runtime.Goexit()
 		}()
 		select {
 		case <-syncRpcTimeoutChan:
@@ -553,18 +576,22 @@ func comunicateReducersBindings(control *core.MASTER_CONTROL, reducersBindings m
 		if core.CheckErr(err, false, "instantiating reducer: "+strconv.Itoa(reducerIdLogic)+"\t at; \t"+worker.Address) {
 			worker.State.Failed = true
 			errs = append(errs, errors.New(core.REDUCER_ACTIVATE+core.ERROR_SEPARATOR+strconv.Itoa(reducerIdLogic)))
+			delete(reducersBindings, reducerIdLogic)
 			continue //don't appending failed reducer until activation
 		}
-		reducerBindings[reducerIdLogic] = worker.Address + ":" + strconv.Itoa(redNewInstancePort) //note the binding to reducer correctly instantiated
-		println("reducer with logic ID: ", reducerIdLogic, " on worker : ", placementWorker, "\t", reducerBindings[reducerIdLogic])
+		redNewInstancePort = reducerIdLogic + core.Config.REDUCE_SERVICE_BASE_PORT                         //default assignement of port for the new reducer
+		reducerAddressesBindings[reducerIdLogic] = worker.Address + ":" + strconv.Itoa(redNewInstancePort) //note the binding to reducer correctly instantiated
+		println("reducer with logic ID: ", reducerIdLogic, " on worker : ", placementWorker, "\t", reducerAddressesBindings[reducerIdLogic])
 		worker.State.ReducersHostedIDs = append(worker.State.ReducersHostedIDs, reducerIdLogic)
 	}
 	if len(errs) > 0 { //no reduce call has been triggered, hopefully only reducers has to respawned
 		_, _ = fmt.Fprint(os.Stderr, "some reducers activation has failed")
 		return false, errs
 	}
+	control.MasterData.ReducersBindingsAddr = reducerAddressesBindings
 
-	/// RPC 5 ---> REDUCERS BINDINGS COMUNICATION TO MAPPERS WORKERS
+	/// RPC ---> REDUCERS BINDINGS COMUNICATION TO MAPPERS WORKERS
+reduceTrigger:
 
 	ends := make([]*rpc.Call, 0, len(control.MasterData.AssignedChunkWorkersFairShare))
 	mappersErrs := make([][]error, len(control.MasterData.AssignedChunkWorkersFairShare))
@@ -575,7 +602,7 @@ func comunicateReducersBindings(control *core.MASTER_CONTROL, reducersBindings m
 	for workerID, chunksShare := range control.MasterData.AssignedChunkWorkersFairShare {
 		worker := core.GetWorker(workerID, &(control.Workers), true)
 		arg := core.ReduceTriggerArg{
-			ReducersAddresses:     reducerBindings,
+			ReducersAddresses:     reducerAddressesBindings,
 			IndividualChunkShare:  chunksShare,
 			FailPostPartialReduce: failPostPartialReduce,
 		}

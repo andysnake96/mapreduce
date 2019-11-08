@@ -14,8 +14,8 @@ import (
 
 func ReducersReplacementRecovery(failedWorkersReducers map[int][]int, oldReducersBindings map[int]int, workersKinds *core.WorkersKinds) map[int]int {
 	//re decide reduce placement on workers selecting a random healty worker
-	//old bindings modified in place
-	//returned new bindings and updated in place old bindings
+	//returned new bindings and updated in place old
+
 	failedReducersIDs := make([]int, 0, len(failedWorkersReducers))
 	newReducersPlacements := make(map[int]int) //new placement for failed reducers
 	// setup workers in preferential order of reducer reschedule
@@ -123,7 +123,6 @@ func MapPhaseRecovery(masterControl *core.MASTER_CONTROL, failedJobs map[int][]i
 	workerMapJobsToReassign := make(map[int][]int) //workerId--> map job to redo (chunkID previusly assigned)
 	lostRedundantMapJobs := make(map[int][]int)
 
-	filteredMapResults := make([]core.MapWorkerArgsWrap, 0, len((*masterControl).MasterData.MapResults))
 	//todo moreFails := core.PingProbeAlivenessFilter(masterControl, false) //filter in place failed workers ( other eventually failed among calls
 	///// evalutate to terminate
 	if len(masterControl.WorkersAll) < core.Config.MIN_WORKERS_NUM {
@@ -173,23 +172,35 @@ func MapPhaseRecovery(masterControl *core.MASTER_CONTROL, failedJobs map[int][]i
 		}
 	}
 	//workerMapJobsToReassign ,_=core.GetLostJobsGeneric(&masterControl.MasterData,moreFails)
-	((*masterControl).MasterData.MapResults) = filteredMapResults
+
 	checkMapRes(masterControl)
-	//re assign failed map job exploiting chunk replication among workers
 	newChunks := AssignChunksIDsRecovery(&masterControl.Workers, workerMapJobsToReassign, lostRedundantMapJobs, (masterControl.MasterData.AssignedChunkWorkers), (masterControl.MasterData.AssignedChunkWorkersFairShare))
-	checkMapRes(masterControl)
+	//re assign failed map job exploiting chunk replication among workers
+	if len(workerMapJobsToReassign) == 0 || len(newChunks) == 0 {
+		println("nothing to recovery")
+		return true //nothing todo --> backup worker failed or chunk replication already solved the problem
+	}
+
 	//// checkpoint master state updating  chunk fair share assignments
 	if core.Config.BACKUP_MASTER {
 		backUpMasterState(masterControl, uploader)
 	}
 	/// retry map
+	((*masterControl).MasterData.MapResults) = make([]core.MapWorkerArgsWrap, 0, len((*masterControl).MasterData.MapResults))
 	mapResultsNew, err := assignMapJobsWithRedundancy(&masterControl.MasterData, &masterControl.Workers, newChunks, masterControl.MasterData.AssignedChunkWorkersFairShare) //RPC 2,3 IN SEQ DIAGRAM
-	masterControl.MasterData.MapResults = append(masterControl.MasterData.MapResults, mapResultsNew...)
+	masterControl.MasterData.MapResults = mapResultsNew
 	if err {
 		_, _ = fmt.Fprintf(os.Stderr, "error on map RE assign")
 		print(&mapResultsNew)
 		return false
 	}
+	//TODO DEBUG CHECKS
+	checkMapRes(masterControl)
+	if len(masterControl.MasterData.MapResults) == 0 {
+		killAll(&masterControl.Workers)
+		panic("NO MAP RESULT")
+	}
+
 	return true
 }
 func AssignChunksIDsRecovery(workerKinds *core.WorkersKinds, workerChunksFailed, lostRedundantChunk map[int][]int, oldAssignementsGlbl, oldAssignementsFairShare map[int][]int) map[int][]int {
@@ -314,8 +325,8 @@ func MasterReplicaStart(myAddr string) {
 	masterControl.MasterAddress = myAddr
 	//masterControl.State = masterState
 	chunks := core.InitChunks(core.FILENAMES_LOCL) //chunkize filenames
-	masterControl.StateChan = make(chan uint32, 5)
-	masterControl.MasterData.Chunks = chunks //save in memory loaded chunks -> they will not be backup in master checkpointing
+	masterControl.MasterData.Chunks = chunks       //save in memory loaded chunks -> they will not be backup in master checkpointing
+	masterControl.StateChan = make(chan uint32, 5*core.Config.FAIL_RETRY)
 	masterControl.MasterRpc = masterRpcInit()
 	refreshConnections(&masterControl)
 
@@ -382,14 +393,14 @@ func refreshConnections(masterControl *core.MASTER_CONTROL) {
 		}
 	}
 	println("while refreshing workers connection founded failed worker: ", len(failedWorkers))
-	fairShareAssignementFiltered := make(map[int][]int)
+	fairShareAssignementFiltered := make(map[int][]int) //TODO USELESS
 	for workerID, chunks := range masterControl.MasterData.AssignedChunkWorkersFairShare {
 		_, failedWorker := failedWorkers[workerID]
 		if !failedWorker {
 			fairShareAssignementFiltered[workerID] = chunks // append fair share of worker only if hasn't failed during master respawn
 		}
 	}
-	///// filter away failed workers and wait for readiness among all active workers
+	///// wait until all worker are idle and re filter away eventual failed worker in between
 	core.PingProbeAlivenessFilter(masterControl, true)
 	/// evaluate to exit on too much faults
 	if len(masterControl.WorkersAll) < core.Config.MIN_WORKERS_NUM {

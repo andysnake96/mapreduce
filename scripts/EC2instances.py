@@ -9,7 +9,7 @@ import sys
 #           - integrable with terminal spawn script
 
 ec2Client=boto3.client("ec2")
-INSTANCE_CHECK_POLLING_TIME=10
+INSTANCE_CHECK_POLLING_TIME=5
 EC2_RUNNING_CODE=16
 def startInstancePortRelay():
     #start port forward relay
@@ -18,10 +18,8 @@ def startInstancePortRelay():
         'Version': '6'
     }
     response=ec2Client.run_instances(MaxCount=1,MinCount=1,LaunchTemplate=launchTemplate)
-    instancesIds=list()
-    for instance in response["Instances"]:
-        instancesIds.append(instance["InstanceId"])
-    return instancesIds
+    for instance in response["Instances"]:	#single line
+    	return instance["InstanceId"]				#requested just 1 instance
 
 def startInstances(num):
     #start num ec2 instances
@@ -34,6 +32,7 @@ def startInstances(num):
     instancesIds=list()
     for instance in response["Instances"]:
         instancesIds.append(instance["InstanceId"])
+    print("STARTED ",num," INSTANCES")
     return instancesIds
 
 def waitForReadyInstance(instanceId):
@@ -58,6 +57,7 @@ def waitForReadyInstances(instancesId):
             if instance["InstanceId"] in nonReadyInstances and instance["State"]["Code"]==EC2_RUNNING_CODE:
                 readyInstancesHostNames.append(instance["PublicDnsName"])
                 nonReadyInstances.pop(nonReadyInstances.index(instance["InstanceId"]))
+                #print("NEW READY INSTANCE, ",instance["PublicDnsName"])
         time.sleep(INSTANCE_CHECK_POLLING_TIME)
     return readyInstancesHostNames
 
@@ -86,9 +86,9 @@ if __name__=="__main__":
             killRunningInstances()
             exit()
         if sys.argv[1]=="relay":
-            instances=startInstancePortRelay()
-            hostNames=waitForReadyInstances(instances)
-            print(hostNames[0])
+            instance=startInstancePortRelay()
+            hostName=waitForReadyInstance(instance)
+            print(hostName)
             exit()
         instanceNum=int(sys.argv[1])
     instances=startInstances(instanceNum)

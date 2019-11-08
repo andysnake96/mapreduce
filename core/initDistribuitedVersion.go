@@ -39,6 +39,7 @@ type MASTER_STATE_DATA struct {
 	MapResults                      []MapWorkerArgsWrap
 	ReducerRoutingInfos             ReducersRouteInfos
 	ReducerSmartBindingsToWorkersID map[int]int
+	ReducersBindingsAddr            map[int]string
 }
 
 func Init_distribuited_version(control *MASTER_CONTROL, filenames []string, loadChunksToS3 bool) (*aws_SDK_wrap.UPLOADER, []int, error) {
@@ -69,7 +70,7 @@ func Init_distribuited_version(control *MASTER_CONTROL, filenames []string, load
 
 	if Config.BACKUP_MASTER {
 		pingPort := NextUnassignedPort(Config.PING_SERVICE_BASE_PORT, &assignedPorts, true, true, "udp")
-		control.StateChan = make(chan uint32, 10) //channel to pass current master state to ping answ routine, buffering is to avoid blocking on channel write
+		control.StateChan = make(chan uint32, 5*Config.FAIL_RETRY) //channel to pass current master state to ping answ routine, buffering is to avoid blocking on channel write
 		conn, e := PingHeartBitRcv(pingPort, control.StateChan)
 		if CheckErr(e, false, "PING SERVICE STARTING ERR") {
 			return uploader, assignedPorts, errors.New(e.Error() + err.Error())
@@ -93,7 +94,7 @@ func loadChunksToChunkStorage(chunks []CHUNK, waitGroup **sync.WaitGroup, contro
 	chunkIDS := BuildSequentialIDsListUpTo(len(chunks))
 	errs := make([]error, 0)
 	errsMutex := sync.Mutex{}
-	println("concurrent S3 UPLOAD OF ", len(chunks), " CHUNKS start")
+	println("concurrent S3 UPLOAD OF ", len(chunks), "CHUNKS start")
 	startTime := time.Now()
 	for i, _ := range chunks {
 		keyChunk := strconv.Itoa(i)
@@ -124,7 +125,7 @@ func BuildSequentialIDsListUpTo(maxID int) []int {
 	return list
 }
 
-const WORKERS_REGISTER_TIMEOUT time.Duration = 200 * time.Second
+const WORKERS_REGISTER_TIMEOUT time.Duration = 115 * time.Second
 const WORKER_DIAL_TIMEOUT time.Duration = 5 * time.Second
 
 func waitWorkersRegister(waitGroup **sync.WaitGroup, control *MASTER_CONTROL, uploader *aws_SDK_wrap.UPLOADER) error {
@@ -183,13 +184,12 @@ func waitWorkersRegister(waitGroup **sync.WaitGroup, control *MASTER_CONTROL, up
 		for i := 0; i < numToInit; i++ {
 			portBuf := make([]byte, len("6666;7777"))
 			if Config.REMOTE_SERVER_PORT_FORWARD { //get worker addresses to estamblish rpc connection over a relay connection to unnatted server
-				if workerConn == nil || true { //init relay connection only first time, done here to avoid another if above
-					workerConn, err = conn.AcceptTCP()
-					if CheckErr(err, false, "invalid connection from local proxy of relay server") {
-						goto exit
-					}
-					connBuffered = bufio.NewReaderSize(workerConn, len("100.100.100.100:6666;7777- "))
+				workerConn, err = conn.AcceptTCP()
+				if CheckErr(err, false, "invalid connection from local proxy of relay server") {
+					goto exit
 				}
+				connBuffered = bufio.NewReaderSize(workerConn, len("100.100.100.100:6666;7777- "))
+
 				line, isPrefix, err := connBuffered.ReadLine()
 				if isPrefix || CheckErr(err, false, "reading line from relay connection") {
 					return err
@@ -282,9 +282,7 @@ func waitWorkersRegister(waitGroup **sync.WaitGroup, control *MASTER_CONTROL, up
 	}
 exit:
 	//check eventual init errors accumulated
-	if !CheckAndSolveInitErr(&workers) {
-		err = errors.New("WORKERS INIT ERROR")
-	}
+	err = CheckAndSolveInitErr(&workers)
 	//build all worker ref
 	workersAll := append(workers.WorkersMapReduce, workers.WorkersOnlyReduce...)
 	workersAll = append(workersAll, workers.WorkersBackup...)
@@ -295,7 +293,7 @@ exit:
 	return err
 }
 
-func CheckAndSolveInitErr(workersKinds *WorkersKinds) bool {
+func CheckAndSolveInitErr(workersKinds *WorkersKinds) error {
 	//check for failed workers inspecting configuration file for workers nums
 	//substitute failed workers with backup workers
 	//return false if eventual errors are unsolvable (needed more backup workers)
@@ -320,7 +318,7 @@ func CheckAndSolveInitErr(workersKinds *WorkersKinds) bool {
 		maxTollerableFails -= fails
 	}
 	if maxTollerableFails < 0 {
-		return false //too few backup workers
+		return errors.New("WORKERS INIT ERROR") //too few backup workers
 	}
 	for i := 0; i < fails; i++ {
 		workersKinds.WorkersMapReduce = append(workersKinds.WorkersMapReduce, workersKinds.WorkersBackup[i])
@@ -335,14 +333,14 @@ func CheckAndSolveInitErr(workersKinds *WorkersKinds) bool {
 		maxTollerableFails -= fails
 	}
 	if maxTollerableFails < 0 {
-		return false //too few backup workers
+		return errors.New("WORKERS INIT ERROR") //too few backup workers
 	}
 	for i := 0; i < fails; i++ {
 		workersKinds.WorkersOnlyReduce = append(workersKinds.WorkersOnlyReduce, workersKinds.WorkersBackup[i])
 	}
 	workersKinds.WorkersBackup = workersKinds.WorkersBackup[:len(workersKinds.WorkersBackup)-fails]
 	println("substituted all failed workers at initialization, residue backup workers :", maxTollerableFails)
-	return true
+	return nil
 }
 
 ////////// WORKER SIDE

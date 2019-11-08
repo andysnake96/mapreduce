@@ -100,7 +100,7 @@ const (
 	ADDRESSES_GEN_FILENAME = "configurations/addresses.json"
 	OUTFILENAME            = "finalTokens.txt"
 )
-const TIMEOUT_PER_RPC time.Duration = time.Second * 11
+const TIMEOUT_PER_RPC time.Duration = time.Second * 16
 const ERR_TIMEOUT_RPC string = "TIMEOUT_RPC"
 
 var FILENAMES_LOCL = []string{"txtSrc/1012-0.txt"} //TODO REMOVE
@@ -121,7 +121,6 @@ const ( //errors kinds
 	REDUCE_CONNECTION          = "REDUCE_CONNECTION"          //worker connection reducer error	--> reduce id logic
 	REDUCE_CALL                = "REDUCE_CALL"                //reduce() error					--> reduce id logic
 	ERROR_SEPARATOR            = " "                          //errors sub field separator
-	TIMEOUT                    = "TIMEOUT"                    // rpc timeout
 
 )
 
@@ -192,23 +191,22 @@ func GetLostJobsGeneric(data *MASTER_STATE_DATA, failedWorkersID map[int]bool) (
 	return mapsToRedo, reduceToRedo
 
 }
-func ParseReduceErrString(reduceRpcErrs []error, data *MASTER_STATE_DATA, moreWorkerFails map[int]bool) (map[int][]int, map[int][]int) {
+
+func ParseReduceErrString(reduceRpcErrs []error, data *MASTER_STATE_DATA, workerFailsPingProbed map[int]bool) (map[int][]int, map[int][]int) {
 	//parse reduce rpc error string, find failed worker setting map/reduce JOB to reset
 	mapsToRedo := make(map[int][]int)
 	reduceToRedo := make(map[int][]int)
-	failedWorkers := make([]int, 0, len(reduceRpcErrs))
+	//failedWorkers := make([]int, 0, len(reduceRpcErrs))
 	for _, err := range reduceRpcErrs {
 		tmpErrString := strings.Split(err.Error(), ERROR_SEPARATOR) //key value in 2 string FAIL_TYPE-->ID OF FAILED
 		failedId, _ := strconv.Atoi(tmpErrString[1])
 		workerFailedID := 0
-		if tmpErrString[0] == REDUCERS_ADDR_COMUNICATION { //worker fail during bindings comunication or nested reduce call
-			workerFailedID = failedId
-		} else {
-			workerFailedID = data.ReducerSmartBindingsToWorkersID[failedId] //worker hosting failed reduce
+		if tmpErrString[0] == REDUCER_ACTIVATE { //reducer activation has failed
+			workerFailedID = data.ReducerSmartBindingsToWorkersID[failedId] //getting worker hosting reducer
+			reduceToRedo[workerFailedID] = append(reduceToRedo[workerFailedID], failedId)
 		}
-		failedWorkers = append(failedWorkers, workerFailedID)
 	}
-	//for each known failed worker from RPC errs propagated mark jobs to redo
+	/*//for each known failed worker from RPC errs propagated mark jobs to redo
 	for _, workerFailedID := range failedWorkers {
 		lostMapJobs, doesExist := data.AssignedChunkWorkersFairShare[workerFailedID]
 		if doesExist {
@@ -219,18 +217,27 @@ func ParseReduceErrString(reduceRpcErrs []error, data *MASTER_STATE_DATA, moreWo
 				reduceToRedo[workerFailedID] = append(reduceToRedo[workerFailedID], reducerID)
 			}
 		}
-	}
+	}*/
 	//for each known failed worker from multiple ping probe filter, update jobs to redo
-	for workerFailedID, _ := range moreWorkerFails {
+	for workerFailedID, _ := range workerFailsPingProbed {
 		//skip if already treated this worker
+
 		_, alreadyKnowFailM := mapsToRedo[workerFailedID]
 		_, alreadyKnowFailR := reduceToRedo[workerFailedID]
 		if alreadyKnowFailM || alreadyKnowFailR {
 			continue
 		}
-		lostMaps, doesExist := data.AssignedChunkWorkersFairShare[workerFailedID]
-		if doesExist {
+		//SEARCH FOR LOST MAP IN FAILED WORKER
+		//lost in fondamental map chunk share --> map to redo
+		lostMaps, isWorkerInFairShare := data.AssignedChunkWorkersFairShare[workerFailedID]
+		if isWorkerInFairShare {
 			mapsToRedo[workerFailedID] = lostMaps
+		}
+		//lost in redundant map chunk share --> update redundant share hashmap
+		// 	--> needed here if no foundamental map has been lost but in next iteration these redundant share will be needed(quite rare :)
+		_, isWorkerInRedundantShare := data.AssignedChunkWorkers[workerFailedID]
+		if isWorkerInRedundantShare {
+			delete(data.AssignedChunkWorkers, workerFailedID)
 		}
 		for reducerID, hostWorker := range data.ReducerSmartBindingsToWorkersID {
 			if workerFailedID == hostWorker {
@@ -553,7 +560,7 @@ func PingProbeAlivenessFilter(control *MASTER_CONTROL, waitIdle bool) map[int]bo
 		for i := 0; i < len(*destWorkersContainer); i++ {
 			worker := (*destWorkersContainer)[i]
 
-			if worker.State.Failed { //avoid useless ping probe
+			if false && worker.State.Failed { //avoid useless ping probe
 				err = errors.New("failed worker")
 				failedWorkers[worker.Id] = true
 			} else {
@@ -578,15 +585,12 @@ func PingProbeAlivenessFilter(control *MASTER_CONTROL, waitIdle bool) map[int]bo
 	(*control).WorkersAll = append((*workers).WorkersMapReduce, (*workers).WorkersOnlyReduce...)
 	(*control).WorkersAll = append((*control).WorkersAll, (*workers).WorkersBackup...)
 
-	/*TODO
-	UPDATE IN PLACE WORKERS_FAIR_SHARE HERE
-	*/
 	///// fails print
 	failsID := ""
 	for key, _ := range failedWorkers {
 		failsID += strconv.Itoa(key) + "\t"
 	}
-	log.Println("failed worker ID: ", failsID, " residue: ", len((*control).WorkersAll))
+	log.Println("failed workers ID: ", failsID, " residue: ", len((*control).WorkersAll))
 	return failedWorkers
 }
 
