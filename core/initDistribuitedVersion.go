@@ -125,9 +125,6 @@ func BuildSequentialIDsListUpTo(maxID int) []int {
 	return list
 }
 
-const WORKERS_REGISTER_TIMEOUT time.Duration = 115 * time.Second
-const WORKER_DIAL_TIMEOUT time.Duration = 5 * time.Second
-
 func waitWorkersRegister(waitGroup **sync.WaitGroup, control *MASTER_CONTROL, uploader *aws_SDK_wrap.UPLOADER) error {
 	//setup worker register service tcp port at master
 	//publish this address to workers
@@ -211,7 +208,7 @@ func waitWorkersRegister(waitGroup **sync.WaitGroup, control *MASTER_CONTROL, up
 				workerAddr = strings.Split(workerConn.RemoteAddr().String(), ":")[0]
 			}
 			if id == 0 { //set timeout to conn only 1 time after first succesfully connection (assuming at least 1 worker will register)
-				err = conn.SetDeadline(time.Now().Add(WORKERS_REGISTER_TIMEOUT))
+				err = conn.SetDeadline(time.Now().Add(time.Duration(Config.WORKERS_REGISTER_TIMEOUT) * time.Second))
 				CheckErr(err, true, "connection timeout err")
 			}
 
@@ -249,7 +246,7 @@ func waitWorkersRegister(waitGroup **sync.WaitGroup, control *MASTER_CONTROL, up
 			var client *rpc.Client
 			select {
 			case client = <-rpcClientChan:
-			case <-time.After(WORKER_DIAL_TIMEOUT):
+			case <-time.After(time.Duration(Config.WORKER_DIAL_TIMEOUT) * time.Second):
 				err = errors.New("DIAL TIMEDOUT FOR WORKER AT " + workerAddr)
 			}
 			if CheckErr(err, false, "dialing connected worker errd") {

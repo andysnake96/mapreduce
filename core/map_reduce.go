@@ -144,13 +144,10 @@ func (r *ReducerIstanceStateInternal) Reduce(RedArgs ReduceArgs, voidReply *int)
 	/*
 		reduce function, aggregate intermediate Tokens in final Tokens with fault tollerant
 		cumulative variable protected by a mutex because of possible race condition over simultaneously rpc dispached to reducer
-		intermediate inputs buffered at reduce levele for fault recovery ( avoid all reduce call to re-happend)
+		intermediate inputs buffered at reduce level for fault recovery ( avoid all reduce call to re-happend)
 	*/
 
 	//random sleep on reduce
-	if Config.SIMULATE_WORKERS_SLOW_DOWN {
-		time.Sleep(time.Millisecond * 1000)
-	}
 	r.mutex.Lock() //avoid race condition over cumulatives variable
 	//update cumulative calls per intermdiate data share (chunk's derivate)
 	duplicateIntermdiateData := false
@@ -169,9 +166,9 @@ func (r *ReducerIstanceStateInternal) Reduce(RedArgs ReduceArgs, voidReply *int)
 		r.mutex.Unlock()
 		return nil
 	}
-	if r.LogicID == 0 || !Config.LOCAL_VERSION { //TODO DEBUG PRINT
-		GenericPrint(RedArgs.Source, "reducer received chunks")
-	}
+
+	GenericPrint(RedArgs.Source, "reducer "+strconv.Itoa(r.LogicID)+"received chunks")
+
 	//actual reduce logic
 	for key, value := range RedArgs.IntermediateTokens {
 		r.IntermediateTokensCumulative[key] += value //continusly aggregate received intermediate Tokens
@@ -183,6 +180,7 @@ func (r *ReducerIstanceStateInternal) Reduce(RedArgs ReduceArgs, voidReply *int)
 			allEnded = false
 		}
 	}
+	r.mutex.Unlock() //here either all ended -> no longer possible interm tokens overlap race condition or not all finished -> so unlocked anyway :)
 	if allEnded {
 		println("ALL ENDED at reducer :", r.LogicID)
 		err := r.MasterClient.Call("MASTER.ReturnReduce", ReduceRet{r.LogicID, r.IntermediateTokensCumulative}, nil)
@@ -190,7 +188,7 @@ func (r *ReducerIstanceStateInternal) Reduce(RedArgs ReduceArgs, voidReply *int)
 		r.StateChan <- uint32(IDLE) //reducer ended
 		println("sended to master", r.MasterAddress, " aggregated tokens")
 	}
-	r.mutex.Unlock()
+	//r.mutex.Unlock()
 	return nil
 }
 func (workerNode *Worker_node_internal) ExitWorker(VoidArg int, VoidRepli *int) error {
@@ -282,7 +280,7 @@ func (workerNode *Worker_node_internal) AssignMaps(arg MapWorkerArgs, Destinatio
 		mapper.DestinationCosts = mapperDestCosts
 		workerNode.MapperInstances[relatedChunkID] = mapper //todo redundants updates
 	}
-	//aggregate destination cost of individual fair share of chunk for master answer
+	//aggregate destination cost of individual FOUNDAMENTAL SHARE of chunk for master answer
 	println("Aggregating route infos for reply")
 	for _, chunkID := range arg.ChunkIdsFairShare {
 		mapperDestCosts := workerNode.MapperInstances[chunkID].DestinationCosts
@@ -623,7 +621,7 @@ func (master *MasterRpc) ReturnReduce(AggregatedTokensReducer ReduceRet, VoidRep
 	}
 	(*master).ReducersReturned[AggregatedTokensReducer.ReducerLogicID] = true
 	*master.ReturnedReducer <- true //notify returned reducer
-	println("Reduce returned, Collected new ", len(AggregatedTokensReducer.AggregatedTokens), " aggregated tokens")
+	println("Reduce returned !! \t Collected new ", len(AggregatedTokensReducer.AggregatedTokens), " aggregated tokens")
 	master.Mutex.Unlock()
 	return nil
 }

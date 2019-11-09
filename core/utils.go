@@ -72,6 +72,8 @@ type Configuration struct {
 	SIMULATE_WORKER_CRUSH_AFTER_MILLISEC  int64
 	WORKER_IDLE_WAIT_POLL_MILLISEC        int
 	PING_RETRY                            int
+	WORKERS_REGISTER_TIMEOUT              int64
+	WORKER_DIAL_TIMEOUT                   int64
 }
 
 func (config *Configuration) printFields() {
@@ -192,7 +194,22 @@ func GetLostJobsGeneric(data *MASTER_STATE_DATA, failedWorkersID map[int]bool) (
 
 }
 
-func ParseReduceErrString(reduceRpcErrs []error, data *MASTER_STATE_DATA, workerFailsPingProbed map[int]bool) (map[int][]int, map[int][]int) {
+/* //TODO ALREADY EXIST ROBTUNESS IN MAP RPC -> MISSING CHUNK WILL BE HANDLED THERE
+func CheckTimeouttedMap(data *MASTER_STATE_DATA,failedWorkers map[int]bool) map[int][]int{
+	//check worker that has been in timeout rpc but hasn't fail if they have map(Chunk) expected
+	//if they haven't rpc will try to recover, if rpc fail map jobs will be considered failed and will be returned as WiD->lost map jobs
+
+	for _, workerMapRes := range data.MapResults {
+		_,isWorkerFoundamental:=data.AssignedChunkWorkersFairShare[workerMapRes.WorkerId]
+		_,isFailedWorker:=failedWorkers[workerMapRes.WorkerId]
+		//check only for worker hosting mappers that hasn't fail but have timeoutted and aren't backup worker (rare redundant timeout may lead on auto recover
+		isMapToRecheck:=workerMapRes.Err!=nil && workerMapRes.Err.Error()==ERR_TIMEOUT_RPC && !isFailedWorker  &&isWorkerFoundamental
+		if isMapToRecheck{
+
+		}
+	}
+}*/
+func ParseErrsLostJobs(reduceRpcErrs []error, data *MASTER_STATE_DATA, workerFailsPingProbed map[int]bool) (map[int][]int, map[int][]int) {
 	//parse reduce rpc error string, find failed worker setting map/reduce JOB to reset
 	mapsToRedo := make(map[int][]int)
 	reduceToRedo := make(map[int][]int)
@@ -204,6 +221,7 @@ func ParseReduceErrString(reduceRpcErrs []error, data *MASTER_STATE_DATA, worker
 		if tmpErrString[0] == REDUCER_ACTIVATE { //reducer activation has failed
 			workerFailedID = data.ReducerSmartBindingsToWorkersID[failedId] //getting worker hosting reducer
 			reduceToRedo[workerFailedID] = append(reduceToRedo[workerFailedID], failedId)
+			//delete(data.ReducerSmartBindingsToWorkersID,failedId) //todo redundant?
 		}
 	}
 	/*//for each known failed worker from RPC errs propagated mark jobs to redo
@@ -220,27 +238,24 @@ func ParseReduceErrString(reduceRpcErrs []error, data *MASTER_STATE_DATA, worker
 	}*/
 	//for each known failed worker from multiple ping probe filter, update jobs to redo
 	for workerFailedID, _ := range workerFailsPingProbed {
-		//skip if already treated this worker
-
+		//evaluate to skip updates on worker jobs structures if operation has already done previusly
 		_, alreadyKnowFailM := mapsToRedo[workerFailedID]
 		_, alreadyKnowFailR := reduceToRedo[workerFailedID]
-		if alreadyKnowFailM || alreadyKnowFailR {
-			continue
-		}
+
 		//SEARCH FOR LOST MAP IN FAILED WORKER
 		//lost in fondamental map chunk share --> map to redo
 		lostMaps, isWorkerInFairShare := data.AssignedChunkWorkersFairShare[workerFailedID]
-		if isWorkerInFairShare {
+		if isWorkerInFairShare && !alreadyKnowFailM {
 			mapsToRedo[workerFailedID] = lostMaps
 		}
 		//lost in redundant map chunk share --> update redundant share hashmap
 		// 	--> needed here if no foundamental map has been lost but in next iteration these redundant share will be needed(quite rare :)
 		_, isWorkerInRedundantShare := data.AssignedChunkWorkers[workerFailedID]
-		if isWorkerInRedundantShare {
+		if isWorkerInRedundantShare && !alreadyKnowFailM {
 			delete(data.AssignedChunkWorkers, workerFailedID)
 		}
 		for reducerID, hostWorker := range data.ReducerSmartBindingsToWorkersID {
-			if workerFailedID == hostWorker {
+			if workerFailedID == hostWorker && !alreadyKnowFailR {
 				reduceToRedo[workerFailedID] = append(reduceToRedo[workerFailedID], reducerID)
 			}
 		}
