@@ -4,10 +4,8 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/base64"
-	"encoding/binary"
 	"encoding/gob"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"golang.org/x/text/encoding/unicode"
 	"io"
@@ -102,7 +100,7 @@ const (
 	ADDRESSES_GEN_FILENAME = "configurations/addresses.json"
 	OUTFILENAME            = "finalTokens.txt"
 )
-const TIMEOUT_PER_RPC time.Duration = time.Second * 16
+const TIMEOUT_PER_RPC time.Duration = time.Second * 6
 const ERR_TIMEOUT_RPC string = "TIMEOUT_RPC"
 
 var FILENAMES_LOCL = []string{"txtSrc/1012-0.txt"} //TODO REMOVE
@@ -215,7 +213,11 @@ func ParseErrsLostJobs(reduceRpcErrs []error, data *MASTER_STATE_DATA, workerFai
 	reduceToRedo := make(map[int][]int)
 	//failedWorkers := make([]int, 0, len(reduceRpcErrs))
 	for _, err := range reduceRpcErrs {
+		println(err)
 		tmpErrString := strings.Split(err.Error(), ERROR_SEPARATOR) //key value in 2 string FAIL_TYPE-->ID OF FAILED
+		if len(tmpErrString) < 2 {
+			continue //replica may setted dummy error just to go in recovery because of reduce recovery failed
+		}
 		failedId, _ := strconv.Atoi(tmpErrString[1])
 		workerFailedID := 0
 		if tmpErrString[0] == REDUCER_ACTIVATE { //reducer activation has failed
@@ -413,12 +415,14 @@ const (
 	CHUNK_ASSIGN
 	MAP_ASSIGN
 	LOCALITY_AWARE_LINK_REDUCE
+	FINAL_AGGREGATE
 	ENDED
 )
 const PING_TRY_NUM = 10
 
 func PingHeartBitRcv(port int, stateChan chan uint32) (net.Conn, error) {
-	//ping receve and reply service under port implemented with ping/pong of 1 byte readed/written by a routine
+	//ping receve and reply service under udp port
+	//will be replied with the big endian encoding of state readed from stateChan, shared with MR logic
 	//stopPing has to be a initiated and 1 buffered channel for non blocking read
 	//return the listen udp connection to caller or error
 	conn, err := net.ListenUDP("udp", &net.UDPAddr{
@@ -429,32 +433,35 @@ func PingHeartBitRcv(port int, stateChan chan uint32) (net.Conn, error) {
 		return conn, err
 	}
 	message := make([]byte, PING_LEN)
-	var state uint32
-	/// go ping reaceiver rountine
+	var state uint32 = 0
+	/// go ping receiver rountine
+	/// GO readfrom & writeto  auto perform full content received/sent
 	go func() {
 		for {
 			_, remoteAddr, err := conn.ReadFromUDP(message) //PING
 			if CheckErr(err, false, "udp read err") {
 				break
 			}
-			/// read state if changed and append to next pong message
-			if len(stateChan) > 0 {
+			//println(message[0])
+			/// take always last state avaible on channel
+			for len(stateChan) > 0 && state != ENDED {
 				state = <-stateChan //unblocking chan read
+				println("readed state : ", state)
+			} //TODO CHECK GIT DIFF IF SOMEHOW ERRORS ....
+
+			_, err = conn.WriteToUDP([]byte{byte(state)}, remoteAddr) //PONG
+			if CheckErr(err, false, "udp write err") {
+				break
 			}
+			//binary.BigEndian.PutUint32(message, state)
 			if state == ENDED {
 				_ = conn.Close()
 				runtime.Goexit()
 			}
-			binary.BigEndian.PutUint32(message, state)
-			println("sending state :", state)
-			_, err = conn.WriteToUDP(message, remoteAddr) //PONG
-			if CheckErr(err, false, "udp write err") {
-				break
-			}
 		}
 	}()
 
-	return nil, nil
+	return conn, nil
 }
 
 /*func PingHeartBitRcv(port int, stopPing chan bool) (net.Conn, error) {
@@ -494,7 +501,7 @@ func PingHeartBitRcv(port int, stateChan chan uint32) (net.Conn, error) {
 	return conn, nil
 }
 */
-func PingHeartBitSnd(addr string) (error, uint32) {
+func PingHeartBitSnd(addr string) (error, byte) {
 	//ping host at addr with 1byte ping msg waiting for a pongBuf or a timeout expire
 	//fixed num of trys performed
 
@@ -505,54 +512,54 @@ func PingHeartBitSnd(addr string) (error, uint32) {
 	defer udpConn.Close()
 	CheckErr(err, true, "udp dial error")
 
-	///// set up ephemeral source socket
-	//euphimeralAddr:=udpConn.LocalAddr().String();
-	//myIp:=strings.Split(euphimeralAddr,":")[0];
-	//ephemeralPortStr :=strings.Split(euphimeralAddr,":")[1];
-	//ephemeralPort,err:=strconv.Atoi(ephemeralPortStr);
-	//CheckErr(err,true,"ephemeral port extracting error");
-	//ephemeralConn, err := net.ListenUDP("udp", &net.UDPAddr{
-	//	 Port: ephemeralPort,
-	//	 IP:   net.ParseIP(myIp),
-	// })
-	//CheckErr(err,true,"ephemeral conn listen error");
-	//defer ephemeralConn.Close();
+	/*///// set up ephemeral source socket
+	euphimeralAddr:=udpConn.LocalAddr().String();
+	myIp:=strings.Split(euphimeralAddr,":")[0];
+	ephemeralPortStr :=strings.Split(euphimeralAddr,":")[1];
+	ephemeralPort,err:=strconv.Atoi(ephemeralPortStr);
+	CheckErr(err,true,"ephemeral port extracting error");
+	ephemeralConn, err := net.ListenUDP("udp", &net.UDPAddr{
+		 Port: ephemeralPort,
+		 IP:   net.ParseIP(myIp),
+	})
+	CheckErr(err,true,"ephemeral conn listen error");
+	defer ephemeralConn.Close();*/
 
 	timeout := time.Millisecond * time.Duration(Config.PING_TIMEOUT_MILLISECONDS)
-	pongBuf := make([]byte, PING_LEN)
-	var pong uint32
-	ping := make([]byte, PING_LEN)
-	binary.BigEndian.PutUint32(ping, PING)
-	myEndianess := GetEndianess()
+	//var pong,ping byte =0,PING	//fuck go
+	//var pong,ping byte =2,1
+	pong := make([]byte, 1)
+	ping := make([]byte, 1)
+	//myEndianess := GetEndianess()
 	socketFail := true
 	for i := 0; i < Config.PING_RETRY && socketFail; i++ { /// for a fixed num of ping try send ping probe
 		err = udpConn.SetReadDeadline(time.Now().Add(timeout))
 		CheckErr(err, true, "set deadline to ping socket error")
 		//// write ping
 		_, err = udpConn.Write(ping) //PING
-		CheckErr(err, true, "udp write ping error")
+		CheckErr(err, false, "udp write ping error")
 		//// read pongBuf converting from netw byte order to host byte order
-		_, err = udpConn.Read(pongBuf) //PONG rcv
-		if CheckErr(err, false, "pong read err") {
-			socketFail = true //no error exit ping try loop
-			continue
+		_, err = udpConn.Read(pong) //PONG rcv
+		if !CheckErr(err, false, "pong read err") {
+			socketFail = false //no error exit ping try loop
 		}
 		//// convert received pong to host endianess
-		if myEndianess == unicode.LittleEndian {
+		/*if myEndianess == unicode.LittleEndian {
 			pong = binary.LittleEndian.Uint32(pongBuf)
 		} else {
 			pong = binary.BigEndian.Uint32(pongBuf)
-		}
-		socketFail = false
+		}*/
 	}
+
 	if socketFail {
 		return err, 0
 	}
-	return nil, pong
+	return nil, pong[0]
 }
 
 func PingProbeAlivenessFilter(control *MASTER_CONTROL, waitIdle bool) map[int]bool {
-	//filter away failed workers;  return map worker_removed_id-->true for each removed worker
+	//waitIdle true -> only ping workers until idle state is received from each of them
+	//waitIdle false
 	//probe each worker for aliveness, filter away dead workers
 	//return the ref to workers removed from Workers structs
 	workers := &(control.Workers)
@@ -562,6 +569,7 @@ func PingProbeAlivenessFilter(control *MASTER_CONTROL, waitIdle bool) map[int]bo
 	}
 	var destWorkersContainer *[]Worker //dest variable for workers to init
 	var err error
+	const maxPing = 255
 	for workerKind, _ := range workersKindsNums {
 		if workerKind == WORKERS_MAP_REDUCE {
 			destWorkersContainer = &(workers.WorkersMapReduce)
@@ -574,28 +582,29 @@ func PingProbeAlivenessFilter(control *MASTER_CONTROL, waitIdle bool) map[int]bo
 		workersNotFailed := make([]Worker, 0, len(*destWorkersContainer))
 		for i := 0; i < len(*destWorkersContainer); i++ {
 			worker := (*destWorkersContainer)[i]
-
-			if false && worker.State.Failed { //avoid useless ping probe
-				err = errors.New("failed worker")
+			p := 0
+		ping:
+			var pong byte = 0
+			err, pong = PingHeartBitSnd(worker.Address + ":" + strconv.Itoa(worker.PingServicePort))
+			p++
+			if CheckErr(err, false, "ping probe to worker: "+strconv.Itoa(worker.Id)) {
 				failedWorkers[worker.Id] = true
-			} else {
-			ping:
-				var pong uint32 = 0
-				err, pong = PingHeartBitSnd(worker.Address + ":" + strconv.Itoa(worker.PingServicePort))
-				if CheckErr(err, false, "ping probe to worker: "+strconv.Itoa(worker.Id)) {
-					failedWorkers[worker.Id] = true
-					continue
-				}
-				if waitIdle && int(pong) != IDLE {
-					time.Sleep(time.Millisecond * time.Duration(Config.WORKER_IDLE_WAIT_POLL_MILLISEC))
-					goto ping
-				}
+				continue
 			}
+			if waitIdle && int(pong) != IDLE && p < maxPing {
+				time.Sleep(time.Millisecond * time.Duration(Config.WORKER_IDLE_WAIT_POLL_MILLISEC))
+				goto ping
+			}
+
 			if err == nil {
 				workersNotFailed = append(workersNotFailed, worker)
+			} else {
+				worker.State.Failed = true
 			}
 		}
-		*destWorkersContainer = workersNotFailed
+		if !waitIdle { ///if needed only idle status wait, don't filter away dead worker -> needed reuse fail check later
+			*destWorkersContainer = workersNotFailed
+		}
 	}
 	(*control).WorkersAll = append((*workers).WorkersMapReduce, (*workers).WorkersOnlyReduce...)
 	(*control).WorkersAll = append((*control).WorkersAll, (*workers).WorkersBackup...)
@@ -607,6 +616,26 @@ func PingProbeAlivenessFilter(control *MASTER_CONTROL, waitIdle bool) map[int]bo
 	}
 	log.Println("failed workers ID: ", failsID, " residue: ", len((*control).WorkersAll))
 	return failedWorkers
+}
+
+const EXIT_FORCED = 39
+
+func SimulateCrush(killBeforeMillis, killAfterMillis int64) {
+	///select a random time before simulate worker death
+	killAfterAbout := rand.Int63n(int64(time.Millisecond) * killBeforeMillis)
+	killAfterAbout += int64(time.Millisecond) * killAfterMillis
+
+	time.Sleep(time.Duration(killAfterAbout))
+	//if killAfterAbout > 1 {
+	//	time.Sleep(time.Duration(killAfterAbout))
+	//}
+	///close every listening socket still open
+	//_ = WorkersNodeInternal.ControlRpcInstance.ListenerRpc.Close()
+	//for _, instance := range WorkersNodeInternal.Instances {
+	//	_ = instance.ListenerRpc.Close()
+	//}
+	_, _ = fmt.Fprint(os.Stderr, "\n\nCRUSH SIMULATION ON PROCESS WITH PID:", os.Getpid(), "\n")
+	os.Exit(EXIT_FORCED)
 }
 
 ////	INSTANCES FUNCs
@@ -653,7 +682,8 @@ func CheckErr(e error, fatal bool, supplementMsg string) bool {
 		//baseMsg := e.Error()		//noted that errors always pre print before return to caller
 		baseMsg := ""
 		if fatal == true {
-			log.Fatal("\n\n"+supplementMsg, e)
+			//log.Fatal("\n\n"+supplementMsg, e)
+			panic("\n\n" + supplementMsg + e.Error())
 		} else {
 			log.Println("\n\n"+baseMsg+supplementMsg, e)
 		}

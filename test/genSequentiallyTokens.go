@@ -32,7 +32,7 @@ const (
 	////////// master fault tollerant
 	StateChan     chan uint32
 	State         uint32
-	PingConn      net.Conn
+	pingConn      net.Conn
 	UploaderState *aws_SDK_wrap.UPLOADER
 }
 func testEncode2() {
@@ -65,7 +65,7 @@ func testEncode2() {
 		WorkersAll: nil,
 		StateChan:  nil,
 		State:      0,
-		PingConn:   nil,
+		pingConn:   nil,
 	}
 	o := &core.MASTER_CONTROL{}
 	b := bytes.Buffer{}

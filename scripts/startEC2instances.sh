@@ -6,6 +6,16 @@ INIT_WAIT_TIME=300
 RESTART_PORT=4444
 INSTANCES_HN_FILENAME="instances.list"
 BOTO3_WRAP_PYTHON_FILENAME="EC2instances.py"
+spawn_terminal_sh_to_ec2(){
+	if [ -z "$1" ] 
+	then
+          echo $SSH_CMD
+          echo $SSH_CMD | $( cat pastToXClipboard.sh )
+	  return
+	fi
+    xfce4-terminal --hold -e "$SSH_CMD$1" -T $1
+}
+
 spawn_terminals_ssh_to_ec2_instances(){
     echo "waiting for initialization of instances"
     sleep $1
@@ -14,17 +24,18 @@ spawn_terminals_ssh_to_ec2_instances(){
     done
 
 }
-
-#echo -e "usage possibilties:\n\t N -> number of ec2 instances to start from default launch template saving instance public host names in $ INSTANCES_HN_FILENAME"
-#echo -e "\tspawn -> spawn ssh terminal connected to ec2 instances configured in file $ INSTANCES_HN_FILENAME "
-#echo -e "\tterminate -> kill all running ec2 instances"
-
-#source spinner.sh
+if [[ $# < 1 ]];then
+	echo  "usage spawn | spawn_ssh_to | relay | master | terminate_instances | terminate | get_hostnames | running| restart | clean-logs | num worker to start"
+	exit 1
+fi
 nice -n 20 ./spinner.sh &
 spinner_pid="$!"
+trap 'kill $spinner_pid && exit 0' INT 
 echo $!
 if [[ $1 == "spawn" ]]; then
     spawn_terminals_ssh_to_ec2_instances $2
+elif [[ $1 == "spawn_ssh_to" ]]; then
+    spawn_terminal_sh_to_ec2 $2
 elif [[ $1 == "relay" ]]; then
     relayHostName="$(python3 $BOTO3_WRAP_PYTHON_FILENAME relay)"
     echo "RELAY_ACTIVATION_SSH_CMD_COMPLD"
@@ -36,9 +47,14 @@ elif [[ $1 == "relay" ]]; then
     ssh -o "StrictHostKeyChecking no " -fNTR 6666:localhost:6666 ec2-user@$relayHostName -i $PK_PATH
     ssh -o "StrictHostKeyChecking no " -fNTR 5555:localhost:5555 ec2-user@$relayHostName -i $PK_PATH
     export RELAY_HN=$relayHostName
+elif [[ $1 == "master" ]]; then
+    python3 $BOTO3_WRAP_PYTHON_FILENAME "master" 
+    echo $SSH_CMD | xclip -selection c #extra to copy the template of ssh connection
 elif [[ $1 == "terminate_instances" ]]; then
     python3 $BOTO3_WRAP_PYTHON_FILENAME "terminate_instances" $(cat ${INSTANCES_HN_FILENAME} | xargs -d "\n")
     rm ${INSTANCES_HN_FILENAME}
+elif [[ $1 == "running" ]]; then
+    aws ec2 describe-instances | grep "running" | wc -l
 elif [[ $1 == "terminate" ]]; then
     python3 $BOTO3_WRAP_PYTHON_FILENAME "terminate"
     rm ${INSTANCES_HN_FILENAME}

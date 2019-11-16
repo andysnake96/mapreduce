@@ -3,9 +3,7 @@ package main
 import (
 	"../aws_SDK_wrap"
 	"../core"
-	"fmt"
 	"log"
-	"math/rand"
 	"os"
 	"reflect"
 	"strconv"
@@ -36,7 +34,7 @@ func main() {
 	stopPingService := make(chan bool, 1)
 	myIp := core.ShellCmdWrapGetIp()
 	println(myIp, "\t", core.Config.REMOTE_SERVER_PORT_FORWARD)
-	println("usage for non default setting: configFileFromS3, Schedule Random Crush")
+	println("usage for non default setting:  Schedule Random Crush")
 	downloader, _ := aws_SDK_wrap.InitS3Links(core.Config.S3_REGION)
 	if core.Config.UPDATE_CONFIGURATION_S3 { //read config file from S3 on argv flag setted
 		//download config file from S3
@@ -62,40 +60,21 @@ func main() {
 
 	//fault simulation
 	isUnluckyWorker := false //worker to crush
-	if len(os.Args) < 3 {
+	if len(os.Args) < 2 {
 		//no crush flag given, gen with random probability in respect with workers to crush
 		totalNumWorkers := core.Config.WORKER_NUM_ONLY_REDUCE + core.Config.WORKER_NUM_BACKUP_WORKER + core.Config.WORKER_NUM_MAP
 		crushProbability := float64(core.Config.SIMULATE_WORKERS_CRUSH_NUM) / float64(totalNumWorkers)
 		isUnluckyWorker = core.RandomBool(crushProbability, 4)
 	} else {
-		crushArg := strings.ToUpper(os.Args[2])
+		crushArg := strings.ToUpper(os.Args[1])
 		isUnluckyWorker = strings.Contains(crushArg, "TRUE")
 	}
 
 	if core.Config.SIMULATE_WORKERS_CRUSH && isUnluckyWorker {
-		simulateWorkerCrush()
+		core.SimulateCrush(core.Config.SIMULATE_WORKER_CRUSH_BEFORE_MILLISEC, core.Config.SIMULATE_WORKER_CRUSH_AFTER_MILLISEC)
 	}
 	waitEndMR(stopPingService)
 	os.Exit(0)
-}
-
-const EXIT_FORCED = 556
-
-func simulateWorkerCrush() {
-	///select a random time before simulate worker death
-	killAfterAbout := rand.Int63n(int64(time.Millisecond) * core.Config.SIMULATE_WORKER_CRUSH_BEFORE_MILLISEC)
-	killAfterAbout += int64(time.Millisecond) * core.Config.SIMULATE_WORKER_CRUSH_AFTER_MILLISEC
-
-	if killAfterAbout > 1 {
-		time.Sleep(time.Duration(killAfterAbout))
-	}
-	///close every listening socket still open
-	//_ = WorkersNodeInternal.ControlRpcInstance.ListenerRpc.Close()
-	//for _, instance := range WorkersNodeInternal.Instances {
-	//	_ = instance.ListenerRpc.Close()
-	//}
-	_, _ = fmt.Fprint(os.Stderr, "CRUSH SIMULATION ON WORKER with pid:", os.Getpid())
-	os.Exit(EXIT_FORCED)
 }
 
 func waitEndMR(stopPing chan bool) { //// wait end of Map Reduce

@@ -152,7 +152,7 @@ func InitWorkers_LocalMock_MasterSide() (WorkersKinds, []Worker) {
 		for i := 0; i < len(*destWorkersContainer); i++ {
 
 			port = NextUnassignedPort(Config.CHUNK_SERVICE_BASE_PORT, &AssignedPortsAll, true, false, "tcp")
-			pingPort := NextUnassignedPort(Config.PING_SERVICE_BASE_PORT, &AssignedPortsAll, true, false, "tcp")
+			pingPort := NextUnassignedPort(Config.PING_SERVICE_BASE_PORT, &AssignedPortsAll, true, false, "udp")
 			client, err := rpc.Dial(Config.RPC_TYPE, worker.Address+":"+strconv.Itoa(port))
 			CheckErr(err, true, "init worker client")
 			//init control rpc instance

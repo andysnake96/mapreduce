@@ -28,7 +28,10 @@ type MASTER_CONTROL struct {
 	////////// master fault tollerant
 	StateChan chan uint32
 	State     uint32
-	PingConn  net.Conn
+	pingConn  net.Conn
+	/// master replica fields
+	FailsAtStart bool //while refreshing rpc connection to workers some fails is detected
+	IsReplica    bool
 }
 
 type MASTER_STATE_DATA struct {
@@ -48,6 +51,7 @@ func Init_distribuited_version(control *MASTER_CONTROL, filenames []string, load
 	barrier := new(sync.WaitGroup)
 	barrier.Add(2)
 	_, uploader := aws_SDK_wrap.InitS3Links(Config.S3_REGION)
+
 	//control.UploaderState=uploader
 	assignedPorts := make([]int, 0, 10)
 	var err error = nil
@@ -75,7 +79,7 @@ func Init_distribuited_version(control *MASTER_CONTROL, filenames []string, load
 		if CheckErr(e, false, "PING SERVICE STARTING ERR") {
 			return uploader, assignedPorts, errors.New(e.Error() + err.Error())
 		}
-		control.PingConn = conn
+		control.pingConn = conn
 	}
 	////// sync worker init routines
 	barrier.Wait()
@@ -138,7 +142,7 @@ func waitWorkersRegister(waitGroup **sync.WaitGroup, control *MASTER_CONTROL, up
 	if CheckErr(err, false, "REGISTER SERVICE SOCKET FAIL") {
 		return err
 	}
-	///////publish master address to workers
+	///////publish master address to workers only if setted
 	if (*control).MasterAddress != "" && (*control).MasterAddress != "0" {
 		masterRegServiceAddr := (*control).MasterAddress + ":" + strconv.Itoa(port)
 		err = aws_SDK_wrap.UploadDATA(uploader, masterRegServiceAddr, MASTER_ADDRESS_PUBLISH_S3_KEY, Config.S3_BUCKET)
@@ -208,7 +212,9 @@ func waitWorkersRegister(waitGroup **sync.WaitGroup, control *MASTER_CONTROL, up
 				workerAddr = strings.Split(workerConn.RemoteAddr().String(), ":")[0]
 			}
 			if id == 0 { //set timeout to conn only 1 time after first succesfully connection (assuming at least 1 worker will register)
-				err = conn.SetDeadline(time.Now().Add(time.Duration(Config.WORKERS_REGISTER_TIMEOUT) * time.Second))
+				registerDeadlineTime := time.Duration(Config.WORKERS_REGISTER_TIMEOUT) * time.Second
+				err = conn.SetDeadline(time.Now().Add(registerDeadlineTime))
+				println("Worker Registration will close at ", time.Now().Add(registerDeadlineTime).String())
 				CheckErr(err, true, "connection timeout err")
 			}
 
@@ -349,8 +355,8 @@ func InitWorker(worker *Worker_node_internal, stopPingChan chan bool, downloader
 	////// start ping service and initialize worker
 	assignedPorts := make([]int, 0, 5)
 	/// init worker struct
-	pingPort := NextUnassignedPort(Config.PING_SERVICE_BASE_PORT, &assignedPorts, true, true, "udp")        //TODO HP AVAIBILITY FOR BASE PORT ASSIGNMENTS
-	controlRpcPort := NextUnassignedPort(Config.CHUNK_SERVICE_BASE_PORT, &assignedPorts, true, true, "tcp") //TODO HP AVAIBILITY FOR BASE PORT ASSIGNMENTS
+	pingPort := NextUnassignedPort(Config.PING_SERVICE_BASE_PORT, &assignedPorts, true, true, "udp")                  //TODO HP AVAIBILITY FOR BASE PORT ASSIGNMENTS
+	controlRpcPort := NextUnassignedPort(Config.CHUNK_SERVICE_BASE_PORT, &assignedPorts, true, true, Config.RPC_TYPE) //TODO HP AVAIBILITY FOR BASE PORT ASSIGNMENTS
 
 	_, _ = fmt.Fprint(os.Stderr, controlRpcPort, pingPort)
 

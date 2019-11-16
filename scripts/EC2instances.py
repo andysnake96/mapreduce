@@ -9,7 +9,7 @@ import sys
 #           - integrable with terminal spawn script
 
 ec2Client=boto3.client("ec2")
-INSTANCE_CHECK_POLLING_TIME=5
+INSTANCE_CHECK_POLLING_TIME=3
 EC2_RUNNING_CODE=16
 def startInstancePortRelay():
     #start port forward relay
@@ -19,8 +19,28 @@ def startInstancePortRelay():
     }
     response=ec2Client.run_instances(MaxCount=1,MinCount=1,LaunchTemplate=launchTemplate)
     for instance in response["Instances"]:	#single line
-    	return instance["InstanceId"]				#requested just 1 instance
+        return instance["InstanceId"]				#requested just 1 instance
 
+def startMaster(userDataScriptPath):
+    #start ec2 instance with user data loaded from argument path
+    userDataFile=open(userDataScriptPath)
+    userData=userDataFile.read()
+    userDataFile.close()
+    launchTemplate= LaunchTemplate={
+        'LaunchTemplateName': 'EC2-INIT-S3DOWN-SCRIPT',
+        #'Version': '1'
+        'Version': '3'
+    }
+    #response=ec2Client.run_instances(MaxCount=1,MinCount=1,LaunchTemplate=launchTemplate,UserData=userDataScriptPath)
+    response=ec2Client.run_instances(MaxCount=1,MinCount=1,LaunchTemplate=launchTemplate,UserData=userData)
+    instancesIds=list()
+    for instance in response["Instances"]:
+        instancesIds.append(instance["InstanceId"])
+    print("STARTED MASTER INSTANCE")
+    return instancesIds
+
+
+INSTANCE_TYPE="t3.nano"
 def startInstances(num):
     #start num ec2 instances
     launchTemplate= LaunchTemplate={
@@ -28,7 +48,10 @@ def startInstances(num):
         #'Version': '1'
         'Version': '3'
     }
-    response=ec2Client.run_instances(MaxCount=num,MinCount=num,LaunchTemplate=launchTemplate)
+    if INSTANCE_TYPE!="":
+        response=ec2Client.run_instances(MaxCount=num,MinCount=num,InstanceType=INSTANCE_TYPE,LaunchTemplate=launchTemplate)
+    else:
+        response=ec2Client.run_instances(MaxCount=num,MinCount=num,LaunchTemplate=launchTemplate)
     instancesIds=list()
     for instance in response["Instances"]:
         instancesIds.append(instance["InstanceId"])
@@ -71,25 +94,34 @@ def killInstances(hostnames):
 
 def killRunningInstances():
     ec2 = boto3.resource('ec2')
-    ec2.instances.filter(Filters=[{'Name': 'instance-state-name', 'Values': ['running']}]).terminate()
-    print("terminated")
+    killStat=ec2.instances.filter(Filters=[{'Name': 'instance-state-name', 'Values': ['running']}]).terminate()
+    print("terminated\t",len(killStat[0]['TerminatingInstances']))
 
 
-
+MASTER_SCRIPT_PATH="start_master.sh"
 if __name__=="__main__":
-    instanceNum=1
-    if len(sys.argv)>1:
-        if sys.argv[1]=="terminate_instances":
-            killInstances(sys.argv[2:])
-            exit()
-        if sys.argv[1]=="terminate":
-            killRunningInstances()
-            exit()
-        if sys.argv[1]=="relay":
-            instance=startInstancePortRelay()
-            hostName=waitForReadyInstance(instance)
-            print(hostName)
-            exit()
+    if len(sys.argv)<2:
+    	print("usage terminate_instances | terminate | master | relay | num_worker_to_start")
+    	exit(1)
+    instanceNum=0
+    if sys.argv[1]=="terminate_instances":
+        killInstances(sys.argv[2:])
+        exit(0)
+    elif sys.argv[1]=="terminate":
+        killRunningInstances()
+        exit(0)
+    elif sys.argv[1]=="master":
+        ids=startMaster(MASTER_SCRIPT_PATH)
+        _id=ids[0]
+        hn=waitForReadyInstance(_id)
+        print(hn)
+        exit(0)
+    elif sys.argv[1]=="relay":
+        instance=startInstancePortRelay()
+        hostName=waitForReadyInstance(instance)
+        print(hostName)
+        exit(0)
+    else:
         instanceNum=int(sys.argv[1])
     instances=startInstances(instanceNum)
     hostNames=waitForReadyInstances(instances)

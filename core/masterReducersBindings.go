@@ -49,7 +49,8 @@ func ReducersBindingsLocallityAwareEuristic(reducersIdsTrafficIN ReducersDataRou
 		_, contractedReducer := reducersBindings[record.ReducerID]
 		if !contractedReducer { //NOT ALREADY CONTRACTED THE REDUCER
 			workerNode := GetWorker(record.WorkerID, workers, true)
-			if workerHostingReducers[record.WorkerID] <= Config.MAX_REDUCERS_PER_WORKER { //NOT TOO MUCH CONTRACTION ON SAME WORKER
+			_, neverContracted := workerHostingReducers[record.WorkerID]
+			if neverContracted || workerHostingReducers[record.WorkerID] <= Config.MAX_REDUCERS_PER_WORKER { //NOT TOO MUCH CONTRACTION ON SAME WORKER
 				reducersBindings[record.ReducerID] = workerNode.Id //CONTRACT  edge
 				println("contracted ", record.ReducerID, "-->", workerNode.Id)
 				contractedR++
@@ -67,7 +68,7 @@ func ReducersBindingsLocallityAwareEuristic(reducersIdsTrafficIN ReducersDataRou
 	}
 	if len(reducersBindings) < Config.ISTANCES_NUM_REDUCE { //TODO ASSERTION CHECK
 
-		panic("reducers placement error" + strconv.Itoa(len(reducersBindings)) + strconv.Itoa(Config.ISTANCES_NUM_REDUCE))
+		panic("reducers placement error" + strconv.Itoa(len(reducersBindings)) + "\t" + strconv.Itoa(len(reducersTrafficsCostListSorted)))
 	}
 
 	return reducersBindings
