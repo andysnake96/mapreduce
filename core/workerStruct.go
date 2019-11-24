@@ -57,13 +57,16 @@ type MapperIstanceStateInternal struct {
 type ReducerIstanceStateInternal struct {
 	IntermediateTokensCumulative map[string]int //used by reduce calls to aggregate intermediate Tokens from the map executions
 	CumulativeCalls              map[int]bool   //cumulative number of reduce calls received per chunk ID (for exit condition) (
-	mutex                        sync.Mutex     //protect cumulative vars from concurrent access
-	MasterClient                 *rpc.Client    //to report back to master final token share of reducer
+	AllEnded                     bool
+	mutex                        sync.Mutex  //protect cumulative vars from concurrent access
+	MasterClient                 *rpc.Client //to report back to master final token share of reducer
 	LogicID                      int
 	StateChan                    chan uint32 //to propagate at worker level
 	Server                       *rpc.Server //to propagate at worker level
 	Port                         int
 	MasterAddress                string
+	REPLAY_ANSWER                int
+
 	//to propagate at worker level
 }
 
@@ -127,10 +130,9 @@ type Worker_node_internal struct {
 	ReducersClients            []*rpc.Client
 	Id                         int         //TODO OLD
 	StateChan                  chan uint32 //actual worker state for pong
-
-	PingPort   int
-	Downloader *aws_SDK_wrap.DOWNLOADER
-	MasterAddr string
+	PingPort                   int
+	Downloader                 *aws_SDK_wrap.DOWNLOADER
+	MasterAddr                 string
 	//////////////// master fault tollerant recovery outputs
 	cacheLock   sync.Mutex
 	reduceCache ReduceOutputCache
