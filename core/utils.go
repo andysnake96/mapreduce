@@ -103,7 +103,8 @@ const (
 const TIMEOUT_PER_RPC time.Duration = time.Second * 6
 const ERR_TIMEOUT_RPC string = "TIMEOUT_RPC"
 
-var FILENAMES_LOCL = []string{"txtSrc/1012-0.txt"} //TODO REMOVE
+var FILENAMES_LOCL = []string{"txtSrc/1012-0.txt"}
+
 func ShellCmdWrapGetIp() string {
 	//get public IP of current node
 	cmd := exec.Command("dig", "+short", "myip.opendns.com", "@resolver1.opendns.com")

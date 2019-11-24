@@ -1,27 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="959bba11-67b5-49b9-be5e-31338d05472f" name="Default Changelist" comment="Heavily tested on ec2 instances with master and worker fault tollerant simulation changing master fault time range&#10;master checkpointing changed similarly to WAL so each op will be checked on replica even if hasn't been done &#10;sligtly change in fault tollerant logic and some little details causing bug with master fault  &#10;Hopefully That's all folks">
-      <change afterPath="$PROJECT_DIR$/scripts/spinner.sh" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/scripts/start_master.sh" afterDir="false" />
+    <list default="true" id="959bba11-67b5-49b9-be5e-31338d05472f" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/configurations/config.json" beforeDir="false" afterPath="$PROJECT_DIR$/configurations/config.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/initDistribuitedVersion.go" beforeDir="false" afterPath="$PROJECT_DIR$/core/initDistribuitedVersion.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/map_reduce.go" beforeDir="false" afterPath="$PROJECT_DIR$/core/map_reduce.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/masterReducersBindings.go" beforeDir="false" afterPath="$PROJECT_DIR$/core/masterReducersBindings.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/core/utils.go" beforeDir="false" afterPath="$PROJECT_DIR$/core/utils.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/worker_local_version.go" beforeDir="false" afterPath="$PROJECT_DIR$/core/worker_local_version.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/master/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/master/main.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/master/recovery.go" beforeDir="false" afterPath="$PROJECT_DIR$/master/recovery.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/out/master" beforeDir="false" afterPath="$PROJECT_DIR$/out/master" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/out/worker" beforeDir="false" afterPath="$PROJECT_DIR$/out/worker" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/outTokens.list" beforeDir="false" afterPath="$PROJECT_DIR$/outTokens.list" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/EC2instances.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/EC2instances.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/start.sh" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/start.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/startEC2instances.sh" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/startEC2instances.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/updateAll.sh" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/updateAll.sh" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/test/genSequentiallyTokens.go" beforeDir="false" afterPath="$PROJECT_DIR$/test/genSequentiallyTokens.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/worker/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/worker/main.go" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -48,144 +34,39 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file pinned="false" current-in-tab="true">
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/core/map_reduce.go">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="357">
-              <caret line="95" column="45" lean-forward="true" selection-start-line="95" selection-start-column="45" selection-end-line="95" selection-end-column="45" />
+            <state relative-caret-position="988">
+              <caret line="95" column="45" selection-start-line="95" selection-start-column="45" selection-end-line="95" selection-end-column="45" />
               <folding>
-                <element signature="e#188#218#0" />
-                <element signature="n#!!block;n#Get_chunk_ids#0" />
-                <element signature="e#450#762#0" />
-                <element signature="e#1041#1517#0" />
-                <element signature="e#1043#1085#0" />
-                <element signature="e#1210#1289#0" />
-                <element signature="e#1295#1514#0" />
-                <element signature="e#1586#1620#0" />
-                <element signature="e#1713#1764#0" />
-                <element signature="e#1731#1761#0" />
-                <element signature="e#1808#1929#0" />
-                <element signature="e#1830#1864#0" />
-                <element signature="n#!!block;n#downloadChunk#0" />
-                <element signature="e#2103#2347#0" />
-                <element signature="e#2580#2644#0" />
-                <element signature="e#2794#2834#0" />
-                <element signature="e#3123#3157#0" />
-                <element signature="e#3683#3736#0" />
-                <element signature="e#3938#4069#0" />
-                <element signature="e#4196#4256#0" />
-                <element signature="e#4234#4253#0" />
-                <element signature="e#4625#4642#0" />
-                <element signature="e#4921#4936#0" />
-                <element signature="n#!!block;n#ExitWorker#0" />
-                <element signature="e#8355#8565#0" />
-                <element signature="e#8589#8757#0" />
-                <element signature="e#8777#8891#0" />
-                <element signature="n#!!block;n#AssignMaps#0" />
-                <element signature="e#9012#9363#0" />
-                <element signature="e#9573#9730#0" />
-                <element signature="e#9668#9727#0" />
-                <element signature="e#9736#10438#0" />
-                <element signature="e#10005#10435#0" />
-                <element signature="e#10180#10374#0" />
-                <element signature="e#10324#10369#0" />
-                <element signature="e#10380#10431#0" />
-                <element signature="e#10673#11063#0" />
-                <element signature="e#10716#10854#0" />
-                <element signature="e#11105#11231#0" />
-                <element signature="e#11319#11685#0" />
-                <element signature="e#11392#11435#0" />
-                <element signature="e#11869#12004#0" />
-                <element signature="e#12006#12101#0" />
-                <element signature="e#12178#12204#0" />
-                <element signature="n#!!block;n#RecoveryMapRes#0" />
-                <element signature="e#12541#12667#0" />
-                <element signature="e#12832#13904#0" />
-                <element signature="e#12933#13694#0" />
-                <element signature="e#13042#13107#0" />
-                <element signature="e#13197#13259#0" />
-                <element signature="e#13302#13444#0" />
-                <element signature="e#13929#14090#0" />
                 <element signature="n#!!block;n#RecoveryReduceResult#0" />
-                <element signature="e#14389#14665#0" />
-                <element signature="e#14510#14762#0" />
-                <element signature="e#14669#14749#0" />
-                <element signature="e#14689#14744#0" />
-                <element signature="e#14732#14825#0" />
-                <element signature="e#14760#14809#0" />
-                <element signature="e#14893#14998#0" />
-                <element signature="e#15088#15193#0" />
-                <element signature="e#15517#15701#0" />
-                <element signature="e#16164#16192#0" />
                 <element signature="n#!!block;n#Map_parse_builtin_quick_route#0" />
-                <element signature="e#20194#20694#0" />
-                <element signature="e#20817#20901#0" />
-                <element signature="e#21021#21147#0" />
-                <element signature="e#21190#21224#0" />
-                <element signature="e#21275#21303#0" />
-                <element signature="e#21398#21433#0" />
-                <element signature="e#21468#21532#0" />
-                <element signature="e#21662#21875#0" />
-                <element signature="e#21813#21819#0" />
                 <element signature="n#!!block;n#Map_quick_route_reducers#0" />
-                <element signature="e#22132#22405#0" />
-                <element signature="e#22434#22446#0" />
-                <element signature="e#22902#22961#0" />
-                <element signature="e#23043#23279#0" />
-                <element signature="e#23203#23209#0" />
-                <element signature="e#23281#23296#0" />
-                <element signature="e#23536#23709#0" />
-                <element signature="e#23725#23790#0" />
-                <element signature="e#23858#23983#0" />
                 <element signature="n#!!block;n#ReturnReduce#0" />
-                <element signature="e#24227#24375#0" />
-                <element signature="e#24436#24503#0" />
-                <element signature="e#24493#24499#0" />
                 <element signature="n#!!block;n#Map_parse_builtin#0" />
-                <element signature="e#24953#24987#0" />
-                <element signature="e#25031#25059#0" />
-                <element signature="e#25154#25178#0" />
               </folding>
             </state>
           </provider>
         </entry>
       </file>
       <file pinned="false" current-in-tab="false">
-        <entry file="file:///usr/lib/go-1.11/src/sync/mutex.go">
+        <entry file="file://$PROJECT_DIR$/scripts/spinner.sh">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="256">
-              <caret line="24" column="5" selection-start-line="24" selection-start-column="5" selection-end-line="24" selection-end-column="5" />
+            <state relative-caret-position="442">
+              <caret line="85" column="57" selection-start-line="85" selection-start-column="57" selection-end-line="85" selection-end-column="57" />
             </state>
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/core/workerStruct.go">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="299">
-              <caret line="128" column="13" selection-start-line="128" selection-start-column="4" selection-end-line="128" selection-end-column="13" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file:///usr/lib/go-1.11/src/builtin/builtin.go">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="3094">
-              <caret line="182" column="5" selection-start-line="182" selection-start-column="5" selection-end-line="182" selection-end-column="5" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
+      <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/core/utils.go">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="299">
-              <caret line="621" column="5" selection-start-line="621" selection-start-column="5" selection-end-line="621" selection-end-column="5" />
+            <state relative-caret-position="177">
+              <caret line="685" selection-start-line="685" selection-end-line="685" />
               <folding>
                 <element signature="e#346#374#0" />
                 <element signature="e#394#2405#0" />
-                <element signature="e#1225#1238#0" />
                 <element signature="e#2450#2482#0" />
                 <element signature="e#2561#2711#0" />
                 <element signature="e#2757#2788#0" />
@@ -210,149 +91,6 @@
                 <element signature="e#6610#6656#0" />
                 <element signature="e#6731#6861#0" />
                 <element signature="e#6768#6857#0" />
-                <element signature="e#6902#7808#0" />
-                <element signature="e#7947#10617#0" />
-                <element signature="e#8196#8865#0" />
-                <element signature="e#8348#8456#0" />
-                <element signature="e#8567#8862#0" />
-                <element signature="e#8867#9344#0" />
-                <element signature="e#9484#10582#0" />
-                <element signature="e#9690#9728#0" />
-                <element signature="e#9917#9963#0" />
-                <element signature="e#9966#10036#0" />
-                <element signature="e#10295#10353#0" />
-                <element signature="e#10428#10579#0" />
-                <element signature="e#10486#10575#0" />
-                <element signature="e#10630#10730#0" />
-                <element signature="e#10768#10842#0" />
-                <element signature="e#10795#10840#0" />
-                <element signature="e#10888#13132#0" />
-                <element signature="e#10940#11201#0" />
-                <element signature="e#11453#11956#0" />
-                <element signature="e#11639#11841#0" />
-                <element signature="e#12214#12390#0" />
-                <element signature="e#12368#12387#0" />
-                <element signature="e#12396#12608#0" />
-                <element signature="e#12755#12958#0" />
-                <element signature="e#12995#13107#0" />
-                <element signature="e#13172#13278#0" />
-                <element signature="e#13202#13276#0" />
-                <element signature="e#13356#13630#0" />
-                <element signature="e#13359#13421#0" />
-                <element signature="e#13569#13584#0" />
-                <element signature="e#13632#13664#0" />
-                <element signature="e#13700#13858#0" />
-                <element signature="e#13891#13916#0" />
-                <element signature="e#13953#14009#0" />
-                <element signature="e#14051#14092#0" />
-                <element signature="e#14138#14182#0" />
-                <element signature="e#14222#14253#0" />
-                <element signature="e#14297#14377#0" />
-                <element signature="e#14426#14499#0" />
-                <element signature="e#14540#14735#0" />
-                <element signature="e#14615#14674#0" />
-                <element signature="e#14680#14732#0" />
-                <element signature="e#14779#14885#0" />
-                <element signature="e#14983#16269#0" />
-                <element signature="e#14986#15032#0" />
-                <element signature="e#15315#15365#0" />
-                <element signature="e#15416#15439#0" />
-                <element signature="e#15498#15527#0" />
-                <element signature="e#15607#16246#0" />
-                <element signature="e#15615#16243#0" />
-                <element signature="e#15718#15734#0" />
-                <element signature="e#15738#15759#0" />
-                <element signature="e#15855#15946#0" />
-                <element signature="e#16105#16121#0" />
-                <element signature="e#16191#16239#0" />
-                <element signature="e#16271#17533#0" />
-                <element signature="e#17582#19526#0" />
-                <element signature="e#17585#17666#0" />
-                <element signature="e#17992#18484#0" />
-                <element signature="e#18566#18604#0" />
-                <element signature="e#18783#19466#0" />
-                <element signature="e#19208#19265#0" />
-                <element signature="e#19315#19463#0" />
-                <element signature="e#19483#19503#0" />
-                <element signature="e#19611#21842#0" />
-                <element signature="e#19614#19697#0" />
-                <element signature="e#19963#20119#0" />
-                <element signature="e#20252#21440#0" />
-                <element signature="e#20292#20351#0" />
-                <element signature="e#20394#20454#0" />
-                <element signature="e#20494#20550#0" />
-                <element signature="e#20707#21273#0" />
-                <element signature="e#20948#21003#0" />
-                <element signature="e#21040#21148#0" />
-                <element signature="e#21167#21229#0" />
-                <element signature="e#21234#21269#0" />
-                <element signature="e#21289#21437#0" />
-                <element signature="e#21689#21731#0" />
-                <element signature="e#22164#22189#0" />
-                <element signature="e#22673#22794#0" />
-                <element signature="e#22724#22778#0" />
-                <element signature="e#22742#22775#0" />
-                <element signature="e#22871#23209#0" />
-                <element signature="e#22943#23021#0" />
-                <element signature="e#23078#23154#0" />
-                <element signature="e#23107#23151#0" />
-                <element signature="e#23156#23175#0" />
-                <element signature="e#23289#23404#0" />
-                <element signature="e#23316#23388#0" />
-                <element signature="e#23365#23385#0" />
-                <element signature="e#23467#23862#0" />
-                <element signature="e#23470#23506#0" />
-                <element signature="e#23559#23846#0" />
-                <element signature="e#23683#23770#0" />
-                <element signature="e#23776#23829#0" />
-                <element signature="e#23896#23946#0" />
-                <element signature="e#23908#23923#0" />
-                <element signature="e#23929#23944#0" />
-                <element signature="e#23980#24030#0" />
-                <element signature="e#23992#24007#0" />
-                <element signature="e#24013#24028#0" />
-                <element signature="e#24120#24573#0" />
-                <element signature="e#24349#24571#0" />
-                <element signature="e#24496#24559#0" />
-                <element signature="e#24653#24810#0" />
-                <element signature="e#24894#25153#0" />
-                <element signature="e#25212#25322#0" />
-                <element signature="e#25265#25298#0" />
-                <element signature="e#25391#25504#0" />
-                <element signature="e#25447#25480#0" />
-                <element signature="e#25561#25656#0" />
-                <element signature="e#25595#25641#0" />
-                <element signature="e#25617#25638#0" />
-                <element signature="e#25725#25852#0" />
-                <element signature="e#25918#26014#0" />
-                <element signature="e#26060#26301#0" />
-                <element signature="e#26211#26276#0" />
-                <element signature="e#26303#26366#0" />
-                <element signature="e#26608#26722#0" />
-                <element signature="e#26640#26686#0" />
-                <element signature="e#26797#27342#0" />
-                <element signature="e#26925#27091#0" />
-                <element signature="e#27031#27060#0" />
-                <element signature="e#27097#27302#0" />
-                <element signature="e#27147#27200#0" />
-                <element signature="e#27245#27272#0" />
-                <element signature="e#27417#27693#0" />
-                <element signature="e#27647#27665#0" />
-                <element signature="e#27671#27690#0" />
-                <element signature="e#27740#27884#0" />
-                <element signature="e#27771#27790#0" />
-                <element signature="e#27820#27869#0" />
-                <element signature="e#27845#27866#0" />
-                <element signature="e#27944#28122#0" />
-                <element signature="e#27973#27992#0" />
-                <element signature="e#28023#28107#0" />
-                <element signature="e#28083#28104#0" />
-                <element signature="e#28237#28251#0" />
-                <element signature="e#28298#28317#0" />
-                <element signature="e#28406#28420#0" />
-                <element signature="e#28464#28483#0" />
-                <element signature="e#28527#28541#0" />
-                <element signature="e#28585#28604#0" />
               </folding>
             </state>
           </provider>
@@ -361,40 +99,120 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/master/main.go">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="422">
-              <caret line="115" column="57" lean-forward="true" selection-start-line="115" selection-start-column="57" selection-end-line="115" selection-end-column="57" />
+            <state relative-caret-position="-238">
+              <caret line="209" column="5" lean-forward="true" selection-start-line="209" selection-start-column="5" selection-end-line="209" selection-end-column="5" />
               <folding>
-                <element signature="n#!!block;n#main#1" />
+                <element signature="e#169#1900#0" />
+                <element signature="e#2346#2852#0" />
+                <element signature="e#2348#2394#0" />
+                <element signature="e#3458#3722#0" />
+                <element signature="e#3677#3719#0" />
+                <element signature="e#4149#4201#0" />
                 <element signature="n#!!block;n#filterFoundamentalMapResult#0" />
+                <element signature="e#14414#14497#0" />
+                <element signature="e#14699#14918#0" />
+                <element signature="e#14794#14856#0" />
+                <element signature="e#14862#14915#0" />
                 <element signature="n#!!block;n#checkMapRes#0" />
+                <element signature="e#15142#15206#0" />
+                <element signature="e#15313#15404#0" />
+                <element signature="e#15355#15373#0" />
+                <element signature="e#15406#15471#0" />
                 <element signature="n#!!block;n#init_local_version#0" />
+                <element signature="e#15682#15739#0" />
+                <element signature="e#15961#15999#0" />
                 <element signature="n#!!block;n#masterRpcInit#0" />
-                <element signature="n#!!block;n#assignChunksIDs#0" />
+                <element signature="e#16266#16446#0" />
+                <element signature="e#16899#17250#0" />
+                <element signature="e#17273#17290#0" />
+                <element signature="e#17428#17456#0" />
+                <element signature="e#17554#18552#0" />
+                <element signature="e#17638#18053#0" />
+                <element signature="e#17675#17728#0" />
+                <element signature="e#18094#18549#0" />
+                <element signature="e#18096#18130#0" />
+                <element signature="e#18611#18645#0" />
                 <element signature="n#!!block;n#copySlice#0" />
                 <element signature="n#!!block;n#comunicateChunksAssignementToWorkers#0" />
+                <element signature="e#19647#19768#0" />
+                <element signature="e#20000#20284#0" />
+                <element signature="e#20026#20281#0" />
+                <element signature="e#20309#20335#0" />
+                <element signature="e#20392#21120#0" />
+                <element signature="e#20471#21117#0" />
+                <element signature="e#20476#20666#0" />
+                <element signature="e#20524#20561#0" />
+                <element signature="e#20805#20960#0" />
                 <element signature="n#!!block;n#assignMapJobsWithRedundancy#0" />
+                <element signature="e#21320#21905#0" />
+                <element signature="e#22257#22845#0" />
+                <element signature="e#22300#22509#0" />
+                <element signature="e#22335#22423#0" />
+                <element signature="e#22543#22793#0" />
+                <element signature="e#22720#22788#0" />
+                <element signature="e#22915#23379#0" />
+                <element signature="e#23433#23939#0" />
+                <element signature="e#23437#23600#0" />
+                <element signature="e#23448#23511#0" />
+                <element signature="e#23514#23596#0" />
+                <element signature="e#23690#23827#0" />
                 <element signature="n#!!block;n#aggregateMappersCosts#0" />
+                <element signature="e#24379#25166#0" />
+                <element signature="e#24937#24999#0" />
+                <element signature="e#25078#25163#0" />
+                <element signature="e#25215#25361#0" />
+                <element signature="n#!!block;n#comunicateReducersBindings#0" />
+                <element signature="e#25557#25652#0" />
+                <element signature="e#26065#26159#0" />
+                <element signature="e#26161#26178#0" />
+                <element signature="e#26286#28329#0" />
+                <element signature="e#26445#26765#0" />
+                <element signature="e#26905#26988#0" />
+                <element signature="e#27153#27315#0" />
+                <element signature="e#27320#27452#0" />
+                <element signature="e#27366#27448#0" />
+                <element signature="e#27567#27796#0" />
+                <element signature="e#28348#28521#0" />
+                <element signature="e#28618#28665#0" />
+                <element signature="e#29129#30147#0" />
+                <element signature="e#29237#29613#0" />
+                <element signature="e#29644#29789#0" />
+                <element signature="e#30193#30819#0" />
+                <element signature="e#30197#30390#0" />
+                <element signature="e#30255#30386#0" />
+                <element signature="e#30533#30816#0" />
+                <element signature="e#30563#30647#0" />
+                <element signature="e#30653#30812#0" />
                 <element signature="n#!!block;n#killAll#0" />
+                <element signature="e#31118#31426#0" />
+                <element signature="e#31187#31423#0" />
+                <element signature="n#!!block;n#jobsEnd#0" />
+                <element signature="e#31482#31671#0" />
+                <element signature="e#31764#31977#0" />
+                <element signature="e#31768#31941#0" />
+                <element signature="e#31854#31937#0" />
               </folding>
             </state>
           </provider>
         </entry>
       </file>
       <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/master/recovery.go">
+        <entry file="file://$PROJECT_DIR$/test/genSequentiallyTokens.go">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="303">
-              <caret line="443" column="70" selection-start-line="443" selection-start-column="70" selection-end-line="443" selection-end-column="70" />
+            <state relative-caret-position="374">
+              <caret line="42" column="5" lean-forward="true" selection-start-line="42" selection-start-column="5" selection-end-line="42" selection-end-column="5" />
               <folding>
-                <element signature="n#!!block;n#MapPhaseRecovery#0" />
-                <element signature="n#!!block;n#AssignChunksIDsRecovery#0" />
-                <element signature="n#!!block;n#mergeMapResults#0" />
-                <element signature="n#!!block;n#backUpMasterState#0" />
-                <element signature="n#!!block;n#RecoveryFailedMasterState#0" />
-                <element signature="n#!!block;n#refreshConnections#0" />
+                <element signature="e#104#224#0" expanded="true" />
+                <element signature="n#!!block;n#parseTokenFileData#0" />
+                <element signature="n#!!block;n#singleBlockMap#0" />
               </folding>
             </state>
           </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/test/map_red_test.go">
+          <provider selected="true" editor-type-id="text-editor" />
         </entry>
       </file>
       <file pinned="false" current-in-tab="false">
@@ -418,8 +236,25 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/configurations/config.json">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="595">
-              <caret line="35" column="51" selection-start-line="35" selection-start-column="51" selection-end-line="35" selection-end-column="51" />
+            <state relative-caret-position="187">
+              <caret line="11" column="60" selection-start-line="11" selection-start-column="60" selection-end-line="11" selection-end-column="60" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/core/initDistribuitedVersion.go">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="289">
+              <caret line="63" column="17" selection-start-line="63" selection-start-column="17" selection-end-line="63" selection-end-column="17" />
+              <folding>
+                <element signature="n#!!block;n#loadChunksToChunkStorage#0" />
+                <element signature="n#!!block;n#BuildSequentialIDsListUpTo#0" />
+                <element signature="n#!!block;n#CheckAndSolveInitErr#0" />
+                <element signature="n#!!block;n#RegisterToMaster#0" />
+                <element signature="n#!!block;n#GetMasterAddr#0" />
+                <element signature="n#!!block;n#MasterAddressFetch#0" />
+              </folding>
             </state>
           </provider>
         </entry>
@@ -436,11 +271,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>error on bindings comunication</find>
-      <find>REDUCE ERRD</find>
-      <find>sLEEP</find>
-      <find>Reduce re</find>
-      <find>Reduce returned</find>
       <find>&quot;udp&quot;</find>
       <find>PING_CONN_TYPE</find>
       <find>tcp</find>
@@ -466,6 +296,11 @@
       <find>waiting for</find>
       <find>SIMULATE_WORKER_CRUSH_BEFORE_MILLISEC</find>
       <find>StateChan</find>
+      <find>REMOTE_SERVER_PORT_FORWARD</find>
+      <find>SIMULATE_WORKERS_SLOW_DOWN</find>
+      <find>time.Millisecond * (time.Duration(core.Config.PING_TIMEOUT_MILLISECONDS))</find>
+      <find>replication factor</find>
+      <find>BEFORE</find>
     </findStrings>
     <replaceStrings>
       <replace>core.Config</replace>
@@ -508,7 +343,6 @@
   <component name="IdeDocumentHistory">
     <option name="CHANGED_PATHS">
       <list>
-        <option value="$PROJECT_DIR$/test/genSequentiallyTokens.go" />
         <option value="$PROJECT_DIR$/scripts/testFaultTollerance.sh" />
         <option value="$PROJECT_DIR$/scripts/spinner.sh" />
         <option value="$PROJECT_DIR$/scripts/startEC2instances.sh" />
@@ -516,19 +350,21 @@
         <option value="$PROJECT_DIR$/core/worker_local_version.go" />
         <option value="$PROJECT_DIR$/worker/main.go" />
         <option value="$PROJECT_DIR$/core/masterReducersBindings.go" />
+        <option value="$PROJECT_DIR$/master/recovery.go" />
+        <option value="$PROJECT_DIR$/core/map_reduce.go" />
         <option value="$PROJECT_DIR$/core/initDistribuitedVersion.go" />
         <option value="$PROJECT_DIR$/configurations/config.json" />
-        <option value="$PROJECT_DIR$/master/recovery.go" />
         <option value="$PROJECT_DIR$/core/utils.go" />
-        <option value="$PROJECT_DIR$/core/map_reduce.go" />
+        <option value="$PROJECT_DIR$/test/genSequentiallyTokens.go" />
         <option value="$PROJECT_DIR$/master/main.go" />
       </list>
     </option>
   </component>
   <component name="ProjectFrameBounds" extendedState="6">
-    <option name="x" value="1917" />
+    <option name="x" value="-3" />
+    <option name="y" value="31" />
     <option name="width" value="2566" />
-    <option name="height" value="1083" />
+    <option name="height" value="1003" />
   </component>
   <component name="ProjectId" id="1OXQQrTE9NaFRZ2QJlLRNIYQTrH" />
   <component name="ProjectLevelVcsManager" settingsEditedManually="true">
@@ -625,7 +461,7 @@
       </list>
     </option>
   </component>
-  <component name="RunManager" selected="Go Build.master">
+  <component name="RunManager" selected="Go Build.go build genSequentiallyTokens.go">
     <configuration default="true" type="GoApplicationRunConfiguration" factoryName="Go Application">
       <module name="mapreducego" />
       <working_directory value="$PROJECT_DIR$/" />
@@ -765,24 +601,25 @@
     </todo-panel>
   </component>
   <component name="ToolWindowManager">
-    <frame x="1917" y="0" width="2566" height="1083" extended-state="6" />
+    <frame x="-3" y="31" width="2566" height="1003" extended-state="6" />
     <editor active="true" />
     <layout>
-      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.07683121" />
+      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.05772293" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
       <window_info id="Favorites" order="2" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="0" />
       <window_info anchor="bottom" id="Find" order="1" weight="0.32842106" />
-      <window_info active="true" anchor="bottom" id="Run" order="2" visible="true" weight="0.32842106" />
+      <window_info anchor="bottom" id="Run" order="2" weight="0.3275862" />
       <window_info anchor="bottom" x="3050" y="95" width="1920" height="971" id="Debug" order="3" type="WINDOWED" weight="0.45157894" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
       <window_info anchor="bottom" id="TODO" order="6" />
       <window_info anchor="bottom" id="Docker" order="7" show_stripe_button="false" />
       <window_info anchor="bottom" id="Database Changes" order="8" />
-      <window_info anchor="bottom" id="Version Control" order="9" weight="0.32842106" />
+      <window_info active="true" anchor="bottom" id="Version Control" order="9" visible="true" weight="0.3275862" />
       <window_info anchor="bottom" id="Terminal" order="10" weight="0.3275862" />
       <window_info anchor="bottom" id="Event Log" order="11" side_tool="true" />
+      <window_info anchor="bottom" id="Messages" order="12" weight="0.32947367" />
       <window_info anchor="right" id="Commander" internal_type="SLIDING" order="0" type="SLIDING" weight="0.4" />
       <window_info anchor="right" id="Ant Build" order="1" weight="0.25" />
       <window_info anchor="right" content_ui="combo" id="Hierarchy" order="2" weight="0.25" />
@@ -864,29 +701,30 @@
     <MESSAGE value="robustness enhanced on both worker and master side,&#10;timeout added on reducer activation rpc.Call with glbl chan --&gt;todo replicate on just other rpc.Call&#10;reducer returning just after error identified on reduce phase handled as spurious return after ping filter &#10;         -&gt;will move main routine at final sorting phase&#10;handled ultra rare possibility of partial reduce return &amp;&amp; all reducers dead &amp;&amp; reducer re spawn&#10;   with reducer id appended in master final return rpc with will avoid duplicate data aggregation and sorting&#10;&#10;TODO MASTER FAIL TEST &#10;     HUGE DATA IN TEST&#10;     &#10;Hopefully&#10;andysnake" />
     <MESSAGE value="fully tested on ec2 for worker fault tollerant&#10;  slightly modified fault tollerant logic for series of rare bug on some unfotunate fault conditions&#10; seem to work ALMOST EVERY TIME on ec2 worker randmized crushed with 4 worker to crush (with random extraction)&#10;    un tested after reducers replacement before map recovery ( if map fail -&gt; reduceToRedo lost --&gt; so old bindings will remain unless fails worker hosting binded reducers)&#10;    &#10;MASTER FAULT TOLLERANT slightly changed -&gt; robstness on map recovery (missing chunk may exisit on random scheduled master dead)&#10;                                             missing chunk will be re downloaded , mapped (concurrently also!) and output mereged&#10;&#10;pre commit before new control of TIMEOUT_RPC errors on MAP -&gt; timeoutted map has to be chekked if everything has been processed on mappers hosted in workers&#10;    similar on reduce" />
     <MESSAGE value="Heavily tested on ec2 instances -&gt; default config with relay server&#10; fault tollerance with 4 fail but realiable master seem to work well&#10; &#10;slightly changed fault tollerant logic for bug free&#10;&#10;LAST TODO:&#10; MASTER FAULT TOLLERANT TEST&#10; CODE CLEANUP&#10; REL END &#10; NjYxD &amp; prj Switch&#10; &#10; Hopefully last week !&#10; andysnake" />
-    <option name="LAST_COMMIT_MESSAGE" value="Heavily tested on ec2 instances -&gt; default config with relay server&#10; fault tollerance with 4 fail but realiable master seem to work well&#10; &#10;slightly changed fault tollerant logic for bug free&#10;&#10;LAST TODO:&#10; MASTER FAULT TOLLERANT TEST&#10; CODE CLEANUP&#10; REL END &#10; NjYxD &amp; prj Switch&#10; &#10; Hopefully last week !&#10; andysnake" />
+    <MESSAGE value="Heavily tested on ec2 instances with master and worker fault tollerant simulation changing master fault time range&#10;master checkpointing changed similarly to WAL so each op will be checked on replica even if hasn't been done &#10;sligtly change in fault tollerant logic and some little details causing bug with master fault  &#10;Hopefully That's all folks" />
+    <option name="LAST_COMMIT_MESSAGE" value="Heavily tested on ec2 instances with master and worker fault tollerant simulation changing master fault time range&#10;master checkpointing changed similarly to WAL so each op will be checked on replica even if hasn't been done &#10;sligtly change in fault tollerant logic and some little details causing bug with master fault  &#10;Hopefully That's all folks" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
       <breakpoints>
         <line-breakpoint type="DlvLineBreakpoint">
           <url>file://$PROJECT_DIR$/master/recovery.go</url>
-          <line>265</line>
+          <line>266</line>
           <option name="timeStamp" value="259" />
         </line-breakpoint>
         <line-breakpoint type="DlvLineBreakpoint">
           <url>file://$PROJECT_DIR$/core/utils.go</url>
-          <line>827</line>
+          <line>829</line>
           <option name="timeStamp" value="266" />
         </line-breakpoint>
         <line-breakpoint type="DlvLineBreakpoint">
           <url>file://$PROJECT_DIR$/master/main.go</url>
-          <line>236</line>
+          <line>234</line>
           <option name="timeStamp" value="270" />
         </line-breakpoint>
         <line-breakpoint type="DlvLineBreakpoint">
           <url>file://$PROJECT_DIR$/master/main.go</url>
-          <line>142</line>
+          <line>141</line>
           <option name="timeStamp" value="272" />
         </line-breakpoint>
         <line-breakpoint type="DlvLineBreakpoint">
@@ -901,17 +739,17 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" type="DlvLineBreakpoint">
           <url>file://$PROJECT_DIR$/test/genSequentiallyTokens.go</url>
-          <line>139</line>
+          <line>74</line>
           <option name="timeStamp" value="290" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="DlvLineBreakpoint">
           <url>file://$PROJECT_DIR$/test/genSequentiallyTokens.go</url>
-          <line>162</line>
+          <line>97</line>
           <option name="timeStamp" value="291" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="DlvLineBreakpoint">
           <url>file://$PROJECT_DIR$/master/recovery.go</url>
-          <line>294</line>
+          <line>295</line>
           <option name="timeStamp" value="296" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="DlvLineBreakpoint">
@@ -1035,9 +873,6 @@
     <entry file="file://$PROJECT_DIR$/Makefile">
       <provider selected="true" editor-type-id="text-editor" />
     </entry>
-    <entry file="file://$PROJECT_DIR$/test/map_red_test.go">
-      <provider selected="true" editor-type-id="text-editor" />
-    </entry>
     <entry file="file://$PROJECT_DIR$/outTokensSingleAggreagation.list">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="187">
@@ -1059,31 +894,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="272">
           <caret line="16" column="5" selection-start-line="16" selection-start-column="5" selection-end-line="16" selection-end-column="5" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/scripts/spinner.sh">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="527">
-          <caret line="126" column="18" selection-start-line="126" selection-start-column="18" selection-end-line="126" selection-end-column="18" />
-          <folding>
-            <element signature="e#35#168#0" />
-            <element signature="e#119#157#0" />
-            <element signature="e#722#745#0" />
-            <element signature="e#29269#29625#0" />
-            <element signature="e#29507#29614#0" />
-            <element signature="e#29567#29608#0" />
-            <element signature="e#29636#29920#0" />
-            <element signature="e#29804#29909#0" />
-            <element signature="e#29864#29890#0" />
-            <element signature="e#29943#30380#0" />
-            <element signature="e#30185#30369#0" />
-            <element signature="e#30402#30671#0" />
-            <element signature="e#30577#30660#0" />
-            <element signature="e#30692#31028#0" />
-            <element signature="e#31059#31316#0" />
-            <element signature="e#31342#31449#0" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -1112,18 +922,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="204">
           <caret line="12" column="7" selection-start-line="12" selection-start-column="7" selection-end-line="12" selection-end-column="7" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/test/genSequentiallyTokens.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="1513">
-          <caret line="102" column="9" selection-start-line="102" selection-start-column="9" selection-end-line="102" selection-end-column="9" />
-          <folding>
-            <element signature="n#!!block;n#parseTokenFileData#0" />
-            <element signature="n#!!block;n#singleBlockMap#0" />
-            <element signature="n#!!block;n#concurrentMap#0" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -1296,25 +1094,31 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/core/initDistribuitedVersion.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="323">
-          <caret line="32" column="91" selection-start-line="32" selection-start-column="91" selection-end-line="32" selection-end-column="91" />
-          <folding>
-            <element signature="n#!!block;n#loadChunksToChunkStorage#0" />
-            <element signature="n#!!block;n#BuildSequentialIDsListUpTo#0" />
-            <element signature="n#!!block;n#CheckAndSolveInitErr#0" />
-            <element signature="n#!!block;n#RegisterToMaster#0" />
-            <element signature="n#!!block;n#GetMasterAddr#0" />
-            <element signature="n#!!block;n#MasterAddressFetch#0" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file:///usr/lib/go-1.11/src/builtin/builtin.go">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="3094">
           <caret line="182" column="5" selection-start-line="182" selection-start-column="5" selection-end-line="182" selection-end-column="5" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file:///usr/lib/go-1.11/src/sync/mutex.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="340">
+          <caret line="24" column="5" selection-start-line="24" selection-start-column="5" selection-end-line="24" selection-end-column="5" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/core/workerStruct.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="2040">
+          <caret line="128" column="13" selection-start-line="128" selection-start-column="4" selection-end-line="128" selection-end-column="13" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/master/recovery.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="7344">
+          <caret line="443" column="70" selection-start-line="443" selection-start-column="70" selection-end-line="443" selection-end-column="70" />
         </state>
       </provider>
     </entry>
@@ -1332,43 +1136,169 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/configurations/config.json">
+    <entry file="file://$PROJECT_DIR$/scripts/spinner.sh">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="595">
-          <caret line="35" column="51" selection-start-line="35" selection-start-column="51" selection-end-line="35" selection-end-column="51" />
+        <state relative-caret-position="442">
+          <caret line="85" column="57" selection-start-line="85" selection-start-column="57" selection-end-line="85" selection-end-column="57" />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/master/recovery.go">
+    <entry file="file://$PROJECT_DIR$/core/initDistribuitedVersion.go">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="303">
-          <caret line="443" column="70" selection-start-line="443" selection-start-column="70" selection-end-line="443" selection-end-column="70" />
+        <state relative-caret-position="289">
+          <caret line="63" column="17" selection-start-line="63" selection-start-column="17" selection-end-line="63" selection-end-column="17" />
           <folding>
-            <element signature="n#!!block;n#MapPhaseRecovery#0" />
-            <element signature="n#!!block;n#AssignChunksIDsRecovery#0" />
-            <element signature="n#!!block;n#mergeMapResults#0" />
-            <element signature="n#!!block;n#backUpMasterState#0" />
-            <element signature="n#!!block;n#RecoveryFailedMasterState#0" />
-            <element signature="n#!!block;n#refreshConnections#0" />
+            <element signature="n#!!block;n#loadChunksToChunkStorage#0" />
+            <element signature="n#!!block;n#BuildSequentialIDsListUpTo#0" />
+            <element signature="n#!!block;n#CheckAndSolveInitErr#0" />
+            <element signature="n#!!block;n#RegisterToMaster#0" />
+            <element signature="n#!!block;n#GetMasterAddr#0" />
+            <element signature="n#!!block;n#MasterAddressFetch#0" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/core/workerStruct.go">
+    <entry file="file://$PROJECT_DIR$/test/map_red_test.go">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/core/map_reduce.go">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="299">
-          <caret line="128" column="13" selection-start-line="128" selection-start-column="4" selection-end-line="128" selection-end-column="13" />
+        <state relative-caret-position="988">
+          <caret line="95" column="45" selection-start-line="95" selection-start-column="45" selection-end-line="95" selection-end-column="45" />
+          <folding>
+            <element signature="n#!!block;n#RecoveryReduceResult#0" />
+            <element signature="n#!!block;n#Map_parse_builtin_quick_route#0" />
+            <element signature="n#!!block;n#Map_quick_route_reducers#0" />
+            <element signature="n#!!block;n#ReturnReduce#0" />
+            <element signature="n#!!block;n#Map_parse_builtin#0" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/configurations/config.json">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="187">
+          <caret line="11" column="60" selection-start-line="11" selection-start-column="60" selection-end-line="11" selection-end-column="60" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/genSequentiallyTokens.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="374">
+          <caret line="42" column="5" lean-forward="true" selection-start-line="42" selection-start-column="5" selection-end-line="42" selection-end-column="5" />
+          <folding>
+            <element signature="e#104#224#0" expanded="true" />
+            <element signature="n#!!block;n#parseTokenFileData#0" />
+            <element signature="n#!!block;n#singleBlockMap#0" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/master/main.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="-238">
+          <caret line="209" column="5" lean-forward="true" selection-start-line="209" selection-start-column="5" selection-end-line="209" selection-end-column="5" />
+          <folding>
+            <element signature="e#169#1900#0" />
+            <element signature="e#2346#2852#0" />
+            <element signature="e#2348#2394#0" />
+            <element signature="e#3458#3722#0" />
+            <element signature="e#3677#3719#0" />
+            <element signature="e#4149#4201#0" />
+            <element signature="n#!!block;n#filterFoundamentalMapResult#0" />
+            <element signature="e#14414#14497#0" />
+            <element signature="e#14699#14918#0" />
+            <element signature="e#14794#14856#0" />
+            <element signature="e#14862#14915#0" />
+            <element signature="n#!!block;n#checkMapRes#0" />
+            <element signature="e#15142#15206#0" />
+            <element signature="e#15313#15404#0" />
+            <element signature="e#15355#15373#0" />
+            <element signature="e#15406#15471#0" />
+            <element signature="n#!!block;n#init_local_version#0" />
+            <element signature="e#15682#15739#0" />
+            <element signature="e#15961#15999#0" />
+            <element signature="n#!!block;n#masterRpcInit#0" />
+            <element signature="e#16266#16446#0" />
+            <element signature="e#16899#17250#0" />
+            <element signature="e#17273#17290#0" />
+            <element signature="e#17428#17456#0" />
+            <element signature="e#17554#18552#0" />
+            <element signature="e#17638#18053#0" />
+            <element signature="e#17675#17728#0" />
+            <element signature="e#18094#18549#0" />
+            <element signature="e#18096#18130#0" />
+            <element signature="e#18611#18645#0" />
+            <element signature="n#!!block;n#copySlice#0" />
+            <element signature="n#!!block;n#comunicateChunksAssignementToWorkers#0" />
+            <element signature="e#19647#19768#0" />
+            <element signature="e#20000#20284#0" />
+            <element signature="e#20026#20281#0" />
+            <element signature="e#20309#20335#0" />
+            <element signature="e#20392#21120#0" />
+            <element signature="e#20471#21117#0" />
+            <element signature="e#20476#20666#0" />
+            <element signature="e#20524#20561#0" />
+            <element signature="e#20805#20960#0" />
+            <element signature="n#!!block;n#assignMapJobsWithRedundancy#0" />
+            <element signature="e#21320#21905#0" />
+            <element signature="e#22257#22845#0" />
+            <element signature="e#22300#22509#0" />
+            <element signature="e#22335#22423#0" />
+            <element signature="e#22543#22793#0" />
+            <element signature="e#22720#22788#0" />
+            <element signature="e#22915#23379#0" />
+            <element signature="e#23433#23939#0" />
+            <element signature="e#23437#23600#0" />
+            <element signature="e#23448#23511#0" />
+            <element signature="e#23514#23596#0" />
+            <element signature="e#23690#23827#0" />
+            <element signature="n#!!block;n#aggregateMappersCosts#0" />
+            <element signature="e#24379#25166#0" />
+            <element signature="e#24937#24999#0" />
+            <element signature="e#25078#25163#0" />
+            <element signature="e#25215#25361#0" />
+            <element signature="n#!!block;n#comunicateReducersBindings#0" />
+            <element signature="e#25557#25652#0" />
+            <element signature="e#26065#26159#0" />
+            <element signature="e#26161#26178#0" />
+            <element signature="e#26286#28329#0" />
+            <element signature="e#26445#26765#0" />
+            <element signature="e#26905#26988#0" />
+            <element signature="e#27153#27315#0" />
+            <element signature="e#27320#27452#0" />
+            <element signature="e#27366#27448#0" />
+            <element signature="e#27567#27796#0" />
+            <element signature="e#28348#28521#0" />
+            <element signature="e#28618#28665#0" />
+            <element signature="e#29129#30147#0" />
+            <element signature="e#29237#29613#0" />
+            <element signature="e#29644#29789#0" />
+            <element signature="e#30193#30819#0" />
+            <element signature="e#30197#30390#0" />
+            <element signature="e#30255#30386#0" />
+            <element signature="e#30533#30816#0" />
+            <element signature="e#30563#30647#0" />
+            <element signature="e#30653#30812#0" />
+            <element signature="n#!!block;n#killAll#0" />
+            <element signature="e#31118#31426#0" />
+            <element signature="e#31187#31423#0" />
+            <element signature="n#!!block;n#jobsEnd#0" />
+            <element signature="e#31482#31671#0" />
+            <element signature="e#31764#31977#0" />
+            <element signature="e#31768#31941#0" />
+            <element signature="e#31854#31937#0" />
+          </folding>
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/core/utils.go">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="299">
-          <caret line="621" column="5" selection-start-line="621" selection-start-column="5" selection-end-line="621" selection-end-column="5" />
+        <state relative-caret-position="177">
+          <caret line="685" selection-start-line="685" selection-end-line="685" />
           <folding>
             <element signature="e#346#374#0" />
             <element signature="e#394#2405#0" />
-            <element signature="e#1225#1238#0" />
             <element signature="e#2450#2482#0" />
             <element signature="e#2561#2711#0" />
             <element signature="e#2757#2788#0" />
@@ -1393,276 +1323,6 @@
             <element signature="e#6610#6656#0" />
             <element signature="e#6731#6861#0" />
             <element signature="e#6768#6857#0" />
-            <element signature="e#6902#7808#0" />
-            <element signature="e#7947#10617#0" />
-            <element signature="e#8196#8865#0" />
-            <element signature="e#8348#8456#0" />
-            <element signature="e#8567#8862#0" />
-            <element signature="e#8867#9344#0" />
-            <element signature="e#9484#10582#0" />
-            <element signature="e#9690#9728#0" />
-            <element signature="e#9917#9963#0" />
-            <element signature="e#9966#10036#0" />
-            <element signature="e#10295#10353#0" />
-            <element signature="e#10428#10579#0" />
-            <element signature="e#10486#10575#0" />
-            <element signature="e#10630#10730#0" />
-            <element signature="e#10768#10842#0" />
-            <element signature="e#10795#10840#0" />
-            <element signature="e#10888#13132#0" />
-            <element signature="e#10940#11201#0" />
-            <element signature="e#11453#11956#0" />
-            <element signature="e#11639#11841#0" />
-            <element signature="e#12214#12390#0" />
-            <element signature="e#12368#12387#0" />
-            <element signature="e#12396#12608#0" />
-            <element signature="e#12755#12958#0" />
-            <element signature="e#12995#13107#0" />
-            <element signature="e#13172#13278#0" />
-            <element signature="e#13202#13276#0" />
-            <element signature="e#13356#13630#0" />
-            <element signature="e#13359#13421#0" />
-            <element signature="e#13569#13584#0" />
-            <element signature="e#13632#13664#0" />
-            <element signature="e#13700#13858#0" />
-            <element signature="e#13891#13916#0" />
-            <element signature="e#13953#14009#0" />
-            <element signature="e#14051#14092#0" />
-            <element signature="e#14138#14182#0" />
-            <element signature="e#14222#14253#0" />
-            <element signature="e#14297#14377#0" />
-            <element signature="e#14426#14499#0" />
-            <element signature="e#14540#14735#0" />
-            <element signature="e#14615#14674#0" />
-            <element signature="e#14680#14732#0" />
-            <element signature="e#14779#14885#0" />
-            <element signature="e#14983#16269#0" />
-            <element signature="e#14986#15032#0" />
-            <element signature="e#15315#15365#0" />
-            <element signature="e#15416#15439#0" />
-            <element signature="e#15498#15527#0" />
-            <element signature="e#15607#16246#0" />
-            <element signature="e#15615#16243#0" />
-            <element signature="e#15718#15734#0" />
-            <element signature="e#15738#15759#0" />
-            <element signature="e#15855#15946#0" />
-            <element signature="e#16105#16121#0" />
-            <element signature="e#16191#16239#0" />
-            <element signature="e#16271#17533#0" />
-            <element signature="e#17582#19526#0" />
-            <element signature="e#17585#17666#0" />
-            <element signature="e#17992#18484#0" />
-            <element signature="e#18566#18604#0" />
-            <element signature="e#18783#19466#0" />
-            <element signature="e#19208#19265#0" />
-            <element signature="e#19315#19463#0" />
-            <element signature="e#19483#19503#0" />
-            <element signature="e#19611#21842#0" />
-            <element signature="e#19614#19697#0" />
-            <element signature="e#19963#20119#0" />
-            <element signature="e#20252#21440#0" />
-            <element signature="e#20292#20351#0" />
-            <element signature="e#20394#20454#0" />
-            <element signature="e#20494#20550#0" />
-            <element signature="e#20707#21273#0" />
-            <element signature="e#20948#21003#0" />
-            <element signature="e#21040#21148#0" />
-            <element signature="e#21167#21229#0" />
-            <element signature="e#21234#21269#0" />
-            <element signature="e#21289#21437#0" />
-            <element signature="e#21689#21731#0" />
-            <element signature="e#22164#22189#0" />
-            <element signature="e#22673#22794#0" />
-            <element signature="e#22724#22778#0" />
-            <element signature="e#22742#22775#0" />
-            <element signature="e#22871#23209#0" />
-            <element signature="e#22943#23021#0" />
-            <element signature="e#23078#23154#0" />
-            <element signature="e#23107#23151#0" />
-            <element signature="e#23156#23175#0" />
-            <element signature="e#23289#23404#0" />
-            <element signature="e#23316#23388#0" />
-            <element signature="e#23365#23385#0" />
-            <element signature="e#23467#23862#0" />
-            <element signature="e#23470#23506#0" />
-            <element signature="e#23559#23846#0" />
-            <element signature="e#23683#23770#0" />
-            <element signature="e#23776#23829#0" />
-            <element signature="e#23896#23946#0" />
-            <element signature="e#23908#23923#0" />
-            <element signature="e#23929#23944#0" />
-            <element signature="e#23980#24030#0" />
-            <element signature="e#23992#24007#0" />
-            <element signature="e#24013#24028#0" />
-            <element signature="e#24120#24573#0" />
-            <element signature="e#24349#24571#0" />
-            <element signature="e#24496#24559#0" />
-            <element signature="e#24653#24810#0" />
-            <element signature="e#24894#25153#0" />
-            <element signature="e#25212#25322#0" />
-            <element signature="e#25265#25298#0" />
-            <element signature="e#25391#25504#0" />
-            <element signature="e#25447#25480#0" />
-            <element signature="e#25561#25656#0" />
-            <element signature="e#25595#25641#0" />
-            <element signature="e#25617#25638#0" />
-            <element signature="e#25725#25852#0" />
-            <element signature="e#25918#26014#0" />
-            <element signature="e#26060#26301#0" />
-            <element signature="e#26211#26276#0" />
-            <element signature="e#26303#26366#0" />
-            <element signature="e#26608#26722#0" />
-            <element signature="e#26640#26686#0" />
-            <element signature="e#26797#27342#0" />
-            <element signature="e#26925#27091#0" />
-            <element signature="e#27031#27060#0" />
-            <element signature="e#27097#27302#0" />
-            <element signature="e#27147#27200#0" />
-            <element signature="e#27245#27272#0" />
-            <element signature="e#27417#27693#0" />
-            <element signature="e#27647#27665#0" />
-            <element signature="e#27671#27690#0" />
-            <element signature="e#27740#27884#0" />
-            <element signature="e#27771#27790#0" />
-            <element signature="e#27820#27869#0" />
-            <element signature="e#27845#27866#0" />
-            <element signature="e#27944#28122#0" />
-            <element signature="e#27973#27992#0" />
-            <element signature="e#28023#28107#0" />
-            <element signature="e#28083#28104#0" />
-            <element signature="e#28237#28251#0" />
-            <element signature="e#28298#28317#0" />
-            <element signature="e#28406#28420#0" />
-            <element signature="e#28464#28483#0" />
-            <element signature="e#28527#28541#0" />
-            <element signature="e#28585#28604#0" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/master/main.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="422">
-          <caret line="115" column="57" lean-forward="true" selection-start-line="115" selection-start-column="57" selection-end-line="115" selection-end-column="57" />
-          <folding>
-            <element signature="n#!!block;n#main#1" />
-            <element signature="n#!!block;n#filterFoundamentalMapResult#0" />
-            <element signature="n#!!block;n#checkMapRes#0" />
-            <element signature="n#!!block;n#init_local_version#0" />
-            <element signature="n#!!block;n#masterRpcInit#0" />
-            <element signature="n#!!block;n#assignChunksIDs#0" />
-            <element signature="n#!!block;n#copySlice#0" />
-            <element signature="n#!!block;n#comunicateChunksAssignementToWorkers#0" />
-            <element signature="n#!!block;n#assignMapJobsWithRedundancy#0" />
-            <element signature="n#!!block;n#aggregateMappersCosts#0" />
-            <element signature="n#!!block;n#killAll#0" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file:///usr/lib/go-1.11/src/sync/mutex.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="256">
-          <caret line="24" column="5" selection-start-line="24" selection-start-column="5" selection-end-line="24" selection-end-column="5" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/core/map_reduce.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="357">
-          <caret line="95" column="45" lean-forward="true" selection-start-line="95" selection-start-column="45" selection-end-line="95" selection-end-column="45" />
-          <folding>
-            <element signature="e#188#218#0" />
-            <element signature="n#!!block;n#Get_chunk_ids#0" />
-            <element signature="e#450#762#0" />
-            <element signature="e#1041#1517#0" />
-            <element signature="e#1043#1085#0" />
-            <element signature="e#1210#1289#0" />
-            <element signature="e#1295#1514#0" />
-            <element signature="e#1586#1620#0" />
-            <element signature="e#1713#1764#0" />
-            <element signature="e#1731#1761#0" />
-            <element signature="e#1808#1929#0" />
-            <element signature="e#1830#1864#0" />
-            <element signature="n#!!block;n#downloadChunk#0" />
-            <element signature="e#2103#2347#0" />
-            <element signature="e#2580#2644#0" />
-            <element signature="e#2794#2834#0" />
-            <element signature="e#3123#3157#0" />
-            <element signature="e#3683#3736#0" />
-            <element signature="e#3938#4069#0" />
-            <element signature="e#4196#4256#0" />
-            <element signature="e#4234#4253#0" />
-            <element signature="e#4625#4642#0" />
-            <element signature="e#4921#4936#0" />
-            <element signature="n#!!block;n#ExitWorker#0" />
-            <element signature="e#8355#8565#0" />
-            <element signature="e#8589#8757#0" />
-            <element signature="e#8777#8891#0" />
-            <element signature="n#!!block;n#AssignMaps#0" />
-            <element signature="e#9012#9363#0" />
-            <element signature="e#9573#9730#0" />
-            <element signature="e#9668#9727#0" />
-            <element signature="e#9736#10438#0" />
-            <element signature="e#10005#10435#0" />
-            <element signature="e#10180#10374#0" />
-            <element signature="e#10324#10369#0" />
-            <element signature="e#10380#10431#0" />
-            <element signature="e#10673#11063#0" />
-            <element signature="e#10716#10854#0" />
-            <element signature="e#11105#11231#0" />
-            <element signature="e#11319#11685#0" />
-            <element signature="e#11392#11435#0" />
-            <element signature="e#11869#12004#0" />
-            <element signature="e#12006#12101#0" />
-            <element signature="e#12178#12204#0" />
-            <element signature="n#!!block;n#RecoveryMapRes#0" />
-            <element signature="e#12541#12667#0" />
-            <element signature="e#12832#13904#0" />
-            <element signature="e#12933#13694#0" />
-            <element signature="e#13042#13107#0" />
-            <element signature="e#13197#13259#0" />
-            <element signature="e#13302#13444#0" />
-            <element signature="e#13929#14090#0" />
-            <element signature="n#!!block;n#RecoveryReduceResult#0" />
-            <element signature="e#14389#14665#0" />
-            <element signature="e#14510#14762#0" />
-            <element signature="e#14669#14749#0" />
-            <element signature="e#14689#14744#0" />
-            <element signature="e#14732#14825#0" />
-            <element signature="e#14760#14809#0" />
-            <element signature="e#14893#14998#0" />
-            <element signature="e#15088#15193#0" />
-            <element signature="e#15517#15701#0" />
-            <element signature="e#16164#16192#0" />
-            <element signature="n#!!block;n#Map_parse_builtin_quick_route#0" />
-            <element signature="e#20194#20694#0" />
-            <element signature="e#20817#20901#0" />
-            <element signature="e#21021#21147#0" />
-            <element signature="e#21190#21224#0" />
-            <element signature="e#21275#21303#0" />
-            <element signature="e#21398#21433#0" />
-            <element signature="e#21468#21532#0" />
-            <element signature="e#21662#21875#0" />
-            <element signature="e#21813#21819#0" />
-            <element signature="n#!!block;n#Map_quick_route_reducers#0" />
-            <element signature="e#22132#22405#0" />
-            <element signature="e#22434#22446#0" />
-            <element signature="e#22902#22961#0" />
-            <element signature="e#23043#23279#0" />
-            <element signature="e#23203#23209#0" />
-            <element signature="e#23281#23296#0" />
-            <element signature="e#23536#23709#0" />
-            <element signature="e#23725#23790#0" />
-            <element signature="e#23858#23983#0" />
-            <element signature="n#!!block;n#ReturnReduce#0" />
-            <element signature="e#24227#24375#0" />
-            <element signature="e#24436#24503#0" />
-            <element signature="e#24493#24499#0" />
-            <element signature="n#!!block;n#Map_parse_builtin#0" />
-            <element signature="e#24953#24987#0" />
-            <element signature="e#25031#25059#0" />
-            <element signature="e#25154#25178#0" />
           </folding>
         </state>
       </provider>

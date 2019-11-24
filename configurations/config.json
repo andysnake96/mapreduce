@@ -9,6 +9,7 @@
 	"SIMULATE_WORKERS_CRUSH_NUM": 				2,
 	"FAIL_RETRY": 								3,
 	"FIXED_PORT": 								false,
+	"_comment": 								"core config",
 	"LoadChunksToS3": 							true,
 	"CHUNK_SIZE": 								32768,
 	"WORKER_NUM_MAP": 							5,
@@ -35,6 +36,7 @@
 	"SIMULATE_WORKER_CRUSH_AFTER_MILLISEC": 	1000,
 	"SIMULATE_WORKER_CRUSH_BEFORE_MILLISEC":	100,
 	"WORKER_IDLE_WAIT_POLL_MILLISEC"	   :	5,
+	"_comment": 								"S3",
 	"S3_REGION": 								"eu-central-1",
 	"S3_BUCKET": 								"mapreducechunks"
 }

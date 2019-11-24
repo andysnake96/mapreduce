@@ -64,7 +64,7 @@ func main() {
 	if len(os.Args) < 3 {
 		println("usage: isMasterCopy , 0 |master public address , [source file1],...[source fileN]")
 		os.Exit(1)
-	} //TODO ARGV TEMPLATE
+	}
 
 	//// public master address
 	if os.Args[2] == "0" {
@@ -81,8 +81,8 @@ func main() {
 	}
 	//// filenames
 	filenames := core.FILENAMES_LOCL //default  divina commedia
-	if len(os.Args) > 4 {
-		filenames = os.Args[4:]
+	if len(os.Args) > 3 {
+		filenames = os.Args[3:]
 	}
 	MasterControl.MasterAddress = masterAddress
 	startInitTime := time.Now()
@@ -104,7 +104,6 @@ const SIMULATE_MASTER_CRUSH = true
 func masterLogic(startPoint uint32, masterControl *core.MASTER_CONTROL, isReplica bool, uploader *aws_SDK_wrap.UPLOADER) {
 	//Core logic of generic master (replica or not)
 	//map reduce phase
-	//TODO basic steps instight
 	var startTime time.Time
 	var err bool
 	var e error
@@ -301,8 +300,8 @@ finalAggreagate:
 	if core.Config.BACKUP_MASTER {
 		masterControl.StateChan <- core.ENDED
 		masterControl.State = core.ENDED
-		masterReplicaPollingTime := 2 * time.Millisecond * (time.Duration(core.Config.PING_TIMEOUT_MILLISECONDS))
-		time.Sleep(masterReplicaPollingTime * 2) //be sure replica see ended state for clean exit
+		masterReplicaPollingTime := time.Millisecond * (time.Duration(core.Config.PING_TIMEOUT_MILLISECONDS))
+		time.Sleep(masterReplicaPollingTime * 3) //be sure replica see ended state for clean exit
 	}
 	os.Exit(0)
 }

@@ -22,85 +22,19 @@ const (
 	MULTY_ROUTINE_CHUNKS_VERSION
 )
 
-/*type MASTER_CONTROLA struct {
-	MasterRpc     *core.MasterRpc
-	MasterAddress string
-	Workers       core.WorkersKinds //connected workers
-	WorkersAll    []core.Worker     //list of all workers ref.
-	//list of all avaibles  chunks
-	MasterData core.MASTER_STATE_DATA
-	////////// master fault tollerant
-	StateChan     chan uint32
-	State         uint32
-	pingConn      net.Conn
-	UploaderState *aws_SDK_wrap.UPLOADER
-}
-func testEncode2() {
-	m := core.MASTER_CONTROL{
-		MasterRpc: &core.MasterRpc{
-			FinalTokens:     []core.Token{core.Token{"a", 1}},
-			ReturnedReducer: nil,
-		},
-		MasterAddress: "192.168.1.96",
-		Workers: core.WorkersKinds{
-			WorkersMapReduce: []core.Worker{{
-				Address:         "1.1.1.1.1",
-				PingServicePort: 0,
-				Id:              0,
-				State: core.WorkerStateMasterControl{
-					ChunksIDs: []int{1, 2, 3},
-					ControlRPCInstance: core.WorkerIstanceControl{
-						Id:       1,
-						Port:     2,
-						Kind:     0,
-						IntState: 0,
-						Client:   nil,
-					},
-					Failed: false,
-				},
-			}},
-			WorkersOnlyReduce: nil,
-			WorkersBackup:     nil,
-		},
-		WorkersAll: nil,
-		StateChan:  nil,
-		State:      0,
-		pingConn:   nil,
-	}
-	o := &core.MASTER_CONTROL{}
-	b := bytes.Buffer{}
-	e := gob.NewEncoder(&b)
-	err := e.Encode(m)
-	core.CheckErr(err, true, "encode")
-	str := base64.StdEncoding.EncodeToString(b.Bytes())
+//var SOURCE_FILENAMES = core.FILENAMES_LOCL
+var SOURCE_FILENAMES = []string{"txtSrc/ALL.txt"}
 
-	by, err := base64.StdEncoding.DecodeString(str)
-	core.CheckErr(err, true, "decode base 64")
-	bb := bytes.Buffer{}
-	bb.Write(by)
-	d := gob.NewDecoder(&bb)
-	err = d.Decode(&o)
-	core.CheckErr(err, true, "decode base 64")
-
-	//core.GenericPrint(deserialized)
-}
-*/
 func main() {
 	core.Config = new(core.Configuration)
 	core.ReadConfigFile(core.CONFIGFILEPATH, core.Config)
 
-	//testEncode2()
-	//os.Exit(0)
-	startTime := time.Now()
-
 	finalTokens := concurrentMap()
 	//finalTokens := singleBlockMap()
 
-	endTime := time.Now()
 	tk := core.TokenSorter{finalTokens}
 	sort.Sort(sort.Reverse(tk))
 	core.SerializeToFile(finalTokens, TEST_TOKENS_OUTPUT_FILE)
-	println("elapsed: ", endTime.Sub(startTime).String())
 	errs := checkDifferenceInFinaleTokens(core.FINAL_TOKEN_FILENAME, TEST_TOKENS_OUTPUT_FILE)
 	println("End Check")
 	if len(errs) > 0 {
@@ -198,9 +132,10 @@ func singleBlockMap() []core.Token {
 	}
 	return finalTokens
 }
+
 func concurrentMap() []core.Token {
 	//multi routine map over chunk
-	chunks := core.InitChunks(core.FILENAMES_LOCL)
+	chunks := core.InitChunks(SOURCE_FILENAMES)
 	mappersOutput := make([]map[string]int, len(chunks))
 
 	barrier := new(sync.WaitGroup)
