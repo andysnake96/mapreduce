@@ -20,6 +20,8 @@
 	"MAX_REDUCERS_PER_WORKER": 					2,
 	"CHUNKS_REPLICATION_FACTOR": 				1,
 	"CHUNKS_REPLICATION_FACTOR_BACKUP_WORKERS":	5,
+	"RESET_REDUCER_RESPAWNED_MASTER":		true,
+	"REPLAY_ANSWERS":		2,
 	"RPC_TYPE": 								"tcp",
 	"_comment": 								"services base port",
 	"MASTER_BASE_PORT":	 						5555,

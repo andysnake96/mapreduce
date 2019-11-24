@@ -53,9 +53,6 @@ func (workerNode *Worker_node_internal) Get_chunk_ids(chunkIDs []int, voidReply 
 		}
 	}
 	for indx, chunk := range chunksDownloaded {
-		if len(chunk) < 5 {
-			panic("INVALID DOWNLOAD")
-		}
 		workerNode.WorkerChunksStore.Chunks[chunkIDs[indx]] = chunk
 	}
 	return nil, mapJobTodo
@@ -101,24 +98,30 @@ func (workerNode *Worker_node_internal) initReducer(logicID, numChunksExpected, 
 		Port:                         port,
 	}
 }
+
+const REDUCER_REPLAY_ANWS = 3 //max num of allowed aggregated tokens transmit to master
+
 func (workerNode *Worker_node_internal) ActivateNewReducer(arg ReduceActiveArg, voidReply *int) error {
 	//create a new reducer instance on top of workerNode,
 	//for the new reducer will be assigned default port as reducerID +reducer port base
 	//Idempontent function, it's safe to Re Activate a Reducer on same worker and same reducer port will be returned
 
-	/*if Config.SIMULATE_WORKERS_SLOW_DOWN {
-		rndSleep := rand.Int63n(int64(MAX_RND_SLEEP))
-		time.Sleep(time.Duration(rndSleep))
-	}*/
-
 	//// check if already instantiated reducer if it exist return his port
+	masterRpcAddr := workerNode.MasterAddr + ":" + strconv.Itoa(Config.MASTER_BASE_PORT)
+
+	var err error = nil
 	for _, reducer := range workerNode.ReducerInstances {
 		if reducer.LogicID == arg.LogicID {
-			return nil
+			//founded reducer ->  reset the client
+			if reducer.MasterClient != nil {
+				_ = reducer.MasterClient.Close()
+			}
+			reducer.MasterClient, err = rpc.Dial(Config.RPC_TYPE, masterRpcAddr) //init master client if has been eventually null-setted
+
+			return err
 		}
 	}
 	/// if new reducer activation is needed init master link and rpc server on this node
-	masterRpcAddr := workerNode.MasterAddr + ":" + strconv.Itoa(Config.MASTER_BASE_PORT)
 	masterClient, err := rpc.Dial(Config.RPC_TYPE, masterRpcAddr) //init master client for future final return
 	if CheckErr(err, false, "reducer activation master link fail on addr= "+masterRpcAddr) {
 		return err
@@ -136,6 +139,7 @@ func (workerNode *Worker_node_internal) ActivateNewReducer(arg ReduceActiveArg, 
 	err = newReducer.Server.RegisterName("REDUCE", &newReducer)
 	CheckErr(err, true, "reduce rpc register")
 	newReducer.Port = ChosenPort
+	newReducer.REPLAY_ANSWER = REDUCER_REPLAY_ANWS
 	go newReducer.Server.Accept(l)
 	workerNode.ReducerInstances = append(workerNode.ReducerInstances, newReducer)
 	//workerNode.StateChan <- uint32(REDUCE)
@@ -150,16 +154,20 @@ func (r *ReducerIstanceStateInternal) Reduce(RedArgs ReduceArgs, voidReply *int)
 		intermediate inputs buffered at reduce level for fault recovery ( avoid all reduce call to re-happend)
 	*/
 
-	//random sleep on reduce
+	var err error = nil
+	allEnded := true                  //for later exit condition check
+	duplicateIntermdiateData := false //for later new Map(chunk) check on already reduced ones
+	rtr := true                       //robstness :single retry on dead master client ( also supported configurable retries master side )
+	if r.AllEnded {
+		goto reducer_compleated
+	}
+	r.mutex.Lock()                //avoid race condition over cumulatives variable
 	r.StateChan <- uint32(REDUCE) //MASTER replica will have to wait reducer re set ping state to IDLE for reactivating
-	//todo for distribuited safety here has to be waited at least 2 * ping polling time to be sure replica will know worker is in REDUCE phase ...?
-	r.mutex.Lock() //avoid race condition over cumulatives variable
 	//update cumulative calls per intermdiate data share (chunk's derivate)
-	duplicateIntermdiateData := false
 	for _, chunkId := range RedArgs.Source {
 		if r.CumulativeCalls[chunkId] == true {
 			duplicateIntermdiateData = true //already processed that intermdiate token share
-			println("intermdiate data contains a share:", chunkId, "already processed")
+			println("dup interm. share:", chunkId)
 		} else if duplicateIntermdiateData { //intermdiate data id collision--->something already processed something not!
 			GenericPrint(RedArgs.Source, "received chunk IDs")
 			panic("CRITICAL INTERMDIATE DATA COLLISION ... ABORTING")
@@ -179,24 +187,32 @@ func (r *ReducerIstanceStateInternal) Reduce(RedArgs ReduceArgs, voidReply *int)
 	for key, value := range RedArgs.IntermediateTokens {
 		r.IntermediateTokensCumulative[key] += value //continusly aggregate received intermediate Tokens
 	}
-	//exit condition check
-	allEnded := true
+
 	for _, processedIntermdDataShare := range r.CumulativeCalls {
 		if !processedIntermdDataShare { //check if all expected itermediate data share has been REDUCED()
 			allEnded = false
 		}
 	}
-	r.mutex.Unlock() //here either all ended -> no longer possible interm tokens overlap race condition or not all finished -> so unlocked anyway :)
+	r.mutex.Unlock()
 	r.StateChan <- uint32(IDLE)
-	if allEnded {
+reducer_compleated:
+	//r.mutex.Unlock() //here either all ended -> no longer possible interm tokens overlap race condition or not all finished -> so unlocked anyway :)
+	if allEnded && rtr && r.REPLAY_ANSWER > 0 {
+		r.AllEnded = true
 		println("ALL ENDED at reducer :", r.LogicID)
-		err := r.MasterClient.Call("MASTER.ReturnReduce", ReduceRet{r.LogicID, r.IntermediateTokensCumulative}, nil)
-		CheckErr(err, false, "master return failed ")
+		err = r.MasterClient.Call("MASTER.ReturnReduce", ReduceRet{r.LogicID, r.IntermediateTokensCumulative}, nil)
+		r.REPLAY_ANSWER--           //replay answer to master only at most a fixed number of times
 		r.StateChan <- uint32(IDLE) //reducer ended
-		println("sended to master", r.MasterAddress, " aggregated tokens ", len(r.IntermediateTokensCumulative))
+		if CheckErr(err, false, "master return failed ") {
+			r.MasterClient, err = rpc.Dial(Config.RPC_TYPE, r.MasterAddress) //robstness: re init master client on error and retry 1 time
+			rtr = false
+			goto reducer_compleated //1 retry with refreshed master client
+		} else {
+			println("sended to master", r.MasterAddress, " aggregated tokens ", len(r.IntermediateTokensCumulative))
+		}
 	}
 
-	return nil
+	return err
 }
 func (workerNode *Worker_node_internal) ExitWorker(VoidArg int, VoidRepli *int) error {
 	//stupid rpc to let the worker exit ---> master knows that worker won't have anymore calls/jobs schedule
@@ -246,9 +262,6 @@ func (workerNode *Worker_node_internal) AssignMaps(arg MapWorkerArgs, Destinatio
 			if !isAlreadyOwnedChunk {
 				workerNode.WorkerChunksStore.Chunks[chunkID] = arg.Chunks[i]
 				mapJobsTODO = append(mapJobsTODO, chunkID)
-				if len(arg.Chunks[i]) < 5 {
-					panic("invalid chunk received ")
-				}
 			} else {
 				println("already have chunk :", chunkID)
 			}
@@ -343,24 +356,46 @@ func (workerNode *Worker_node_internal) RecoveryMapRes(chunkFairShare []int, Des
 func (workerNode *Worker_node_internal) RecoveryReduceResult(ReducerID int, FinalTokens *ReduceRet) error {
 	// return final result to new master if it exist
 	var reducer *ReducerIstanceStateInternal = nil
-	for _, r := range workerNode.ReducerInstances {
+	redIndex := -1
+	var err error = nil
+	for rindx, r := range workerNode.ReducerInstances {
 		if r.LogicID == ReducerID && r.Port == (Config.REDUCE_SERVICE_BASE_PORT+ReducerID) { //todo lock unneeded because of wait idle
 			reducer = &r
+			redIndex = rindx
 			//check if reducer has compleated the job -> all mapper interm tokens received & processed
 			for _, processed := range r.CumulativeCalls {
 				if !processed {
-					return errors.New("uncompleted reduction")
+					err = errors.New("uncompleted reduction")
+					goto exit
 				}
 			}
 			break
 		}
 	}
-	if reducer != nil && len(reducer.IntermediateTokensCumulative) > 0 {
+	if reducer == nil {
+		err = errors.New("not founded reducer")
+		return err
+	}
+	if len(reducer.IntermediateTokensCumulative) > 0 {
 		*FinalTokens = ReduceRet{reducer.LogicID, reducer.IntermediateTokensCumulative}
 		println("requested recovery for reducer ", reducer.LogicID, ReducerID, " of tokens: ", len(reducer.IntermediateTokensCumulative))
-		return nil
+		if !Config.RESET_REDUCER_RESPAWNED_MASTER {
+			return nil
+		}
+		goto exit
 	}
-	return errors.New("not founded reducer")
+
+exit:
+	//new master asked cached data -> refresh the master client for later returns
+	masterRpcAddr := workerNode.MasterAddr + ":" + strconv.Itoa(Config.MASTER_BASE_PORT)
+	reducer.MasterClient, err = rpc.Dial(Config.RPC_TYPE, masterRpcAddr) //init master client if has been eventually null-setted
+	CheckErr(err, false, "REFRESH MASTER CLIENT ON REDUCER")
+	if Config.RESET_REDUCER_RESPAWNED_MASTER { //if configured-> reset alive reducers
+		oldRplAnsw := reducer.REPLAY_ANSWER
+		workerNode.ReducerInstances[redIndex] = workerNode.initReducer(ReducerID, len(reducer.CumulativeCalls), reducer.Port, reducer.MasterClient)
+		workerNode.ReducerInstances[redIndex].REPLAY_ANSWER = oldRplAnsw
+	}
+	return err
 }
 
 type ReduceTriggerArg struct {
@@ -465,9 +500,9 @@ func (workerNode *Worker_node_internal) ReducersCollocations(arg ReduceTriggerAr
 
 		if end.Error != nil {
 			hasErrd = true
+			CheckErr(end.Error, false, "REDUCE ERRD")
 			e := errors.New(REDUCE_CALL + ERROR_SEPARATOR + strconv.Itoa(reducerLogicId))
 			errs = append(errs, e)
-			CheckErr(e, false, "REDUCE ERRD")
 		}
 	}
 	//if Config.BACKUP_MASTER{
@@ -497,10 +532,7 @@ func (m *MapperIstanceStateInternal) Map_parse_builtin_quick_route(rawChunkId in
 	m.ChunkID = rawChunkId
 	m.WorkerChunks.Mutex.Lock()
 	rawChunk := m.WorkerChunks.Chunks[rawChunkId]
-	if len(rawChunk) < 5 {
-		println(string(rawChunk))
-		panic("fetched invalid chunk" + string(rawChunk))
-	}
+
 	m.WorkerChunks.Mutex.Unlock()
 	//m.IntermediateTokens = make(map[string]int)
 	destinationsCosts := Map2ReduceRouteCost{
@@ -515,9 +547,6 @@ func (m *MapperIstanceStateInternal) Map_parse_builtin_quick_route(rawChunkId in
 	//words:= strings.Fields(rawChunck)	//parse Go builtin by spaces
 	for _, word := range words {
 		m.IntermediateTokens[word]++
-	}
-	if len(m.IntermediateTokens) < 5 {
-		panic("intermdiate token error:" + rawChunk) //TODO DEBUG
 	}
 	//building reverse map for smart activations of ReducerNodes
 	var destReducerNodeId int
@@ -592,7 +621,7 @@ func (master *MasterRpc) ReturnReduce(AggregatedTokensReducer ReduceRet, VoidRep
 	_, alreadyReturnedReducer := (*master).ReducersReturned[AggregatedTokensReducer.ReducerLogicID]
 	if alreadyReturnedReducer {
 		master.Mutex.Unlock()
-		println("reducer returned twice, ignoring data of size:", len(AggregatedTokensReducer.AggregatedTokens))
+		//println("reducer returned twice, ignoring data of size:", len(AggregatedTokensReducer.AggregatedTokens))
 		return nil
 	}
 	for k, v := range AggregatedTokensReducer.AggregatedTokens {

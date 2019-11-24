@@ -98,7 +98,7 @@ func loadChunksToChunkStorage(chunks []CHUNK, waitGroup **sync.WaitGroup, contro
 	chunkIDS := BuildSequentialIDsListUpTo(len(chunks))
 	errs := make([]error, 0)
 	errsMutex := sync.Mutex{}
-	println("concurrent S3 UPLOAD OF ", len(chunks), "CHUNKS start")
+	println("concurrent S3 UPLOAD OF ", len(chunks), "CHUNKS")
 	startTime := time.Now()
 	for i, _ := range chunks {
 		keyChunk := strconv.Itoa(i)
@@ -118,7 +118,7 @@ func loadChunksToChunkStorage(chunks []CHUNK, waitGroup **sync.WaitGroup, contro
 	stopTime := time.Now()
 	(*control).MasterData.ChunkIDS = chunkIDS
 	(*waitGroup).Done()
-	println("loaded: ", len(chunks), " approx in : ", stopTime.Sub(startTime).String())
+	println("loaded: ", len(chunks), "CHUNKS approx in: ", stopTime.Sub(startTime).String())
 }
 
 func BuildSequentialIDsListUpTo(maxID int) []int {

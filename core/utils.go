@@ -72,6 +72,7 @@ type Configuration struct {
 	PING_RETRY                            int
 	WORKERS_REGISTER_TIMEOUT              int64
 	WORKER_DIAL_TIMEOUT                   int64
+	RESET_REDUCER_RESPAWNED_MASTER        bool
 }
 
 func (config *Configuration) printFields() {
@@ -447,8 +448,8 @@ func PingHeartBitRcv(port int, stateChan chan uint32) (net.Conn, error) {
 			/// take always last state avaible on channel
 			for len(stateChan) > 0 && state != ENDED {
 				state = <-stateChan //unblocking chan read
-				println("readed state : ", state)
-			} //TODO CHECK GIT DIFF IF SOMEHOW ERRORS ....
+				//println("readed state : ", state)
+			}
 
 			_, err = conn.WriteToUDP([]byte{byte(state)}, remoteAddr) //PONG
 			if CheckErr(err, false, "udp write err") {

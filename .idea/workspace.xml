@@ -4,10 +4,11 @@
     <list default="true" id="959bba11-67b5-49b9-be5e-31338d05472f" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/configurations/config.json" beforeDir="false" afterPath="$PROJECT_DIR$/configurations/config.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/initDistribuitedVersion.go" beforeDir="false" afterPath="$PROJECT_DIR$/core/initDistribuitedVersion.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/map_reduce.go" beforeDir="false" afterPath="$PROJECT_DIR$/core/map_reduce.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/core/utils.go" beforeDir="false" afterPath="$PROJECT_DIR$/core/utils.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/master/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/master/main.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/outTokens.list" beforeDir="false" afterPath="$PROJECT_DIR$/outTokens.list" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/test/genSequentiallyTokens.go" beforeDir="false" afterPath="$PROJECT_DIR$/test/genSequentiallyTokens.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/out/worker" beforeDir="false" afterPath="$PROJECT_DIR$/out/worker" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -34,39 +35,146 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file pinned="false" current-in-tab="false">
+      <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/core/map_reduce.go">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="988">
-              <caret line="95" column="45" selection-start-line="95" selection-start-column="45" selection-end-line="95" selection-end-column="45" />
+            <state relative-caret-position="357">
+              <caret line="135" column="35" lean-forward="true" selection-start-line="135" selection-start-column="35" selection-end-line="135" selection-end-column="35" />
               <folding>
-                <element signature="n#!!block;n#RecoveryReduceResult#0" />
+                <element signature="e#188#218#0" />
+                <element signature="n#!!block;n#Get_chunk_ids#0" />
+                <element signature="e#451#763#0" />
+                <element signature="e#1046#1523#0" />
+                <element signature="e#1048#1090#0" />
+                <element signature="e#1215#1294#0" />
+                <element signature="e#1300#1520#0" />
+                <element signature="e#1592#1626#0" />
+                <element signature="e#1719#1771#0" />
+                <element signature="e#1737#1768#0" />
+                <element signature="e#1815#1936#0" />
+                <element signature="n#!!block;n#downloadChunk#0" />
+                <element signature="e#2111#2355#0" />
+                <element signature="e#2588#2652#0" />
+                <element signature="e#2802#2842#0" />
+                <element signature="e#3131#3165#0" />
+                <element signature="e#3691#3744#0" />
+                <element signature="e#4120#4314#0" />
+                <element signature="e#4158#4311#0" />
+                <element signature="e#4191#4202#0" />
+                <element signature="e#4633#4650#0" />
+                <element signature="e#4929#4944#0" />
+                <element signature="n#!!block;n#Reduce#0" />
+                <element signature="e#5601#5921#0" />
+                <element signature="e#6290#6320#0" />
+                <element signature="e#6418#6503#0" />
+                <element signature="e#6424#6973#0" />
+                <element signature="e#6466#6634#0" />
+                <element signature="e#6668#6866#0" />
+                <element signature="e#6872#6970#0" />
+                <element signature="e#7003#7069#0" />
+                <element signature="e#7231#7334#0" />
+                <element signature="e#7438#7566#0" />
+                <element signature="e#7472#7563#0" />
+                <element signature="e#7755#8118#0" />
+                <element signature="e#7865#7908#0" />
+                <element signature="e#8191#8479#0" />
+                <element signature="e#8485#8598#0" />
+                <element signature="n#!!block;n#ExitWorker#0" />
+                <element signature="e#8447#8657#0" />
+                <element signature="e#8681#8845#0" />
+                <element signature="e#8865#8979#0" />
+                <element signature="n#!!block;n#AssignMaps#0" />
+                <element signature="e#9100#9451#0" />
+                <element signature="e#9661#9820#0" />
+                <element signature="e#9758#9817#0" />
+                <element signature="e#9826#10300#0" />
+                <element signature="e#9867#10297#0" />
+                <element signature="e#10042#10236#0" />
+                <element signature="e#10242#10293#0" />
+                <element signature="e#10535#10925#0" />
+                <element signature="e#10578#10716#0" />
+                <element signature="e#10967#11093#0" />
+                <element signature="e#11181#11547#0" />
+                <element signature="e#11254#11297#0" />
+                <element signature="e#11731#11866#0" />
+                <element signature="e#11868#11963#0" />
+                <element signature="e#12040#12066#0" />
+                <element signature="n#!!block;n#RecoveryMapRes#0" />
+                <element signature="e#12403#12529#0" />
+                <element signature="e#12694#13767#0" />
+                <element signature="e#12795#13557#0" />
+                <element signature="e#12904#12969#0" />
+                <element signature="e#13060#13122#0" />
+                <element signature="e#13165#13307#0" />
+                <element signature="e#13792#13953#0" />
+                <element signature="e#15005#15110#0" />
+                <element signature="n#!!block;n#postFailReduce#0" />
+                <element signature="e#15200#15305#0" />
+                <element signature="e#15629#15813#0" />
+                <element signature="e#16060#16323#0" />
+                <element signature="e#16161#16320#0" />
+                <element signature="e#16276#16304#0" />
+                <element signature="e#16372#16661#0" />
+                <element signature="e#16408#16658#0" />
+                <element signature="e#16413#16529#0" />
+                <element signature="e#16445#16524#0" />
+                <element signature="e#16554#16654#0" />
+                <element signature="n#!!block;n#ReducersCollocations#0" />
+                <element signature="e#16785#17223#0" />
+                <element signature="e#17381#17738#0" />
+                <element signature="e#17522#17640#0" />
+                <element signature="e#17646#17735#0" />
+                <element signature="e#17751#17798#0" />
+                <element signature="e#17830#18038#0" />
+                <element signature="e#17963#18022#0" />
+                <element signature="e#18456#18953#0" />
+                <element signature="e#18608#18625#0" />
+                <element signature="e#18697#18793#0" />
+                <element signature="e#18877#18912#0" />
+                <element signature="e#19058#19372#0" />
+                <element signature="e#19062#19178#0" />
+                <element signature="e#19092#19174#0" />
+                <element signature="e#19202#19369#0" />
+                <element signature="e#19374#19400#0" />
+                <element signature="e#19574#19630#0" />
                 <element signature="n#!!block;n#Map_parse_builtin_quick_route#0" />
+                <element signature="e#19812#20312#0" />
+                <element signature="e#20639#20765#0" />
+                <element signature="e#20808#20842#0" />
+                <element signature="e#20893#20921#0" />
+                <element signature="e#21016#21051#0" />
+                <element signature="e#21280#21493#0" />
+                <element signature="e#21431#21437#0" />
                 <element signature="n#!!block;n#Map_quick_route_reducers#0" />
+                <element signature="e#21750#22023#0" />
+                <element signature="e#22052#22064#0" />
+                <element signature="e#22520#22579#0" />
+                <element signature="e#22661#22897#0" />
+                <element signature="e#22821#22827#0" />
+                <element signature="e#22899#22914#0" />
+                <element signature="e#23154#23327#0" />
+                <element signature="e#23343#23408#0" />
+                <element signature="e#23476#23601#0" />
                 <element signature="n#!!block;n#ReturnReduce#0" />
+                <element signature="e#23845#23993#0" />
+                <element signature="e#24054#24121#0" />
+                <element signature="e#24111#24117#0" />
                 <element signature="n#!!block;n#Map_parse_builtin#0" />
+                <element signature="e#24571#24605#0" />
+                <element signature="e#24649#24677#0" />
+                <element signature="e#24772#24796#0" />
               </folding>
             </state>
           </provider>
         </entry>
       </file>
       <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/scripts/spinner.sh">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="442">
-              <caret line="85" column="57" selection-start-line="85" selection-start-column="57" selection-end-line="85" selection-end-column="57" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/core/utils.go">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="177">
-              <caret line="685" selection-start-line="685" selection-end-line="685" />
+            <state relative-caret-position="160">
+              <caret line="74" column="46" selection-start-line="74" selection-start-column="46" selection-end-line="74" selection-end-column="46" />
               <folding>
                 <element signature="e#346#374#0" />
-                <element signature="e#394#2405#0" />
                 <element signature="e#2450#2482#0" />
                 <element signature="e#2561#2711#0" />
                 <element signature="e#2757#2788#0" />
@@ -97,16 +205,42 @@
         </entry>
       </file>
       <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/worker/main.go">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="186">
+              <caret line="56" selection-start-line="56" selection-end-line="56" />
+              <folding>
+                <element signature="n#!!block;n#waitEndMR#0" />
+                <element signature="n#!!block;n#waitWorkersEnd#0" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/core/workerStruct.go">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="194">
+              <caret line="65" column="6" selection-start-line="65" selection-start-column="6" selection-end-line="65" selection-end-column="6" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/master/main.go">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="-238">
-              <caret line="209" column="5" lean-forward="true" selection-start-line="209" selection-start-column="5" selection-end-line="209" selection-end-column="5" />
+            <state relative-caret-position="153">
+              <caret line="302" column="14" lean-forward="true" selection-start-line="302" selection-start-column="14" selection-end-line="302" selection-end-column="14" />
               <folding>
                 <element signature="e#169#1900#0" />
+                <element signature="n#!!block;n#main#1" />
                 <element signature="e#2346#2852#0" />
                 <element signature="e#2348#2394#0" />
+                <element signature="e#3099#3211#0" />
+                <element signature="e#3284#3406#0" />
                 <element signature="e#3458#3722#0" />
                 <element signature="e#3677#3719#0" />
+                <element signature="e#3821#3851#0" />
                 <element signature="e#4149#4201#0" />
                 <element signature="n#!!block;n#filterFoundamentalMapResult#0" />
                 <element signature="e#14414#14497#0" />
@@ -117,12 +251,12 @@
                 <element signature="e#15142#15206#0" />
                 <element signature="e#15313#15404#0" />
                 <element signature="e#15355#15373#0" />
-                <element signature="e#15406#15471#0" />
                 <element signature="n#!!block;n#init_local_version#0" />
                 <element signature="e#15682#15739#0" />
                 <element signature="e#15961#15999#0" />
                 <element signature="n#!!block;n#masterRpcInit#0" />
                 <element signature="e#16266#16446#0" />
+                <element signature="n#!!block;n#assignChunksIDs#0" />
                 <element signature="e#16899#17250#0" />
                 <element signature="e#17273#17290#0" />
                 <element signature="e#17428#17456#0" />
@@ -131,6 +265,7 @@
                 <element signature="e#17675#17728#0" />
                 <element signature="e#18094#18549#0" />
                 <element signature="e#18096#18130#0" />
+                <element signature="e#18607#19396#0" />
                 <element signature="e#18611#18645#0" />
                 <element signature="n#!!block;n#copySlice#0" />
                 <element signature="n#!!block;n#comunicateChunksAssignementToWorkers#0" />
@@ -199,13 +334,20 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/test/genSequentiallyTokens.go">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="374">
-              <caret line="42" column="5" lean-forward="true" selection-start-line="42" selection-start-column="5" selection-end-line="42" selection-end-column="5" />
+            <state relative-caret-position="357">
+              <caret line="41" column="5" selection-start-line="41" selection-start-column="5" selection-end-line="41" selection-end-column="5" />
               <folding>
                 <element signature="e#104#224#0" expanded="true" />
-                <element signature="n#!!block;n#parseTokenFileData#0" />
-                <element signature="n#!!block;n#singleBlockMap#0" />
               </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/master/recovery.go">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="272">
+              <caret line="274" column="30" selection-start-line="274" selection-start-column="30" selection-end-line="274" selection-end-column="30" />
             </state>
           </provider>
         </entry>
@@ -216,28 +358,10 @@
         </entry>
       </file>
       <file pinned="false" current-in-tab="false">
-        <entry file="file:///usr/lib/go-1.11/src/runtime/panic.go">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="11492">
-              <caret line="680" selection-start-line="680" selection-end-line="680" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/core/masterReducersBindings.go">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="867">
-              <caret line="54" column="48" selection-start-line="54" selection-start-column="48" selection-end-line="54" selection-end-column="48" />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/configurations/config.json">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="187">
-              <caret line="11" column="60" selection-start-line="11" selection-start-column="60" selection-end-line="11" selection-end-column="60" />
+            <state relative-caret-position="108">
+              <caret line="23" column="29" selection-start-line="23" selection-start-column="29" selection-end-line="23" selection-end-column="29" />
             </state>
           </provider>
         </entry>
@@ -245,10 +369,9 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/core/initDistribuitedVersion.go">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="289">
-              <caret line="63" column="17" selection-start-line="63" selection-start-column="17" selection-end-line="63" selection-end-column="17" />
+            <state relative-caret-position="1843">
+              <caret line="197" column="23" selection-start-line="197" selection-start-column="23" selection-end-line="197" selection-end-column="23" />
               <folding>
-                <element signature="n#!!block;n#loadChunksToChunkStorage#0" />
                 <element signature="n#!!block;n#BuildSequentialIDsListUpTo#0" />
                 <element signature="n#!!block;n#CheckAndSolveInitErr#0" />
                 <element signature="n#!!block;n#RegisterToMaster#0" />
@@ -271,13 +394,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>&quot;udp&quot;</find>
-      <find>PING_CONN_TYPE</find>
-      <find>tcp</find>
-      <find>Activate</find>
-      <find>ActivateNewReducer</find>
-      <find>gob</find>
-      <find>error</find>
       <find>ENCODE ERR</find>
       <find>type not registered</find>
       <find>WORKERS_REGISTER_TIMEOUT</find>
@@ -301,6 +417,13 @@
       <find>time.Millisecond * (time.Duration(core.Config.PING_TIMEOUT_MILLISECONDS))</find>
       <find>replication factor</find>
       <find>BEFORE</find>
+      <find>REDUCE ERRD</find>
+      <find>readed state</find>
+      <find>panic</find>
+      <find>CONCURRENT S3</find>
+      <find>reducer returne</find>
+      <find>REPLAY</find>
+      <find>RESET_REDUCER_RESPAWNED_MASTER</find>
     </findStrings>
     <replaceStrings>
       <replace>core.Config</replace>
@@ -351,12 +474,13 @@
         <option value="$PROJECT_DIR$/worker/main.go" />
         <option value="$PROJECT_DIR$/core/masterReducersBindings.go" />
         <option value="$PROJECT_DIR$/master/recovery.go" />
-        <option value="$PROJECT_DIR$/core/map_reduce.go" />
+        <option value="$PROJECT_DIR$/test/genSequentiallyTokens.go" />
         <option value="$PROJECT_DIR$/core/initDistribuitedVersion.go" />
+        <option value="$PROJECT_DIR$/core/workerStruct.go" />
+        <option value="$PROJECT_DIR$/master/main.go" />
         <option value="$PROJECT_DIR$/configurations/config.json" />
         <option value="$PROJECT_DIR$/core/utils.go" />
-        <option value="$PROJECT_DIR$/test/genSequentiallyTokens.go" />
-        <option value="$PROJECT_DIR$/master/main.go" />
+        <option value="$PROJECT_DIR$/core/map_reduce.go" />
       </list>
     </option>
   </component>
@@ -461,7 +585,7 @@
       </list>
     </option>
   </component>
-  <component name="RunManager" selected="Go Build.go build genSequentiallyTokens.go">
+  <component name="RunManager" selected="Go Build.worker">
     <configuration default="true" type="GoApplicationRunConfiguration" factoryName="Go Application">
       <module name="mapreducego" />
       <working_directory value="$PROJECT_DIR$/" />
@@ -550,13 +674,13 @@
       <method v="2" />
     </configuration>
     <list>
-      <item itemvalue="Go Build.master" />
-      <item itemvalue="Go Build.masterReplica" />
-      <item itemvalue="Go Build.worker" />
-      <item itemvalue="Go Build.wrk2" />
+      <item itemvalue="Go Build.go build genSequentiallyTokens.go" />
       <item itemvalue="Go Build.go build main.go" />
       <item itemvalue="Go Build.go build s3_interact.go" />
-      <item itemvalue="Go Build.go build genSequentiallyTokens.go" />
+      <item itemvalue="Go Build.masterReplica" />
+      <item itemvalue="Go Build.master" />
+      <item itemvalue="Go Build.worker" />
+      <item itemvalue="Go Build.wrk2" />
     </list>
     <recent_temporary>
       <list>
@@ -613,7 +737,7 @@
       <window_info anchor="bottom" x="3050" y="95" width="1920" height="971" id="Debug" order="3" type="WINDOWED" weight="0.45157894" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
-      <window_info anchor="bottom" id="TODO" order="6" />
+      <window_info anchor="bottom" id="TODO" order="6" weight="0.32988507" />
       <window_info anchor="bottom" id="Docker" order="7" show_stripe_button="false" />
       <window_info anchor="bottom" id="Database Changes" order="8" />
       <window_info active="true" anchor="bottom" id="Version Control" order="9" visible="true" weight="0.3275862" />
@@ -702,7 +826,9 @@
     <MESSAGE value="fully tested on ec2 for worker fault tollerant&#10;  slightly modified fault tollerant logic for series of rare bug on some unfotunate fault conditions&#10; seem to work ALMOST EVERY TIME on ec2 worker randmized crushed with 4 worker to crush (with random extraction)&#10;    un tested after reducers replacement before map recovery ( if map fail -&gt; reduceToRedo lost --&gt; so old bindings will remain unless fails worker hosting binded reducers)&#10;    &#10;MASTER FAULT TOLLERANT slightly changed -&gt; robstness on map recovery (missing chunk may exisit on random scheduled master dead)&#10;                                             missing chunk will be re downloaded , mapped (concurrently also!) and output mereged&#10;&#10;pre commit before new control of TIMEOUT_RPC errors on MAP -&gt; timeoutted map has to be chekked if everything has been processed on mappers hosted in workers&#10;    similar on reduce" />
     <MESSAGE value="Heavily tested on ec2 instances -&gt; default config with relay server&#10; fault tollerance with 4 fail but realiable master seem to work well&#10; &#10;slightly changed fault tollerant logic for bug free&#10;&#10;LAST TODO:&#10; MASTER FAULT TOLLERANT TEST&#10; CODE CLEANUP&#10; REL END &#10; NjYxD &amp; prj Switch&#10; &#10; Hopefully last week !&#10; andysnake" />
     <MESSAGE value="Heavily tested on ec2 instances with master and worker fault tollerant simulation changing master fault time range&#10;master checkpointing changed similarly to WAL so each op will be checked on replica even if hasn't been done &#10;sligtly change in fault tollerant logic and some little details causing bug with master fault  &#10;Hopefully That's all folks" />
-    <option name="LAST_COMMIT_MESSAGE" value="Heavily tested on ec2 instances with master and worker fault tollerant simulation changing master fault time range&#10;master checkpointing changed similarly to WAL so each op will be checked on replica even if hasn't been done &#10;sligtly change in fault tollerant logic and some little details causing bug with master fault  &#10;Hopefully That's all folks" />
+    <MESSAGE value="argv default changed" />
+    <MESSAGE value="configurable robstness added, rested with different worker topology and larger input&#10;last code commit&#10;:)" />
+    <option name="LAST_COMMIT_MESSAGE" value="configurable robstness added, rested with different worker topology and larger input&#10;last code commit&#10;:)" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -714,12 +840,12 @@
         </line-breakpoint>
         <line-breakpoint type="DlvLineBreakpoint">
           <url>file://$PROJECT_DIR$/core/utils.go</url>
-          <line>829</line>
+          <line>830</line>
           <option name="timeStamp" value="266" />
         </line-breakpoint>
         <line-breakpoint type="DlvLineBreakpoint">
           <url>file://$PROJECT_DIR$/master/main.go</url>
-          <line>234</line>
+          <line>233</line>
           <option name="timeStamp" value="270" />
         </line-breakpoint>
         <line-breakpoint type="DlvLineBreakpoint">
@@ -739,12 +865,12 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" type="DlvLineBreakpoint">
           <url>file://$PROJECT_DIR$/test/genSequentiallyTokens.go</url>
-          <line>74</line>
+          <line>137</line>
           <option name="timeStamp" value="290" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="DlvLineBreakpoint">
           <url>file://$PROJECT_DIR$/test/genSequentiallyTokens.go</url>
-          <line>97</line>
+          <line>160</line>
           <option name="timeStamp" value="291" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="DlvLineBreakpoint">
@@ -1075,18 +1201,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/worker/main.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="677">
-          <caret line="79" selection-start-line="79" selection-end-line="79" />
-          <folding>
-            <element signature="n#!!block;n#waitEndMR#0" />
-            <element signature="n#!!block;n#waitWorkersEnd#0" />
-            <element signature="e#5448#7420#0" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/core/workersUtils.go">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="493">
@@ -1105,20 +1219,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="340">
           <caret line="24" column="5" selection-start-line="24" selection-start-column="5" selection-end-line="24" selection-end-column="5" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/core/workerStruct.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="2040">
-          <caret line="128" column="13" selection-start-line="128" selection-start-column="4" selection-end-line="128" selection-end-column="13" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/master/recovery.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="7344">
-          <caret line="443" column="70" selection-start-line="443" selection-start-column="70" selection-end-line="443" selection-end-column="70" />
         </state>
       </provider>
     </entry>
@@ -1143,12 +1243,42 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/test/map_red_test.go">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/test/genSequentiallyTokens.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="357">
+          <caret line="41" column="5" selection-start-line="41" selection-start-column="5" selection-end-line="41" selection-end-column="5" />
+          <folding>
+            <element signature="e#104#224#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/master/recovery.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="272">
+          <caret line="274" column="30" selection-start-line="274" selection-start-column="30" selection-end-line="274" selection-end-column="30" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/worker/main.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="186">
+          <caret line="56" selection-start-line="56" selection-end-line="56" />
+          <folding>
+            <element signature="n#!!block;n#waitEndMR#0" />
+            <element signature="n#!!block;n#waitWorkersEnd#0" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/core/initDistribuitedVersion.go">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="289">
-          <caret line="63" column="17" selection-start-line="63" selection-start-column="17" selection-end-line="63" selection-end-column="17" />
+        <state relative-caret-position="1843">
+          <caret line="197" column="23" selection-start-line="197" selection-start-column="23" selection-end-line="197" selection-end-column="23" />
           <folding>
-            <element signature="n#!!block;n#loadChunksToChunkStorage#0" />
             <element signature="n#!!block;n#BuildSequentialIDsListUpTo#0" />
             <element signature="n#!!block;n#CheckAndSolveInitErr#0" />
             <element signature="n#!!block;n#RegisterToMaster#0" />
@@ -1158,52 +1288,27 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/test/map_red_test.go">
-      <provider selected="true" editor-type-id="text-editor" />
-    </entry>
-    <entry file="file://$PROJECT_DIR$/core/map_reduce.go">
+    <entry file="file://$PROJECT_DIR$/core/workerStruct.go">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="988">
-          <caret line="95" column="45" selection-start-line="95" selection-start-column="45" selection-end-line="95" selection-end-column="45" />
-          <folding>
-            <element signature="n#!!block;n#RecoveryReduceResult#0" />
-            <element signature="n#!!block;n#Map_parse_builtin_quick_route#0" />
-            <element signature="n#!!block;n#Map_quick_route_reducers#0" />
-            <element signature="n#!!block;n#ReturnReduce#0" />
-            <element signature="n#!!block;n#Map_parse_builtin#0" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/configurations/config.json">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="187">
-          <caret line="11" column="60" selection-start-line="11" selection-start-column="60" selection-end-line="11" selection-end-column="60" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/test/genSequentiallyTokens.go">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="374">
-          <caret line="42" column="5" lean-forward="true" selection-start-line="42" selection-start-column="5" selection-end-line="42" selection-end-column="5" />
-          <folding>
-            <element signature="e#104#224#0" expanded="true" />
-            <element signature="n#!!block;n#parseTokenFileData#0" />
-            <element signature="n#!!block;n#singleBlockMap#0" />
-          </folding>
+        <state relative-caret-position="194">
+          <caret line="65" column="6" selection-start-line="65" selection-start-column="6" selection-end-line="65" selection-end-column="6" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/master/main.go">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-238">
-          <caret line="209" column="5" lean-forward="true" selection-start-line="209" selection-start-column="5" selection-end-line="209" selection-end-column="5" />
+        <state relative-caret-position="153">
+          <caret line="302" column="14" lean-forward="true" selection-start-line="302" selection-start-column="14" selection-end-line="302" selection-end-column="14" />
           <folding>
             <element signature="e#169#1900#0" />
+            <element signature="n#!!block;n#main#1" />
             <element signature="e#2346#2852#0" />
             <element signature="e#2348#2394#0" />
+            <element signature="e#3099#3211#0" />
+            <element signature="e#3284#3406#0" />
             <element signature="e#3458#3722#0" />
             <element signature="e#3677#3719#0" />
+            <element signature="e#3821#3851#0" />
             <element signature="e#4149#4201#0" />
             <element signature="n#!!block;n#filterFoundamentalMapResult#0" />
             <element signature="e#14414#14497#0" />
@@ -1214,12 +1319,12 @@
             <element signature="e#15142#15206#0" />
             <element signature="e#15313#15404#0" />
             <element signature="e#15355#15373#0" />
-            <element signature="e#15406#15471#0" />
             <element signature="n#!!block;n#init_local_version#0" />
             <element signature="e#15682#15739#0" />
             <element signature="e#15961#15999#0" />
             <element signature="n#!!block;n#masterRpcInit#0" />
             <element signature="e#16266#16446#0" />
+            <element signature="n#!!block;n#assignChunksIDs#0" />
             <element signature="e#16899#17250#0" />
             <element signature="e#17273#17290#0" />
             <element signature="e#17428#17456#0" />
@@ -1228,6 +1333,7 @@
             <element signature="e#17675#17728#0" />
             <element signature="e#18094#18549#0" />
             <element signature="e#18096#18130#0" />
+            <element signature="e#18607#19396#0" />
             <element signature="e#18611#18645#0" />
             <element signature="n#!!block;n#copySlice#0" />
             <element signature="n#!!block;n#comunicateChunksAssignementToWorkers#0" />
@@ -1292,13 +1398,19 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/configurations/config.json">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="108">
+          <caret line="23" column="29" selection-start-line="23" selection-start-column="29" selection-end-line="23" selection-end-column="29" />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/core/utils.go">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="177">
-          <caret line="685" selection-start-line="685" selection-end-line="685" />
+        <state relative-caret-position="160">
+          <caret line="74" column="46" selection-start-line="74" selection-start-column="46" selection-end-line="74" selection-end-column="46" />
           <folding>
             <element signature="e#346#374#0" />
-            <element signature="e#394#2405#0" />
             <element signature="e#2450#2482#0" />
             <element signature="e#2561#2711#0" />
             <element signature="e#2757#2788#0" />
@@ -1323,6 +1435,137 @@
             <element signature="e#6610#6656#0" />
             <element signature="e#6731#6861#0" />
             <element signature="e#6768#6857#0" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/core/map_reduce.go">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="357">
+          <caret line="135" column="35" lean-forward="true" selection-start-line="135" selection-start-column="35" selection-end-line="135" selection-end-column="35" />
+          <folding>
+            <element signature="e#188#218#0" />
+            <element signature="n#!!block;n#Get_chunk_ids#0" />
+            <element signature="e#451#763#0" />
+            <element signature="e#1046#1523#0" />
+            <element signature="e#1048#1090#0" />
+            <element signature="e#1215#1294#0" />
+            <element signature="e#1300#1520#0" />
+            <element signature="e#1592#1626#0" />
+            <element signature="e#1719#1771#0" />
+            <element signature="e#1737#1768#0" />
+            <element signature="e#1815#1936#0" />
+            <element signature="n#!!block;n#downloadChunk#0" />
+            <element signature="e#2111#2355#0" />
+            <element signature="e#2588#2652#0" />
+            <element signature="e#2802#2842#0" />
+            <element signature="e#3131#3165#0" />
+            <element signature="e#3691#3744#0" />
+            <element signature="e#4120#4314#0" />
+            <element signature="e#4158#4311#0" />
+            <element signature="e#4191#4202#0" />
+            <element signature="e#4633#4650#0" />
+            <element signature="e#4929#4944#0" />
+            <element signature="n#!!block;n#Reduce#0" />
+            <element signature="e#5601#5921#0" />
+            <element signature="e#6290#6320#0" />
+            <element signature="e#6418#6503#0" />
+            <element signature="e#6424#6973#0" />
+            <element signature="e#6466#6634#0" />
+            <element signature="e#6668#6866#0" />
+            <element signature="e#6872#6970#0" />
+            <element signature="e#7003#7069#0" />
+            <element signature="e#7231#7334#0" />
+            <element signature="e#7438#7566#0" />
+            <element signature="e#7472#7563#0" />
+            <element signature="e#7755#8118#0" />
+            <element signature="e#7865#7908#0" />
+            <element signature="e#8191#8479#0" />
+            <element signature="e#8485#8598#0" />
+            <element signature="n#!!block;n#ExitWorker#0" />
+            <element signature="e#8447#8657#0" />
+            <element signature="e#8681#8845#0" />
+            <element signature="e#8865#8979#0" />
+            <element signature="n#!!block;n#AssignMaps#0" />
+            <element signature="e#9100#9451#0" />
+            <element signature="e#9661#9820#0" />
+            <element signature="e#9758#9817#0" />
+            <element signature="e#9826#10300#0" />
+            <element signature="e#9867#10297#0" />
+            <element signature="e#10042#10236#0" />
+            <element signature="e#10242#10293#0" />
+            <element signature="e#10535#10925#0" />
+            <element signature="e#10578#10716#0" />
+            <element signature="e#10967#11093#0" />
+            <element signature="e#11181#11547#0" />
+            <element signature="e#11254#11297#0" />
+            <element signature="e#11731#11866#0" />
+            <element signature="e#11868#11963#0" />
+            <element signature="e#12040#12066#0" />
+            <element signature="n#!!block;n#RecoveryMapRes#0" />
+            <element signature="e#12403#12529#0" />
+            <element signature="e#12694#13767#0" />
+            <element signature="e#12795#13557#0" />
+            <element signature="e#12904#12969#0" />
+            <element signature="e#13060#13122#0" />
+            <element signature="e#13165#13307#0" />
+            <element signature="e#13792#13953#0" />
+            <element signature="e#15005#15110#0" />
+            <element signature="n#!!block;n#postFailReduce#0" />
+            <element signature="e#15200#15305#0" />
+            <element signature="e#15629#15813#0" />
+            <element signature="e#16060#16323#0" />
+            <element signature="e#16161#16320#0" />
+            <element signature="e#16276#16304#0" />
+            <element signature="e#16372#16661#0" />
+            <element signature="e#16408#16658#0" />
+            <element signature="e#16413#16529#0" />
+            <element signature="e#16445#16524#0" />
+            <element signature="e#16554#16654#0" />
+            <element signature="n#!!block;n#ReducersCollocations#0" />
+            <element signature="e#16785#17223#0" />
+            <element signature="e#17381#17738#0" />
+            <element signature="e#17522#17640#0" />
+            <element signature="e#17646#17735#0" />
+            <element signature="e#17751#17798#0" />
+            <element signature="e#17830#18038#0" />
+            <element signature="e#17963#18022#0" />
+            <element signature="e#18456#18953#0" />
+            <element signature="e#18608#18625#0" />
+            <element signature="e#18697#18793#0" />
+            <element signature="e#18877#18912#0" />
+            <element signature="e#19058#19372#0" />
+            <element signature="e#19062#19178#0" />
+            <element signature="e#19092#19174#0" />
+            <element signature="e#19202#19369#0" />
+            <element signature="e#19374#19400#0" />
+            <element signature="e#19574#19630#0" />
+            <element signature="n#!!block;n#Map_parse_builtin_quick_route#0" />
+            <element signature="e#19812#20312#0" />
+            <element signature="e#20639#20765#0" />
+            <element signature="e#20808#20842#0" />
+            <element signature="e#20893#20921#0" />
+            <element signature="e#21016#21051#0" />
+            <element signature="e#21280#21493#0" />
+            <element signature="e#21431#21437#0" />
+            <element signature="n#!!block;n#Map_quick_route_reducers#0" />
+            <element signature="e#21750#22023#0" />
+            <element signature="e#22052#22064#0" />
+            <element signature="e#22520#22579#0" />
+            <element signature="e#22661#22897#0" />
+            <element signature="e#22821#22827#0" />
+            <element signature="e#22899#22914#0" />
+            <element signature="e#23154#23327#0" />
+            <element signature="e#23343#23408#0" />
+            <element signature="e#23476#23601#0" />
+            <element signature="n#!!block;n#ReturnReduce#0" />
+            <element signature="e#23845#23993#0" />
+            <element signature="e#24054#24121#0" />
+            <element signature="e#24111#24117#0" />
+            <element signature="n#!!block;n#Map_parse_builtin#0" />
+            <element signature="e#24571#24605#0" />
+            <element signature="e#24649#24677#0" />
+            <element signature="e#24772#24796#0" />
           </folding>
         </state>
       </provider>

@@ -179,7 +179,6 @@ checkMap:
 			}
 			killAll(&masterControl.Workers)
 			println("NO RETRIES LEFT ...")
-			panic("")
 			os.Exit(43)
 		}
 	}
@@ -192,7 +191,7 @@ locality_aware_link_reduce:
 		fails := RecoveryReduceResults(masterControl)
 		if !fails {
 			goto finalAggreagate
-		} else { //unkown previous assignement result, entering in recovery logic will automatically show missed jobs
+		} else if !core.Config.RESET_REDUCER_RESPAWNED_MASTER { //unkown previous assignement result, entering in recovery logic will automatically show missed jobs
 			errs = make([]error, 0, 1) //set fake error to enter to recovery logic
 			errs = append(errs, errors.New(core.ERR_TIMEOUT_RPC))
 			reduceCallTriggered = true //for safety set mappers to operate in reduce postFailReduce mode <- it's unknown if some reduce call has been triggered
@@ -257,7 +256,6 @@ checkReduce:
 				}
 				killAll(&masterControl.Workers)
 				println("NO RETRIES LEFT ...")
-				panic("")
 				os.Exit(43)
 			}
 		}
@@ -276,7 +274,6 @@ checkReduce:
 			}
 			killAll(&masterControl.Workers)
 			println("NO RETRIES LEFT ...")
-			panic("")
 			os.Exit(43)
 		}
 	} //checkpoint avoided here because of reduce link comunication return when mappers already called REDUCE
@@ -333,13 +330,11 @@ func checkMapRes(control *core.MASTER_CONTROL) {
 	for _, value := range allChunksAssigned {
 		_, BUG := alreadySeen[value]
 		if BUG {
-			panic("")
+			os.Exit(43)
 		}
 		alreadySeen[value] = true
 	}
-	//if len(allChunksAssigned) != len(control.MasterData.ChunkIDS) {
-	//	panic("WTF")
-	//}
+
 }
 
 func init_local_version(control *core.MASTER_CONTROL) {
